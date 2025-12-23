@@ -15,6 +15,8 @@ inductive Entity (c : Component) where
 | withName : String -> Entity c
 deriving DecidableEq, Repr
 
+def getComponent {c : Component} (_ : Entity c) : Component := c
+
 def defineEntity (c : Component) :
  String -> Entity c :=
   fun s => Entity.withName s
@@ -49,19 +51,38 @@ notation s " :: " "[" v "]" " ⊸ " e => defineCollectionValueField e v s
 notation s " :: " f " ⊸ " e => defineSingleRelationField e f s
 notation s " :: " "[" f "]" " ⊸ " e => defineCollectionRelationField e f s
 
-def ComponentEntities := Σ (c : Component), Entity c deriving Repr
 
+def AbstractEntity := Σ (c : Component), Entity c deriving DecidableEq, Repr
 
-def ComponentEntitiesStructure := Σ (c : Component), (e : Entity c) -> Finset (Field e)
+def EntityFields (c : Component) := Σ (e : Entity c), List (Field e) deriving DecidableEq, Repr
 
-instance {c : Component} : CoeOut (Entity c)  ComponentEntities where
-  coe := fun e => ⟨ c, e ⟩
+def fieldToEntityFields {c : Component} (e : Entity c) (f : Field e) : EntityFields c :=
+  ⟨ e, [f] ⟩
 
---
+def ComponentBundle := Σ (c : Component), EntityFields c deriving DecidableEq, Repr
+
+instance {c : Component} : CoeOut (Entity c) AbstractEntity where
+  coe e := ⟨ c, e ⟩
+
+instance {c : Component} : CoeOut (EntityFields c)  ComponentBundle where
+  coe e := ⟨ c, e ⟩
+
+instance {c : Component} {e : Entity c} : CoeOut (Field e) ComponentBundle where
+  coe f := ⟨ c, fieldToEntityFields e f ⟩
+
+def fieldMatchBuild (l : List (List (ComponentBundle))) :
+ (c : Component) -> List (EntityFields c) :=
+  fun c =>
+    l.flatten.filterMap (fun ⟨ found, compEnt ⟩ =>
+                          if h : c = found then
+                          some (h ▸ compEnt)
+                          else
+                          none)
+
 structure System where
-  components : Finset Component
-  entities : List ComponentEntities
-  --fields : ∀ {c: Component}, (e : Entity c) -> Finset (Field e)
+  components : List Component
+  entities : ∀ (c : Component), List (Entity c)
+  fields : ∀ (c : Component), List (EntityFields c)
 
 def meetingComponent := Component.withName "Meeting"
 def identityComponent := Component.withName "Identity"
@@ -70,24 +91,39 @@ def meetingEntity := "Meeting" ⊏ meetingComponent
 def agendaEntity := "Agenda" ⊏ meetingComponent
 def userEntity := "User" ⊏ identityComponent
 
-def allEntities : List ComponentEntities := [ meetingEntity,
+def allEntities : List AbstractEntity := [ meetingEntity,
   agendaEntity,
   userEntity]
 
 
-def meetingEntityFields : Finset (Field meetingEntity) := {
+def allFields : List ComponentBundle := [
   "id" :: ValueType.Numerical ⊸ meetingEntity,
   "author" :: userEntity ⊸ meetingEntity,
-  "agenda" :: agendaEntity ⊸ meetingEntity
-}
-
-def agendaEntityFields : Finset (Field agendaEntity) := {
+  "agenda" :: agendaEntity ⊸ meetingEntity,
   "id" :: ValueType.Numerical ⊸ agendaEntity,
   "participants" :: [userEntity] ⊸ agendaEntity,
   "tags" :: [ValueType.Categorical] ⊸ agendaEntity
-}
+]
 
-def ex : System := {
-  components := {meetingComponent, identityComponent},
-  entities := allEntities
-}
+def ex (inputComponents : List Component)
+ (inputEntities : List AbstractEntity)
+ (inputFields : List ComponentBundle) : System :=
+  {
+  components := inputComponents
+  entities := fun c => if _ : c ∈ inputComponents then inputEntities.filterMap (fun ⟨ fc, fe ⟩  =>
+                                                              if h : fc = c then
+                                                              some (h ▸ fe)
+                                                              else
+                                                              none)
+                                          else []
+  fields := fun c => if _ : c ∈ inputComponents then inputFields.filterMap (fun ⟨ fc , ff ⟩ =>
+                                                                            if h : c = fc then
+                                                                            some (h ▸ ff)
+                                                                            else
+                                                                            none)
+                                                else []
+  }
+
+def conc := ex [meetingComponent, identityComponent] allEntities allFields
+
+#eval (conc.components).map (fun c => (conc.entities c).map (fun e => (⟨c, e⟩ : AbstractEntity)) )
