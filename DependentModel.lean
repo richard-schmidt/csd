@@ -117,13 +117,30 @@ def ex (inputComponents : List Component)
                                                               none)
                                           else []
   fields := fun c => if _ : c ∈ inputComponents then inputFields.filterMap (fun ⟨ fc , ff ⟩ =>
-                                                                            if h : c = fc then
+                                                                            if h : fc = c then
                                                                             some (h ▸ ff)
                                                                             else
                                                                             none)
                                                 else []
   }
 
-def conc := ex [meetingComponent, identityComponent] allEntities allFields
+def toySystem := ex [meetingComponent, identityComponent] allEntities allFields
 
-#eval (conc.components).map (fun c => (conc.entities c).map (fun e => (⟨c, e⟩ : AbstractEntity)) )
+#eval (toySystem.components).map
+  (
+    fun c =>
+      (toySystem.entities c).map
+        (fun e =>
+          (⟨c, e⟩ : AbstractEntity)
+        )
+  )
+
+#eval (toySystem.components).map
+(
+  fun c =>
+    (toySystem.fields c).map
+    (
+      fun ⟨ e, f ⟩  =>
+        (⟨ c, e, f ⟩ : Σ (α : Component), (Σ (ε : Entity α ), (List (Field ε))))
+    )
+)
