@@ -13,9 +13,8 @@ deriving DecidableEq, Repr
 
 inductive Entity (c : Component) where
 | withName : String -> Entity c
+| join : Entity c -> Entity c -> Entity c
 deriving DecidableEq, Repr
-
-def getComponent {c : Component} (_ : Entity c) : Component := c
 
 def defineEntity (c : Component) :
  String -> Entity c :=
@@ -26,8 +25,8 @@ notation s " ⊏ " c => defineEntity c s
 inductive Field {c : Component} (e : Entity c)  where
 | valueSingle : ValueType -> String -> Field e
 | valueCollection : ValueType -> String -> Field e
-| relationSingle : (e' : Entity d) -> String -> Field e
-| relationCollection : (e' : Entity d) -> String -> Field e
+| relationSingle {d : Component} : (e' : Entity d) -> String -> Field e
+| relationCollection {d : Component} : (e' : Entity d) -> String -> Field e
 deriving DecidableEq, Repr
 
 def defineSimpleValueField {c : Component} (e : Entity c) :
@@ -51,6 +50,13 @@ notation s " :: " "[" v "]" " ⊸ " e => defineCollectionValueField e v s
 notation s " :: " f " ⊸ " e => defineSingleRelationField e f s
 notation s " :: " "[" f "]" " ⊸ " e => defineCollectionRelationField e f s
 
+def mapField {c : Component} {e e' : Entity c} : Field e -> Field e' :=
+  fun f =>
+  match f with
+  | Field.valueSingle v s => s :: v ⊸ e'
+  | Field.valueCollection v s => s :: [v] ⊸ e'
+  | Field.relationSingle e'' s => s :: e'' ⊸ e'
+  | Field.relationCollection e'' s => s :: [e''] ⊸ e'
 
 def AbstractEntity := Σ (c : Component), Entity c deriving DecidableEq, Repr
 
@@ -58,6 +64,12 @@ def EntityFields (c : Component) := Σ (e : Entity c), List (Field e) deriving D
 
 def fieldToEntityFields {c : Component} (e : Entity c) (f : Field e) : EntityFields c :=
   ⟨ e, [f] ⟩
+
+def efJoin {c : Component} : EntityFields c -> EntityFields c -> EntityFields c :=
+  fun ef ef' =>
+  match ef, ef' with
+  | ⟨ e, f ⟩, ⟨ e', f' ⟩ => if _ : e = e' then ⟨ e, f ++ (f'.map mapField) ⟩ else
+   let e'' := Entity.join e e'; ⟨ e'', (f.map mapField) ++ (f'.map mapField) ⟩
 
 def ComponentBundle := Σ (c : Component), EntityFields c deriving DecidableEq, Repr
 
@@ -141,6 +153,19 @@ def toySystem := ex [meetingComponent, identityComponent] allEntities allFields
     (toySystem.fields c).map
     (
       fun ⟨ e, f ⟩  =>
-        (⟨ c, e, f ⟩ : Σ (α : Component), (Σ (ε : Entity α ), (List (Field ε))))
+        (⟨ c, e, f ⟩ : Σ (α : Component), EntityFields α)
     )
 )
+
+def compA : Component := Component.withName "A"
+def compB : Component := Component.withName "B"
+def entAa := "a" ⊏ compA
+def entAb := "b" ⊏ compA
+def entBa := "a" ⊏ compB
+def entBb := "b" ⊏ compB
+def f1 := "f1" :: ValueType.Categorical ⊸ entAa
+def f2 := "f2" :: entBa ⊸ entAa
+def f3 := "f3" :: ValueType.Numerical ⊸ entAb
+def f4 := "f4" :: [entBb] ⊸ entAb
+
+#eval efJoin ⟨ entAa, [f1, f2]⟩  ⟨ entAb, [f3, f4] ⟩
