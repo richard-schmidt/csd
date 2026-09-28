@@ -1,0 +1,26 @@
+name = "Categorical"
+version = "0.1.0"
+keywords = ["math"]
+defaultTargets = ["Showcase", "Sketches"]
+
+[leanOptions]
+pp.unicode.fun = true # pretty-prints `fun a ↦ b`
+relaxedAutoImplicit = false
+weak.linter.mathlibStandardSet = true
+maxSynthPendingDepth = 3
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
+rev = "v4.26.0"
+
+# Showcase: finished modules, no sorry. Sketches: drafts that build.
+# Each module has its own namespace; they are built by glob, without a
+# root file importing them all. wip/ and deprecated/ are not built.
+[[lean_lib]]
+name = "Showcase"
+globs = ["Showcase.+"]
+
+[[lean_lib]]
+name = "Sketches"
+globs = ["Sketches.+"]
