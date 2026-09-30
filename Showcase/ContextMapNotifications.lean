@@ -154,6 +154,52 @@ def repriceOrderLine : Endpoint .Orders RepriceOrderLine Bool where
 
 #eval (repriceOrderLine.handle ⟨1, 2, 3⟩).run
 
+structure RefundDifference where
+  orderId   : Nat
+  productId : Nat
+  price     : Nat
+  refund    : Nat
+
+/-- A paid order gets a lower price: Payments refunds the difference, which reprices
+the order line, which changes the price in the catalog. Three events for one action. -/
+def refundDifference : Endpoint .Payments RefundDifference Unit where
+  handle c := do
+    let _ ← call repriceOrderLine ⟨c.orderId, c.productId, c.price⟩
+    emit "RefundIssued" .high s!"CHF {c.refund} refunded on order {c.orderId}"
+
+/-! ## Delivery at the edge
+
+No endpoint sends anything: each returns its events to its caller. Only the edge,
+the code that received the user's command, decides what the user is told. It sees
+the whole chain, so it can send one message instead of one per event. -/
+
+/-- What the customer sees; `low` events stay internal. -/
+def Level.forCustomer : Level → Bool
+  | .critical | .high => true
+  | _ => false
+
+structure Message where
+  lines : List String
+deriving DecidableEq, Repr
+
+/-- One message for the whole chain, or none when nothing concerns the customer. -/
+def deliver (es : List Event) : Option Message :=
+  match es.filter (·.level.forCustomer) with
+  | [] => none
+  | relevant => some ⟨relevant.map (·.payload)⟩
+
+/-- Merging loses nothing the customer should hear about. -/
+theorem deliver_keeps (es : List Event) (e : Event) (he : e ∈ es)
+    (hc : e.level.forCustomer = true) : ∃ m, deliver es = some m ∧ e.payload ∈ m.lines := by
+  have hmem : e ∈ es.filter (·.level.forCustomer) := List.mem_filter.mpr ⟨he, hc⟩
+  unfold deliver
+  split
+  · rename_i h; rw [h] at hmem; simp at hmem
+  · exact ⟨_, rfl, List.mem_map.mpr ⟨e, hmem, rfl⟩⟩
+
+#eval (refundDifference.handle ⟨1, 2, 3, 5⟩).run.2.length   -- 3 events
+#eval deliver (refundDifference.handle ⟨1, 2, 3, 5⟩).run.2  -- 1 message
+
 
 /-! Catalog is upstream of Orders, so Catalog may not call Orders. The call is
 rejected when it is written: no instance `Upstream Domain.Orders Domain.Catalog`.

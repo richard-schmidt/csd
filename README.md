@@ -80,7 +80,7 @@ structure Endpoint (D : Domain) (InType : Type) (OutType : Type)
 
 [`ContextMapNotifications.lean`](Showcase/ContextMapNotifications.lean)
 
-The notification monad above, with the context map as a type. `Svc D α` is a computation in domain `D`: a value, the events it caused in the order they happened, and a proof that each event comes from `D` or from a domain upstream of `D`. `emit` is the only way to create an event and tags it with `D`. `call` needs an `Upstream U D` instance, so a call against the context map does not compile. `Svc D` is proven a lawful monad, and a closed map lets negative facts be proved (no event from Payments ever reaches Catalog). Core Lean only.
+The notification monad above, with the context map as a type. `Svc D α` is a computation in domain `D`: a value, the events it caused in the order they happened, and a proof that each event comes from `D` or from a domain upstream of `D`. `emit` is the only way to create an event and tags it with `D`. `call` needs an `Upstream U D` instance, so a call against the context map does not compile. `Svc D` is proven a lawful monad; `deliver` merges the events of one command (three, in the refund example) into one message for the user without losing any the user should see; and a closed map lets negative facts be proved (no event from Payments ever reaches Catalog). Core Lean only.
 
 ```lean
 def Svc (D : Domain) (α : Type) : Type :=
