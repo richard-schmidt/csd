@@ -76,6 +76,21 @@ instance : Monad Notify
 structure Endpoint (D : Domain) (InType : Type) (OutType : Type)
 ```
 
+### Notifications that follow the context map
+
+[`ContextMapNotifications.lean`](Showcase/ContextMapNotifications.lean)
+
+The notification monad above, with the context map as a type. `Svc D α` is a computation in domain `D`: a value, the events it caused in the order they happened, and a proof that each event comes from `D` or from a domain upstream of `D`. `emit` is the only way to create an event and tags it with `D`. `call` needs an `Upstream U D` instance, so a call against the context map does not compile. `Svc D` is proven a lawful monad, and a closed map lets negative facts be proved (no event from Payments ever reaches Catalog). Core Lean only.
+
+```lean
+def Svc (D : Domain) (α : Type) : Type :=
+  { r : α × List Event // ∀ e ∈ r.2, Reaches e.domain D }
+instance (D) : LawfulMonad (Svc D)
+
+def call {U D α β} [h : Upstream U D] (e : Endpoint U α β) (a : α) : Svc D β
+theorem no_payment_events_in_catalog : ¬ Reaches .Payments .Catalog
+```
+
 ## Sketches
 
 The modules in [`Sketches/`](Sketches/) build, but are drafts. Some proofs are still `sorry`, and they say so.
