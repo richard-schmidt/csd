@@ -124,4 +124,4 @@ CI builds both libraries on each push and generates the API documentation.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+GPL-3.0, see [LICENSE](LICENSE).
