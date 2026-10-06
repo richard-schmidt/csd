@@ -1,7 +1,7 @@
 name = "Categorical"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["Showcase", "Sketches"]
+defaultTargets = ["Showcase", "Sketches", "Production"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
@@ -24,3 +24,9 @@ globs = ["Showcase.+"]
 [[lean_lib]]
 name = "Sketches"
 globs = ["Sketches.+"]
+
+# Production: the code of the series "Composable production systems" on
+# richardschmidt.pro, one module per part. No sorry.
+[[lean_lib]]
+name = "Production"
+globs = ["Production.+"]
