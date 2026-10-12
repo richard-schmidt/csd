@@ -91,6 +91,19 @@ def call {U D α β} [h : Upstream U D] (e : Endpoint U α β) (a : α) : Svc D 
 theorem no_payment_events_in_catalog : ¬ Reaches .Payments .Catalog
 ```
 
+## Production systems
+
+[`Production/`](Production/) is the code of the series "Composable production systems" on richardschmidt.pro, one module per part, built on the Moore machines of `CyberPhy.lean`. No `sorry`.
+
+- [`Station.lean`](Production/Station.lean): a machining station as a Moore machine, `run` and its timing convention (n inputs, n + 1 outputs), and a station that stays failed until repaired.
+- [`Wiring.lean`](Production/Wiring.lean): a machine with a box as its interface, wiring as lens composition, and the functor `Box ⥤ Type 1` (its laws hold by `rfl`). Serial composition is two machines side by side, wired into one box; `run_serial` proves that the second machine sees the first one step late. Side by side is associative and unital up to relabelling the states, not as an equation.
+
+```lean
+def wire {A B : Box} (f : A ⟶ B) (M : Machine A) : Machine B
+theorem run_serial (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) (m n inputs) :
+    run (M ≫ₛ N).toMoore (m, n) inputs = run N.toMoore n (run M.toMoore m inputs).dropLast
+```
+
 ## Sketches
 
 The modules in [`Sketches/`](Sketches/) build, but are drafts. Some proofs are still `sorry`, and they say so.
