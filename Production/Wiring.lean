@@ -1,4 +1,4 @@
-import Production.Station
+import Production.Boxes
 
 /-!
 # Composable production systems, part 3: composing machines by wiring
@@ -63,9 +63,21 @@ def Machine.toMoore {B : Box} (M : Machine B) : MooreMachine where
   state := M.state
   lens := M.lens
 
+/-- A csd Moore machine as a machine with its interface as a box. -/
+def Machine.ofMoore (M : MooreMachine) : Machine ⟨M.α, M.β⟩ where
+  state := M.state
+  lens := M.lens
+
+/-- What a machine shows while it is fed `inputs` (part 1's `run`). -/
+def Machine.run {B : Box} (M : Machine B) (s : M.state) (inputs : List B.σᵢ) : List B.σₒ :=
+  Production.run M.toMoore s inputs
+
+/-- The state after all the inputs (part 1's `final`). -/
+def Machine.final {B : Box} (M : Machine B) (s : M.state) (inputs : List B.σᵢ) : M.state :=
+  Production.final M.toMoore s inputs
+
 /-- Two machines side by side: pairs of states, inputs and outputs. -/
-def Machine.par {A B : Box} (M : Machine A) (N : Machine B) :
-    Machine (boxTensorProd A B) where
+def Machine.par {A B : Box} (M : Machine A) (N : Machine B) : Machine (A ⊗ B) where
   state := M.state × N.state
   lens := Lens.prod M.lens N.lens
 
@@ -76,18 +88,10 @@ def Machine.unit : Machine boxUnit where
 
 /-! ## Serial composition -/
 
-/-- The wiring of a serial connection: the outer input goes to the first
-machine, the first machine's output to the second machine's input, and the
-outer output is the second machine's output. -/
-def serialBox (I X O : Type) :
-    boxHom (boxTensorProd ⟨I, X⟩ ⟨X, O⟩) ⟨I, O⟩ where
-  in_comp := fun ((x, _), i) => (i, x)
-  out_comp := fun (_, o) => o
-
-/-- `M` feeds `N`: both side by side, wired along `serialBox`. -/
+/-- `M` feeds `N`: both side by side, wired along `serialWiring` (part 2). -/
 def serial {I X O : Type} (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) :
     Machine ⟨I, O⟩ :=
-  wire (serialBox I X O) (M.par N)
+  wire (serialWiring I X O) (M.par N)
 
 infixr:70 " ≫ₛ " => serial
 
@@ -108,16 +112,14 @@ theorem serial_view {I X O : Type} (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O
 one step late: `N` never sees `M`'s last output. -/
 theorem run_serial {I X O : Type} (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩)
     (m : M.state) (n : N.state) (inputs : List I) :
-    run (M ≫ₛ N).toMoore (m, n) inputs =
-      run N.toMoore n (run M.toMoore m inputs).dropLast := by
+    (M ≫ₛ N).run (m, n) inputs = N.run n (M.run m inputs).dropLast := by
   induction inputs generalizing m n with
   | nil => rfl
   | cons i is ih =>
-    have hne : run M.toMoore (M.lens.update m i) is ≠ [] := by
-      cases is <;> simp [run]
-    change N.lens.view n ::
-        run (M ≫ₛ N).toMoore (M.lens.update m i, N.lens.update n (M.lens.view m)) is
-      = run N.toMoore n (M.lens.view m :: run M.toMoore (M.lens.update m i) is).dropLast
+    have hne : M.run (M.lens.update m i) is ≠ [] := by
+      cases is <;> simp [Machine.run, run]
+    change N.lens.view n :: (M ≫ₛ N).run (M.lens.update m i, N.lens.update n (M.lens.view m)) is
+      = N.run n (M.lens.view m :: M.run (M.lens.update m i) is).dropLast
     rw [ih, List.dropLast_cons_of_ne_nil hne]
     rfl
 
@@ -132,14 +134,9 @@ structure Machine.Iso {B : Box} (M N : Machine B) where
 
 /-- Isomorphic machines show the same thing on every run. -/
 theorem Machine.Iso.run {B : Box} {M N : Machine B} (e : Machine.Iso M N)
-    (s : M.state) (inputs : List B.σᵢ) :
-    Production.run N.toMoore (e.equiv s) inputs = Production.run M.toMoore s inputs := by
-  induction inputs generalizing s with
-  | nil => exact congrArg (· :: []) (e.view s)
-  | cons b bs ih =>
-    change N.lens.view (e.equiv s) :: Production.run N.toMoore (N.lens.update (e.equiv s) b) bs
-      = M.lens.view s :: Production.run M.toMoore (M.lens.update s b) bs
-    rw [e.view, ← e.update, ih]
+    (s : M.state) (inputs : List B.σᵢ) : N.run (e.equiv s) inputs = M.run s inputs := by
+  induction inputs generalizing s <;>
+    simp_all [Machine.run, Production.run, Machine.toMoore, e.view, ← e.update]
 
 /-- Wiring two machines side by side along `f ⊗ g` is wiring each one, then
 putting them side by side: an equation, the states are the same. -/
@@ -169,48 +166,63 @@ def Machine.parUnitRight {A : Box} (M : Machine A) :
   view _ := rfl
   update _ _ := rfl
 
-/-! ## Machining feeds Assembly -/
+/-! ## Machining feeds assembly -/
 
 /-- Inside the assembly station: the last light it saw on machining, its own
-status, and how many products it has assembled. -/
+status (`idle` or `processing`), and how many products it has finished. -/
 structure Assembly where
   seen : Status
   status : Status
   done : Nat
   deriving Repr
 
-/-- Assembly watches machining's light. A part has come when the light goes
-from `blocked` to `idle` (machining handed it on); assembling it takes one
-step. -/
+/-- One step of assembly. A product in progress is finished (assembling takes
+one step). A part has come when machining's light goes from `blocked` to
+`idle` (machining handed it on); then assembly starts on it. -/
 def assemblyStep (s : Assembly) (upstream : Status) : Assembly :=
-  if s.seen = .blocked ∧ upstream = .idle then
-    { s with seen := upstream, status := .processing }
-  else if s.status = .processing then
-    { seen := upstream, status := .idle, done := s.done + 1 }
-  else
-    { s with seen := upstream }
+  let arrived := s.seen = .blocked ∧ upstream = .idle
+  { seen := upstream
+    status := if arrived then .processing else .idle
+    done := if s.status = .processing then s.done + 1 else s.done }
 
 /-- The assembly station: it reads a `Status` and shows a `Status`. -/
 def assembly : Machine ⟨Status, Status⟩ where
   state := Assembly
   lens := { view := Assembly.status, update := assemblyStep }
 
-/-- Part 1's machining station, with its interface as a box. -/
-def machiningM : Machine ⟨Signal, Status⟩ where
-  state := Machining
-  lens := machining.lens
-
 def assemblyStart : Assembly := { seen := .idle, status := .idle, done := 0 }
 
-/-- The line of two stations, fed Part 1's shift. Machining hands its part on
-at step 3 (light back to `idle`); assembly starts on it at step 4, one step
-late. -/
-example : run (machiningM ≫ₛ assembly).toMoore (start, assemblyStart) shift =
-    [.idle, .idle, .idle, .idle, .processing, .idle, .idle, .idle, .idle] := by
+/-- The two stations in series: nobody releases machining's part but the line. -/
+def serialLine : Machine lineBox := Machine.ofMoore machining ≫ₛ assembly
+
+/-- The two stations with part 2's handoff: the line releases machining's part
+when assembly is idle. -/
+def handoffLine : Machine lineBox := wire handoffWiring ((Machine.ofMoore machining).par assembly)
+
+/-- An operator who loads machining whenever they can. Nobody sends `release`. -/
+def loading : List Signal := [.arrive, .finish, .arrive, .arrive, .finish, .arrive, .arrive]
+
+/-- In series only, the line stops at the first finished part: machining stays
+blocked and assembly never works. -/
+example : serialLine.run (start, assemblyStart) loading =
+    [.idle, .idle, .idle, .idle, .idle, .idle, .idle, .idle] := by
   rfl
 
-/-- One product assembled during the shift. -/
-example : (final (machiningM ≫ₛ assembly).toMoore (start, assemblyStart) shift).2.done = 1 := by
+example : (serialLine.final (start, assemblyStart) loading).1.status = .blocked := by
+  rfl
+
+/-- With the handoff, the parts flow, and assembly starts one step after
+machining hands a part on (steps 3 and 6). -/
+example : handoffLine.run (start, assemblyStart) loading =
+    [.idle, .idle, .idle, .idle, .processing, .idle, .idle, .processing] := by
+  rfl
+
+/-- Two parts handed on by machining, one product finished, the second in
+assembly. -/
+example : (handoffLine.final (start, assemblyStart) loading).1.done = 2 := by
+  rfl
+
+example : (handoffLine.final (start, assemblyStart) loading).2.done = 1 := by
   rfl
 
 end Production
