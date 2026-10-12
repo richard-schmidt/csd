@@ -1,4 +1,4 @@
-import Production.Station
+import Production.Boxes
 
 /-!
 # Composable production systems, part 3: composing machines by wiring
@@ -76,15 +76,7 @@ def Machine.unit : Machine boxUnit where
 
 /-! ## Serial composition -/
 
-/-- The wiring of a serial connection: the outer input goes to the first
-machine, the first machine's output to the second machine's input, and the
-outer output is the second machine's output. -/
-def serialBox (I X O : Type) :
-    boxHom (boxTensorProd ⟨I, X⟩ ⟨X, O⟩) ⟨I, O⟩ where
-  in_comp := fun ((x, _), i) => (i, x)
-  out_comp := fun (_, o) => o
-
-/-- `M` feeds `N`: both side by side, wired along `serialBox`. -/
+/-- `M` feeds `N`: both side by side, wired along `serialBox` (part 2). -/
 def serial {I X O : Type} (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) :
     Machine ⟨I, O⟩ :=
   wire (serialBox I X O) (M.par N)
@@ -211,6 +203,40 @@ example : run (machiningM ≫ₛ assembly).toMoore (start, assemblyStart) shift 
 
 /-- One product assembled during the shift. -/
 example : (final (machiningM ≫ₛ assembly).toMoore (start, assemblyStart) shift).2.done = 1 := by
+  rfl
+
+/-! ## Feedback: the handoff line -/
+
+/-- The two stations wired without feedback (part 2's `serialLine`). -/
+def serialLineM : Machine lineBox := wire serialLine (machiningM.par assembly)
+
+/-- The two stations wired with the handoff (part 2's `handoffLine`): the line
+releases machining's part when assembly is idle. -/
+def handoffLineM : Machine lineBox := wire handoffLine (machiningM.par assembly)
+
+/-- An operator who loads machining whenever they can. Nobody sends `release`. -/
+def loading : List Signal := [.arrive, .finish, .arrive, .arrive, .finish, .arrive, .arrive]
+
+/-- Without feedback, nobody releases the part: machining stays blocked and
+assembly never works. -/
+example : run serialLineM.toMoore (start, assemblyStart) loading =
+    [.idle, .idle, .idle, .idle, .idle, .idle, .idle, .idle] := by
+  rfl
+
+example : (final serialLineM.toMoore (start, assemblyStart) loading).1.status = .blocked := by
+  rfl
+
+/-- With the handoff, the parts flow. The line's release takes the place of
+the operator's signal at steps 3 and 6. -/
+example : run handoffLineM.toMoore (start, assemblyStart) loading =
+    [.idle, .idle, .idle, .idle, .processing, .idle, .idle, .processing] := by
+  rfl
+
+/-- Two parts handed on by machining, one assembled, the second in assembly. -/
+example : (final handoffLineM.toMoore (start, assemblyStart) loading).1.done = 2 := by
+  rfl
+
+example : (final handoffLineM.toMoore (start, assemblyStart) loading).2.done = 1 := by
   rfl
 
 end Production
