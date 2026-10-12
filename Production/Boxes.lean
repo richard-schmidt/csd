@@ -29,39 +29,36 @@ def lineBox : Box := ⟨Signal, Status⟩
 /-- The wiring of a serial connection: the outer input goes to the first box,
 the first box's output to the second box's input, and the outer output is the
 second box's output. -/
-def serialBox (I X O : Type) :
-    boxHom (boxTensorProd ⟨I, X⟩ ⟨X, O⟩) ⟨I, O⟩ where
+def serialWiring (I X O : Type) : (⟨I, X⟩ ⊗ ⟨X, O⟩ : Box) ⟶ ⟨I, O⟩ where
   in_comp := fun ((x, _), i) => (i, x)
   out_comp := fun (_, o) => o
 
-/-- Machining feeds assembly, nothing more: the line's signals go to machining,
-machining's light to assembly. -/
-def serialLine : machiningBox ⊗ assemblyBox ⟶ lineBox :=
-  serialBox Signal Status Status
-
 /-- Machining feeds assembly, with a handoff: when machining shows `blocked`
-and assembly shows `idle`, the line releases the finished part itself, in place
-of the outer signal of that step. Machining's input now depends on assembly's
+and assembly shows `idle`, the line releases the finished part itself, unless
+the line is signalling a fault. Machining's input now depends on assembly's
 output: feedback. -/
-def handoffLine : machiningBox ⊗ assemblyBox ⟶ lineBox where
+def handoffWiring : machiningBox ⊗ assemblyBox ⟶ lineBox where
   in_comp := fun (((m, a), sig) : (Status × Status) × Signal) =>
-    (if m = .blocked ∧ a = .idle then .release else sig, m)
+    (if sig ≠ .fault ∧ m = .blocked ∧ a = .idle then .release else sig, m)
   out_comp := fun (_, a) => a
 
-/-- The two wirings show the same thing: they differ only in what machining
-receives. -/
-example : serialLine.out_comp = handoffLine.out_comp := rfl
+/-- The handoff never hides a fault: a fault from the line reaches machining,
+whatever the two stations show. -/
+theorem handoff_keeps_fault (m a : Status) :
+    handoffWiring.in_comp ((m, a), .fault) = (.fault, m) := rfl
 
-/-- Without the handoff, a blocked machining station next to an idle assembly
-station receives what the line sends; with it, it receives `release`. -/
-example : serialLine.in_comp ((.blocked, .idle), .arrive) = (.arrive, .blocked) := rfl
-example : handoffLine.in_comp ((.blocked, .idle), .arrive) = (.release, .blocked) := rfl
+/-- Apart from that, the handoff only ever replaces the line's signal by
+`release`, and only when machining is blocked. -/
+theorem handoff_replaces (m a : Status) (sig : Signal) :
+    (handoffWiring.in_comp ((m, a), sig)).1 = sig ∨
+      ((handoffWiring.in_comp ((m, a), sig)).1 = .release ∧ m = .blocked) := by
+  simp only [handoffWiring]
+  split <;> simp_all
 
-/-- Wiring composes: the line inside a cell, the cell inside a plant, is the
-same nesting whichever way it is grouped (the category laws of `Box`, by `rfl`
-in `CyberPhy`). -/
-example {A B C D : Box} (f : A ⟶ B) (g : B ⟶ C) (h : C ⟶ D) :
-    (f ≫ g) ≫ h = f ≫ (g ≫ h) :=
-  Category.assoc f g h
+/-- A blocked station ignores every signal except `fault` and `release`. So
+the signal the handoff replaces would have changed nothing. -/
+theorem blocked_ignores (d : Nat) (sig : Signal) (hf : sig ≠ .fault) (hr : sig ≠ .release) :
+    step ⟨.blocked, d⟩ sig = ⟨.blocked, d⟩ := by
+  cases sig <;> simp_all [step]
 
 end Production

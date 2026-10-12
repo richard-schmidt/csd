@@ -96,13 +96,13 @@ theorem no_payment_events_in_catalog : ¬ Reaches .Payments .Catalog
 [`Production/`](Production/) is the code of the series "Composable production systems" on richardschmidt.pro, one module per part, built on the Moore machines of `CyberPhy.lean`. No `sorry`.
 
 - [`Station.lean`](Production/Station.lean): a machining station as a Moore machine, `run` and its timing convention (n inputs, n + 1 outputs), and a station that stays failed until repaired.
-- [`Boxes.lean`](Production/Boxes.lean): the line's stations as boxes, and two ways to wire them: in series, and in series with a handoff in which machining's input depends on assembly's output (feedback). Wiring only, no behaviour.
-- [`Wiring.lean`](Production/Wiring.lean): a machine with a box as its interface, wiring as lens composition, and the functor `Box ⥤ Type 1` (its laws hold by `rfl`). Serial composition is two machines side by side, wired into one box; `run_serial` proves that the second machine sees the first one step late. With the handoff wiring, parts flow; without it, machining stays blocked. Side by side is associative and unital up to relabelling the states, not as an equation.
+- [`Boxes.lean`](Production/Boxes.lean): the line's stations as boxes, and two ways to wire them: in series, and in series with a handoff in which machining's input depends on assembly's output (feedback). Wiring only, no behaviour. The handoff never hides a fault (`handoff_keeps_fault`), and the signal it replaces would have changed nothing (`blocked_ignores`).
+- [`Wiring.lean`](Production/Wiring.lean): a machine with a box as its interface, wiring as lens composition, and the functor `Box ⥤ Type 1` (its laws hold by `rfl`). Serial composition is two machines side by side, wired into one box; `run_serial` proves that the second machine sees the first one step late. In series only, the line stops at the first finished part; with the handoff, parts flow. Side by side is associative and unital up to relabelling the states, not as an equation.
 
 ```lean
 def wire {A B : Box} (f : A ⟶ B) (M : Machine A) : Machine B
 theorem run_serial (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) (m n inputs) :
-    run (M ≫ₛ N).toMoore (m, n) inputs = run N.toMoore n (run M.toMoore m inputs).dropLast
+    (M ≫ₛ N).run (m, n) inputs = N.run n (M.run m inputs).dropLast
 ```
 
 ## Sketches
