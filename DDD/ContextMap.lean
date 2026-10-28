@@ -1,27 +1,40 @@
-import DDD.Translation
+import DDD.Glue
 import Mathlib.CategoryTheory.Category.Cat.Op
 import Mathlib.CategoryTheory.Grothendieck
 
 /-!
-# Context maps and lax integration
+# Context maps and their integrations
 
 A context map is a quiver of contexts, with an arrow `u ⟶ d` from each upstream
 context `u` to each downstream context `d` it serves, a well-formed schema per
-context and a valid translation per arrow, from the upstream schema to the
-downstream one.
+context, a valid translation per arrow, from the upstream schema to the
+downstream one, declared equations between routes, and the contexts marked as
+kernels.
 
-- `ContextMap.diagram`: the functor `D : J ⥤ Cat` on the free category `J` of the
-  arrows (`Paths`), sending each context to its schema category and each arrow
-  to the functor of its translation.
+- `ContextMap.J`: the category of contexts, the free category on the arrows
+  (`Paths`) quotiented by the declared equations between routes (`routeEqns`).
+  Without declarations it is the free category.
+- `ContextMap.diagram`: the functor `D : J ⥤ Cat`, sending each context to its
+  schema category, each arrow to the functor of its translation, and each route
+  to the composite. It is defined on the quotient because routes declared equal
+  have the same composite (`coherent`).
 - `ContextMap.Lax`: the lax integration, `(Grothendieck (D ⋙ Cat.opFunctor))ᵒᵖ`.
   `embed c` includes the schema of the context `c`. A reference from `x` in a
-  downstream context `d` to `y` in an upstream context `u` is a path `f : u ⟶ d`
-  of `J` and a morphism `x ⟶ D f y` in the schema of `d` (`ContextMap.ref`).
-  `projection` is the dependency graph of the contexts, onto `Jᵒᵖ`.
+  downstream context `d` to `y` in an upstream context `u` is a morphism
+  `f : u ⟶ d` of `J` and a morphism `x ⟶ D f y` in the schema of `d`
+  (`ContextMap.ref`). `projection` is the dependency graph of the contexts,
+  onto `Jᵒᵖ`.
 - `nonInterference`: if no context has an endomorphism in `J` other than the
   identity, every context embeds fully faithfully and injectively on objects.
-  `endo_eq_id_of_rank` gives the hypothesis for every context map with a rank
-  that increases along its arrows, so for every map without cycles.
+  `endo_eq_id_of_rank` gives the hypothesis on the free category for every
+  context map with a rank that increases along its arrows, so for every map
+  without cycles, and `ContextMap.endo_eq_id` carries it to `J`.
+- Strict integration: every arrow out of a context marked as a kernel is the
+  empty translation, an inclusion that keeps names. Two arrows out of a kernel
+  whose targets share nothing outside it glue (`kernelGluing`); the kernel span
+  of the gluing is the image of the two arrows under `D`
+  (`kernelGluing_ι₁`, `kernelGluing_ι₂`), so the glued schema category is the
+  pushout of that span in `Cat` (`isPushout_kernel`).
 -/
 
 namespace DDD
@@ -53,33 +66,115 @@ theorem endo_eq_id_of_rank {V : Type} [Quiver.{1} V] (rank : V → Nat)
   have := hle (a := c) (b := c) f
   exact Quiver.Path.eq_nil_of_length_zero f (by omega)
 
-/-- A context map on the contexts `C`: a well-formed schema per context and a
-valid translation per arrow, from the upstream schema to the downstream one. -/
+/-- If every endomorphism of a category is an identity, so is every endomorphism
+of a quotient of it. -/
+theorem Quotient.endo_eq_id {B : Type*} [Category B] {r : HomRel B}
+    (h : ∀ (b : B) (f : b ⟶ b), f = 𝟙 b) :
+    ∀ (c : CategoryTheory.Quotient r) (f : c ⟶ c), f = 𝟙 c := by
+  rintro ⟨c⟩ f
+  obtain ⟨g, rfl⟩ := (CategoryTheory.Quotient.functor r).map_surjective f
+  rw [h c g, CategoryTheory.Functor.map_id]
+  rfl
+
+section Routes
+
+variable {C : Type} [Quiver.{1} C]
+
+/-- The functor on the free category of the arrows: each context to its schema
+category, each arrow to the functor of its translation, and each route to the
+composite. -/
+def routeDiagram (schema : C → Schema) (translation : ∀ {u d : C}, (u ⟶ d) → Translation)
+    (wellFormed : ∀ c, (schema c).WellFormed)
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d)) :
+    Paths C ⥤ Cat.{0, 0} :=
+  Paths.lift
+    { obj c := (schema c).cat
+      map f := (translation f).functor (wellFormed _) (valid f) }
+
+end Routes
+
+/-- A context map on the contexts `C`: a well-formed schema per context, a valid
+translation per arrow, from the upstream schema to the downstream one, the
+declared equations between routes, which the translations respect, and the
+contexts marked as kernels, out of which every arrow is an inclusion. By default
+no equation is declared and no context is a kernel. -/
 structure ContextMap (C : Type) [Quiver.{1} C] where
   schema : C → Schema
   translation : ∀ {u d : C}, (u ⟶ d) → Translation
   wellFormed : ∀ c, (schema c).WellFormed
   valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d)
+  /-- The declared equations between routes. -/
+  routeEqns : HomRel (Paths C) := fun _ _ _ _ => False
+  /-- Routes declared equal have the same composite functor. -/
+  coherent : ∀ ⦃u d : Paths C⦄ (p q : u ⟶ d), routeEqns p q →
+      (routeDiagram schema translation wellFormed valid).map p =
+        (routeDiagram schema translation wellFormed valid).map q := by
+    intro _ _ _ _ h
+    cases h
+  /-- The contexts marked as kernels. -/
+  kernel : C → Bool := fun _ => false
+  /-- Every arrow out of a kernel is the empty translation. -/
+  inclusion : ∀ {u d : C} (f : u ⟶ d), kernel u = true → translation f = {} := by
+    intro _ _ _ h
+    cases h
 
 namespace ContextMap
 
 variable {C : Type} [Quiver.{1} C] (M : ContextMap C)
 
-/-- Each context to its schema category, each arrow to the functor of its
-translation. -/
-def prefunctor : C ⥤q Cat.{0, 0} where
-  obj c := (M.schema c).cat
-  map f := (M.translation f).functor (M.wellFormed _) (M.valid f)
+/-! ## The category of contexts and the diagram -/
 
-/-- The diagram `D : J ⥤ Cat` of a context map, on the free category `J` of its
-arrows. -/
-def diagram : Paths C ⥤ Cat.{0, 0} := Paths.lift M.prefunctor
+/-- The diagram on the free category of the arrows, before the declared
+equations. -/
+def freeDiagram : Paths C ⥤ Cat.{0, 0} :=
+  routeDiagram M.schema M.translation M.wellFormed M.valid
 
-theorem diagram_obj (c : C) : M.diagram.obj c = (M.schema c).cat := rfl
+/-- The category of contexts: the free category on the arrows, quotiented by the
+declared equations between routes. -/
+def J : Type := CategoryTheory.Quotient M.routeEqns
 
-theorem diagram_map_toPath {u d : C} (f : u ⟶ d) :
-    M.diagram.map f.toPath = (M.translation f).functor (M.wellFormed _) (M.valid f) :=
+instance : Category M.J := inferInstanceAs (Category (CategoryTheory.Quotient M.routeEqns))
+
+/-- A context, as an object of `J`. -/
+def ctx (c : C) : M.J := ⟨c⟩
+
+/-- A route, as a morphism of `J`. -/
+def route {u d : C} (p : Quiver.Path u d) : M.ctx u ⟶ M.ctx d :=
+  (CategoryTheory.Quotient.functor M.routeEqns).map p
+
+/-- An arrow, as a morphism of `J`. -/
+def arrow {u d : C} (f : u ⟶ d) : M.ctx u ⟶ M.ctx d := M.route f.toPath
+
+/-- Routes declared equal are equal in `J`. -/
+theorem route_eq {u d : C} {p q : Quiver.Path u d} (h : M.routeEqns p q) :
+    M.route p = M.route q :=
+  CategoryTheory.Quotient.sound _ h
+
+/-- Every morphism of `J` is a route. -/
+theorem route_surjective {u d : C} (f : M.ctx u ⟶ M.ctx d) :
+    ∃ p : Quiver.Path u d, M.route p = f :=
+  (CategoryTheory.Quotient.functor M.routeEqns).map_surjective f
+
+/-- The diagram `D : J ⥤ Cat` of a context map. -/
+def diagram : M.J ⥤ Cat.{0, 0} :=
+  CategoryTheory.Quotient.lift M.routeEqns M.freeDiagram fun _ _ p q h => M.coherent p q h
+
+theorem diagram_obj (c : C) : M.diagram.obj (M.ctx c) = (M.schema c).cat := rfl
+
+theorem diagram_map_route {u d : C} (p : Quiver.Path u d) :
+    M.diagram.map (M.route p) = M.freeDiagram.map p := rfl
+
+theorem diagram_map_arrow {u d : C} (f : u ⟶ d) :
+    M.diagram.map (M.arrow f) = (M.translation f).functor (M.wellFormed _) (M.valid f) :=
   Paths.lift_toPath _ _
+
+/-- If the only route from each context to itself is the empty one, every
+endomorphism of `J` is an identity. -/
+theorem endo_eq_id (h : ∀ (c : Paths C) (f : c ⟶ c), f = 𝟙 c) :
+    ∀ (c : M.J) (f : c ⟶ c), f = 𝟙 c :=
+  Quotient.endo_eq_id h
+
+/-! ## Lax integration -/
 
 /-- The lax integration: the contravariant Grothendieck construction of the
 diagram. -/
@@ -90,44 +185,91 @@ instance : Category M.Lax :=
 
 /-- The schema of the context `c` inside the lax integration. -/
 def embed (c : C) : (M.schema c).cat ⥤ M.Lax :=
-  (Grothendieck.ι (M.diagram ⋙ Cat.opFunctor) c).rightOp
+  (Grothendieck.ι (M.diagram ⋙ Cat.opFunctor) (M.ctx c)).rightOp
 
 /-- A reference from `x` in the downstream context `d` to `y` in the upstream
-context `u`: a path `f : u ⟶ d` of `J` and a morphism `x ⟶ D f y` in the schema
-of `d`. -/
-def ref {u d : Paths C} (f : u ⟶ d) {x : (M.schema d).cat} {y : (M.schema u).cat}
+context `u`: a morphism `f : u ⟶ d` of `J` and a morphism `x ⟶ D f y` in the
+schema of `d`. -/
+def ref {u d : C} (f : M.ctx u ⟶ M.ctx d) {x : (M.schema d).cat} {y : (M.schema u).cat}
     (φ : x ⟶ (M.diagram.map f).obj y) : (M.embed d).obj x ⟶ (M.embed u).obj y :=
   Quiver.Hom.op (⟨f, φ.op⟩ : CategoryTheory.Grothendieck.Hom (F := M.diagram ⋙ Cat.opFunctor)
-    ⟨u, Opposite.op y⟩ ⟨d, Opposite.op x⟩)
+    ⟨M.ctx u, Opposite.op y⟩ ⟨M.ctx d, Opposite.op x⟩)
 
 /-- The dependency graph of the contexts: the projection of the lax integration
 onto `Jᵒᵖ`. -/
-def projection : M.Lax ⥤ (Paths C)ᵒᵖ :=
+def projection : M.Lax ⥤ M.Jᵒᵖ :=
   (Grothendieck.forget (M.diagram ⋙ Cat.opFunctor)).op
 
-theorem projection_ref {u d : Paths C} (f : u ⟶ d) {x : (M.schema d).cat}
+theorem projection_ref {u d : C} (f : M.ctx u ⟶ M.ctx d) {x : (M.schema d).cat}
     {y : (M.schema u).cat} (φ : x ⟶ (M.diagram.map f).obj y) :
     M.projection.map (M.ref f φ) = f.op := rfl
 
 instance (c : C) : (M.embed c).Faithful :=
-  @Functor.rightOp_faithful _ _ _ _ (Grothendieck.ι (M.diagram ⋙ Cat.opFunctor) c)
-    (CategoryTheory.Grothendieck.faithful_ι (F := M.diagram ⋙ Cat.opFunctor) c)
+  @Functor.rightOp_faithful _ _ _ _ (Grothendieck.ι (M.diagram ⋙ Cat.opFunctor) (M.ctx c))
+    (CategoryTheory.Grothendieck.faithful_ι (F := M.diagram ⋙ Cat.opFunctor) (M.ctx c))
 
 theorem embed_injective (c : C) : Function.Injective (M.embed c).obj := by
   intro x y h
   have h₁ := congrArg Opposite.unop h
-  change (⟨c, Opposite.op x⟩ : Grothendieck (M.diagram ⋙ Cat.opFunctor)) = ⟨c, Opposite.op y⟩ at h₁
+  change (⟨M.ctx c, Opposite.op x⟩ : Grothendieck (M.diagram ⋙ Cat.opFunctor)) =
+    ⟨M.ctx c, Opposite.op y⟩ at h₁
   injection h₁ with _ h₂
   exact Opposite.op_injective h₂
 
 /-- Lax non-interference: if no context has an endomorphism in `J` other than the
 identity, every context embeds into the lax integration fully faithfully and
 injectively on objects. -/
-theorem nonInterference (hJ : ∀ (c : Paths C) (f : c ⟶ c), f = 𝟙 c) (c : C) :
+theorem nonInterference (hJ : ∀ (c : M.J) (f : c ⟶ c), f = 𝟙 c) (c : C) :
     (M.embed c).Full ∧ (M.embed c).Faithful ∧ Function.Injective (M.embed c).obj := by
   refine ⟨?_, inferInstance, M.embed_injective c⟩
-  exact @Functor.rightOp_full _ _ _ _ (Grothendieck.ι (M.diagram ⋙ Cat.opFunctor) c)
-    (Grothendieck.ι_full (M.diagram ⋙ Cat.opFunctor) hJ c)
+  exact @Functor.rightOp_full _ _ _ _ (Grothendieck.ι (M.diagram ⋙ Cat.opFunctor) (M.ctx c))
+    (Grothendieck.ι_full (M.diagram ⋙ Cat.opFunctor) hJ (M.ctx c))
+
+/-! ## Strict integration along kernels -/
+
+/-- An arrow out of a kernel includes the schema of the kernel with the same
+names. -/
+theorem valid_empty {k d : C} (f : k ⟶ d) (hk : M.kernel k = true) :
+    ({} : Translation).Valid (M.schema k) (M.schema d) :=
+  M.inclusion f hk ▸ M.valid f
+
+variable {k d₁ d₂ : C} (f₁ : k ⟶ d₁) (f₂ : k ⟶ d₂) (hk : M.kernel k = true)
+  (hc : Schema.gluingClashes (M.schema k) (M.schema d₁) (M.schema d₂) = [])
+  (hwf : (Schema.glue (M.schema d₁) (M.schema d₂)).WellFormed)
+
+/-- The targets of two arrows out of a kernel, glued along it. The conditions:
+the targets share no name outside the kernel, and the glued schema is well
+formed. -/
+def kernelGluing : Gluing where
+  kernel := M.schema k
+  left := M.schema d₁
+  right := M.schema d₂
+  wf_kernel := M.wellFormed k
+  wf_left := M.wellFormed d₁
+  wf_right := M.wellFormed d₂
+  wf_glued := hwf
+  gluable :=
+    ⟨M.valid_empty f₁ hk, M.valid_empty f₂ hk, (Schema.gluingClashes_eq_nil_iff.mp hc).1,
+      (Schema.gluingClashes_eq_nil_iff.mp hc).2⟩
+
+/-- The first leg of the kernel span is the image of the first arrow under `D`. -/
+theorem kernelGluing_ι₁ : (M.kernelGluing f₁ f₂ hk hc hwf).ι₁ = M.diagram.map (M.arrow f₁) := by
+  rw [diagram_map_arrow]
+  exact Translation.functor_congr _ _ _ (M.inclusion f₁ hk).symm
+
+/-- The second leg of the kernel span is the image of the second arrow under
+`D`. -/
+theorem kernelGluing_ι₂ : (M.kernelGluing f₁ f₂ hk hc hwf).ι₂ = M.diagram.map (M.arrow f₂) := by
+  rw [diagram_map_arrow]
+  exact Translation.functor_congr _ _ _ (M.inclusion f₂ hk).symm
+
+/-- Strict integration along a kernel: the glued schema category is the pushout
+in `Cat` of the images under `D` of the two arrows out of the kernel. -/
+theorem isPushout_kernel :
+    IsPushout (M.diagram.map (M.arrow f₁)) (M.diagram.map (M.arrow f₂))
+      (M.kernelGluing f₁ f₂ hk hc hwf).inl (M.kernelGluing f₁ f₂ hk hc hwf).inr := by
+  rw [← kernelGluing_ι₁, ← kernelGluing_ι₂]
+  exact (M.kernelGluing f₁ f₂ hk hc hwf).isPushout
 
 end ContextMap
 

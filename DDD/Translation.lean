@@ -212,6 +212,12 @@ theorem functor_map_mor (hS' : S'.WellFormed) (hT : T.Valid S S') {a b : S.Obj}
     (p : Quiver.Path a b) :
     (functor hS' hT).map (Schema.mor p) = Schema.mor (functorPath hS' hT p) := rfl
 
+/-- Equal translations induce equal functors. -/
+theorem functor_congr {T' : Translation} (hS' : S'.WellFormed) (hT : T.Valid S S')
+    (hT' : T'.Valid S S') (h : T = T') : functor hS' hT = functor hS' hT' := by
+  subst h
+  rfl
+
 /-- Value types go to themselves. -/
 theorem obj_value (hT : T.Valid S S') (v : ValueType) :
     obj hT ⟨.value v, trivial⟩ = ⟨.value v, trivial⟩ := rfl

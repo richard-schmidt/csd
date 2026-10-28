@@ -25,8 +25,9 @@ translation from the upstream schema to the downstream one, checked valid with
   value. Sending the billing address to the destination instead violates the
   equation `billTo = customer.address` and fails the check.
 
-`contextMap` puts the schemas and translations together, and `contextMap.diagram`
-is the context map as a functor `Paths Domain ⥤ Cat`. The map has no cycle
+`contextMap` puts the schemas and translations together, with no declared
+equation between routes, so `contextMap.J` is the free category on the arrows,
+and `contextMap.diagram` is the context map as a functor `J ⥤ Cat`. The map has no cycle
 (`rank`), so each context embeds into the lax integration fully faithfully and
 injectively on objects (`nonInterference`). `refundOfOrder` is a reference
 across contexts: from a refund in Payments to the order it refunds in Orders,
@@ -121,8 +122,8 @@ def contextMap : ContextMap Domain where
     | _, _, .orders_payments => ordersPayments_valid
     | _, _, .orders_shipping => ordersShipping_valid
 
-/-- The context map as a functor from the free category of its arrows to `Cat`. -/
-example : Paths Domain ⥤ Cat := contextMap.diagram
+/-- The context map as a functor from the category of contexts to `Cat`. -/
+example : contextMap.J ⥤ Cat := contextMap.diagram
 
 /-- Arrows go from a lower to a higher rank, so the map has no cycle. -/
 def rank : Domain → Nat
@@ -138,13 +139,13 @@ theorem rank_lt {u d : Domain} (f : u ⟶ d) : rank u < rank d := by
 theorem nonInterference (c : Domain) :
     (contextMap.embed c).Full ∧ (contextMap.embed c).Faithful ∧
       Function.Injective (contextMap.embed c).obj :=
-  contextMap.nonInterference (endo_eq_id_of_rank rank rank_lt) c
+  contextMap.nonInterference (contextMap.endo_eq_id (endo_eq_id_of_rank rank rank_lt)) c
 
 /-! ## A reference across contexts -/
 
 /-- The arrow from Orders to Payments, as a morphism of `J`. -/
-def ordersToPayments : @Quiver.Hom (Paths Domain) _ .Orders .Payments :=
-  (Paths.of Domain).map ⟨.orders_payments⟩
+def ordersToPayments : contextMap.ctx .Orders ⟶ contextMap.ctx .Payments :=
+  contextMap.arrow ⟨.orders_payments⟩
 
 /-- The refund entity type, in the schema category of Payments. -/
 def refund : (contextMap.schema .Payments).cat := Schema.obj _ ⟨.entity "Refund", by decide⟩

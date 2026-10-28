@@ -315,7 +315,8 @@ Phase 3 is complete, with no `sorry`:
    Orders is not faithful (`delivery_not_faithful`).
 
 Not yet done: limits and colimits of attributed states, `Σ_T` for attributed
-states, and the check that declared composite translations agree.
+states, the check that declared composite translations agree, and strict
+integration along a kernel with more than two inclusions.
 
 Revision after the decision review of phases 1 to 3 (see Decisions), in order:
 
@@ -329,9 +330,13 @@ Revision after the decision review of phases 1 to 3 (see Decisions), in order:
    Done.
 5. `PathEq.lean`, `Glue.lean`: classes of equal paths computed once per
    source; `decide +kernel` in the examples. Done.
-6. `ContextMap.lean`: `J` presented by declared equations between routes, `D`
-   on the quotient; kernel contexts, and strict integration as the colimit of
-   `D` along their inclusions.
+6. `ContextMap.lean`: `J` presented by declared equations between routes
+   (`routeEqns`), `D` on the quotient, which the translations respect
+   (`coherent`, a proof obligation); lax integration and non-interference over
+   `J`, with `endo_eq_id` carrying the rank argument to the quotient; kernel
+   contexts, out of which every arrow is the empty translation; two arrows out
+   of a kernel glue (`kernelGluing`), and the glued schema category is the
+   pushout in `Cat` of their images under `D` (`isPushout_kernel`). Done.
 7. Published languages: the check that a published language contains roots
    only.
 8. Examples: a context type with CatalogPL, OrdersPL and the Customer/Address
