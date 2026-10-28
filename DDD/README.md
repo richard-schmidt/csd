@@ -186,7 +186,9 @@ DDD/
 julia/               Catlab side
 ```
 
-Each module has its own namespace. `sorry` is allowed in this library.
+The core modules share the namespace `DDD`, with the operations on schemas in
+`DDD.Schema`; each example module has its own namespace. `sorry` is allowed in
+this library.
 
 ## Relation to existing modules
 
@@ -213,20 +215,27 @@ Each module has its own namespace. `sorry` is allowed in this library.
 Phase 0 is complete: library entry in `lakefile.toml` and this note, on branch
 `claude/ddd-design`, CI green.
 
-Phase 1 work items:
+Phase 1 is complete, with no `sorry`:
 
-1. `Values.lean`: `ValueType`, `K`, and `DecidableEq` for every `K v`. `Float`
-   is replaced by an exact type for amounts; the representations of `Date`
-   and `Uuid` are fixed here.
-2. `Schema.lean`: the deep presentation (entity types, value types,
-   references, attributes, equations, aggregate annotations) and the
-   well-formedness checker with its soundness lemma.
-3. `Semantics.lean`: the quiver of a schema, `Paths`, the `HomRel` of the
-   equations, `Quotient`, and `Schema.cat : Cat`.
-4. `PathEq.lean`: decision procedures for path equality in free and in acyclic
-   schemas, with soundness lemmas relating them to `Schema.cat`.
-5. `Examples/Catalog.lean`, `Examples/Orders.lean`: the two schemas, with
-   attributes, checked with `decide`.
+1. `Values.lean`: `ValueType` (`int`, `decimal`, `string`, `date`, `uuid`) and
+   `K`, with `DecidableEq` for every `K v`. `Decimal` replaces `Float`: finite
+   decimals in lowest terms, equal exactly when they denote the same rational
+   number (`Decimal.toRat_injective`). `Date` is the number of days since
+   1970-01-01 in the proleptic Gregorian calendar, `Uuid` is `BitVec 128`.
+2. `Schema.lean`: the deep presentation and `Schema.WellFormed`, decided by
+   `checkWellFormed` (`checkWellFormed_iff`), so `decide` proves and refutes
+   well-formedness.
+3. `Semantics.lean`: `Schema.cat`, the quotient of `Paths` on the quiver of
+   generators by the congruence of the equations. Every equation of a
+   well-formed schema holds in it (`pathEq_of_mem_eqns`).
+4. `PathEq.lean`: `Schema.PathEq`, decided by `pathEqFree` in free schemas and
+   by `pathEqAcyclic` in acyclic ones (`pathEqFree_iff`, `pathEqAcyclic_iff`).
+   Both are sound in every well-formed schema. `Acyclic` is decided by
+   `checkAcyclic`.
+5. `Examples/Catalog.lean` (free, with a cycle) and `Examples/Orders.lean`
+   (acyclic, two equations, one ending in an attribute): well-formedness, path
+   equalities and inequalities, and a schema that violates an aggregate
+   boundary in each, checked with `decide`.
 
 ## Decisions
 
@@ -235,3 +244,10 @@ Phase 1 work items:
 - Library: a separate `lean_lib`, `DDD`.
 - Attributes: in schemas from phase 1. Attributed states in phase 3, after the
   entity-only states and before phase 4, in the strict formulation.
+- Generators: a reference or attribute is identified by its source entity type
+  and its name, so names are unique per entity type, not per schema. A deep
+  path is a source and a list of names.
+- Amounts: `Decimal`, not `ℚ`. Every value has a finite decimal notation, as
+  amounts do; `ℚ` would admit `1/3`.
+- Acyclic: no path has more generators than there are entity types. This is
+  the finiteness `pathEqAcyclic` needs, and it is decided by enumerating paths.

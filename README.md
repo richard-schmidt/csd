@@ -107,7 +107,16 @@ theorem run_serial (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) (m n inputs
 
 ## DDD
 
-[`DDD/`](DDD/) models bounded contexts as finitely presented categories, context maps as diagrams of them, and the integration of contexts into larger systems, with a Julia side (Catlab) whose results Lean checks. [`DDD/README.md`](DDD/README.md) describes the structures, the theorems and checks, and the roadmap. The library has no modules yet. `sorry` is allowed.
+[`DDD/`](DDD/) models bounded contexts as finitely presented categories, context maps as diagrams of them, and the integration of contexts into larger systems, with a Julia side (Catlab) whose results Lean checks. [`DDD/README.md`](DDD/README.md) describes the structures, the theorems and checks, and the roadmap. `sorry` is allowed.
+
+Phase 1, schemas, is done. A schema is a finite presentation (entity types, references, attributes into shared value types, equations, aggregates) with a well-formedness check that `decide` runs. `Schema.cat` is the category it presents. Path equality is decided for schemas without equations and for acyclic schemas, and the Catalog and Orders schemas in [`Examples/`](DDD/Examples/) are checked this way.
+
+```lean
+def Schema.cat (S : Schema) : Cat := Cat.of (CategoryTheory.Quotient S.rel)
+theorem checkWellFormed_iff : S.checkWellFormed = true ↔ S.WellFormed
+theorem pathEqAcyclic_iff (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj) (l l' : List String) :
+    S.pathEqAcyclic a.1 l l' = true ↔ S.PathEq a l l'
+```
 
 ## Sketches
 
