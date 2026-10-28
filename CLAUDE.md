@@ -23,8 +23,10 @@ and `DDD`. CI runs the same build on every push.
   allowed.
 - `wip/` and `deprecated/` are not built.
 
-Each module has its own namespace. Libraries are built by glob, without a root
-file importing all modules.
+Each module of `Showcase/` and `Sketches/` has its own namespace. `Production/`
+and `DDD/` share a library namespace (`Production`, `DDD`); each module in
+`DDD/Examples/` has its own. Libraries are built by glob, without a root file
+importing all modules.
 
 ## Writing style
 
