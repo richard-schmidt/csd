@@ -4,6 +4,10 @@ Bounded contexts as finitely presented categories, context maps as diagrams of
 such categories, and the integration of contexts into larger systems.
 Composability properties are stated either as theorems or as decidable checks.
 
+[`docs/approach.md`](docs/approach.md) describes the approach in depth, with
+figures. This note holds the plan, the status, the next steps and the
+decisions.
+
 ## Two kinds of guarantee
 
 - **General theorems** hold for all systems and are proved once, through
@@ -217,6 +221,7 @@ DDD/
   Certificate.lean   JSON import, checkers, soundness lemmas
   Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
                      Gluing
+  docs/              approach.md, its figures, and figures.py, which draws them
 julia/               Catlab side
 ```
 
@@ -321,7 +326,7 @@ Phase 3 is complete, with no `sorry`:
 
 Not yet done: limits and colimits of attributed states, `Σ_T` for attributed
 states, the check that declared composite translations agree, and strict
-integration along a kernel with more than two inclusions.
+integration along a kernel with more than two inclusions. See Next steps.
 
 Revision after the decision review of phases 1 to 3 (see Decisions), in order:
 
@@ -358,6 +363,111 @@ Revision after the decision review of phases 1 to 3 (see Decisions), in order:
 
 The revision is complete, with no `sorry`. Where it changes a module, it
 supersedes the description under phases 1 to 3.
+
+## Next steps
+
+In order. Each item states what it defines and proves, and when it is done.
+
+![The next steps in order, with the dependencies between them.](docs/figures/next-steps.svg)
+
+### 1. Coherence by check
+
+The obligation `coherent` of a context map is a proof. It becomes a check:
+
+- `Translation.comp T U`: the composite of deep translations, entity images
+  composed and each generator sent to the image under `U` of its image path
+  under `T`; its validity, and `functor_comp`: the functor of the composite is
+  the composite of the functors (by `Schema.ext_functor`).
+- `Translation.checkSameFunctor`: two translations between the same schemas
+  have the same entity images and, for each generator, image paths equal in the
+  target by `pathEq`; soundness: they induce the same functor.
+- `ContextMap.routeTranslation p`, the composite along a route, and a check on
+  the declared pairs of routes whose soundness gives `coherent`.
+
+Done when: an example with a declared diamond is accepted by `decide`, and one
+whose two composites differ is refuted.
+
+### 2. Phase 4: Julia and certificates
+
+Done when Julia reproduces the phase 3 results on the example map and Lean
+accepts its certificates.
+
+1. JSON with `Lean.Json`: `ToJson` and `FromJson` for `Schema`, `Translation`,
+   the data of a context map (contexts, arrows, translations, route equations,
+   kernel flags) and finite states; a format version; round-trip tests on the
+   examples. Generators are named `Entity.name`.
+2. Finite states as data: a list of entities per entity type, each generator a
+   finite function, attribute values in `K`; a check that the data satisfies
+   the equations of the schema, with soundness into `Schema.State K S`. The
+   value-object condition (two entities of a value object with equal
+   attributes are equal) is checked on this form.
+3. `Certificate.lean`: certificates and their checkers for a translation
+   (validity), a gluing (the schema Julia computed equals `Schema.glue` up to
+   the order of its lists: a check of equality up to permutation, and a lemma
+   that such schemas present isomorphic categories), a restriction `Δ_T X`, and
+   a morphism of states.
+4. `csd-check`: a `lake exe` that reads a JSON certificate and runs the
+   compiled checkers. It trusts the compiler, as `native_decide` does, and
+   states so in its output.
+5. `julia/`: Catlab and ACSets.jl. Schemas as acsets on a schema of schemas,
+   gluing as an acset pushout with the union of equations, restriction and
+   homomorphism search on states. Names that clash outside a kernel are
+   qualified with the context name before export.
+6. CI: the Julia side runs on the example map, and `csd-check` on its output.
+
+### 3. Strict integration along several inclusions
+
+- Gluing a kernel into more than two schemas, and gluing along several
+  kernels: the condition that the schemas share only kernel names pairwise,
+  and the glued schema.
+- The colimit of `D` restricted to the inclusions out of kernels: the glued
+  schema category of each merged component, with an `IsColimit` statement that
+  extends `isPushout_kernel`.
+- The context map after the merge: each merged component one context with its
+  glued schema, each other arrow composed with the leg into it (item 1's
+  `Translation.comp`); lax non-interference for the result, and strict
+  non-interference for each leg by `checkFullyFaithful`.
+
+Done when: the example map with a second kernel shared by three contexts is
+merged, and its merged map is checked.
+
+### 4. Attributed states
+
+- Limits and colimits with values fixed: which shapes exist, their
+  construction on entity types, and their universal properties. Colimits merge
+  data along a shared sub-state.
+- `Σ_T` on attributed states: the condition on `T` under which
+  `restrictStateFunctor` has a left adjoint, and the adjoint under that
+  condition.
+
+### 5. Phase 5: open systems
+
+- Structured cospans `I ⟶ S ⟵ O` of schemas, with interfaces that are published
+  languages included by the empty translation; composition by gluing along the
+  shared interface (item 3, with the interface as kernel); identities, and
+  associativity up to isomorphism of schema categories.
+- Behaviour: machines of `Production/Wiring.lean` whose state type is the
+  attributed states of an aggregate schema, with wiring compatible with the
+  composition of cospans.
+- Events: the `Svc` events of `Showcase/ContextMapNotifications.lean` routed
+  along `J` through `toDomains`, so that an event of a context reaches only its
+  downstream contexts.
+
+### Conditional
+
+- Names as indices instead of strings in the checkers, with a lemma relating
+  the two, if a check on a larger model exceeds the time CI allows. The strict
+  non-interference checks of the examples take 14 to 22 seconds of kernel time
+  each.
+- Path equality for schemas with both cycles and equations, from a rewriting
+  system supplied as a certificate, if a model needs it. It is not part of
+  phase 4.
+
+Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
+the gluing of item 3 and the states of item 4; the state certificates of
+phase 4 use its finite states. Item 1 comes first because it is small and makes
+declared diamonds checkable; phase 4 comes next because its exit criterion
+concerns the phase 3 results.
 
 ## Decisions
 

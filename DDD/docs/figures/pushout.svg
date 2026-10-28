@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 430" width="820" height="430" role="img" aria-label="The two arrows out of the Customers kernel and the legs into the glued schema form a pushout square in Cat; functors that agree on the kernel factor uniquely through it."><style>svg { --surface: #ffffff; --region: #f3f5f8; --fg: #1b232c; --muted: #5a6675; --line: #c9d1da; --accent: #17708f; --accentfill: rgba(23,112,143,0.10); --kern: #2f7a4b; --kernfill: rgba(47,122,75,0.10); --warn: #b4421b; --warnfill: rgba(180,66,27,0.08); } @media (prefers-color-scheme: dark) { svg { --surface: #19212a; --region: #202a35; --fg: #e3e9ef; --muted: #9aa7b5; --line: #34414f; --accent: #5db4d3; --accentfill: rgba(93,180,211,0.14); --kern: #6cc28d; --kernfill: rgba(108,194,141,0.13); --warn: #f08c5e; --warnfill: rgba(240,140,94,0.11); } }
+.bgr { fill: var(--surface); }
+.n rect { fill: var(--surface); stroke: var(--fg); stroke-width: 1.2; }
+.n.pl rect { fill: var(--accentfill); stroke: var(--accent); stroke-width: 1.5; }
+.n.kern rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.glued rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.muted rect { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 3; }
+.n.warn rect { fill: var(--warnfill); stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.n.val rect { fill: var(--region); stroke: var(--muted); }
+.n.chip rect { fill: var(--surface); stroke: var(--muted); }
+.n.chip.s rect { fill: var(--accentfill); stroke: var(--accent); }
+.n.dot rect { fill: var(--region); stroke: var(--muted); }
+.n .t { fill: var(--fg); font: 500 12.5px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+.n .s { fill: var(--muted); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .a { fill: var(--fg); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n.chip .t, .n.val .t, .n.dot .t { font: 400 11.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .hr { stroke: var(--line); stroke-width: 1; }
+.badge { font: 500 10px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.b-pl { fill: var(--accent); } .b-kern { fill: var(--kern); } .b-warn { fill: var(--warn); }
+.b-muted { fill: var(--muted); }
+.e { fill: none; stroke-width: 1.4; }
+.e.acl { stroke: var(--fg); }
+.e.muted { stroke: var(--muted); }
+.e.incl { stroke: var(--accent); stroke-dasharray: 6 4; }
+.e.kern { stroke: var(--kern); stroke-dasharray: 6 4; stroke-width: 1.6; }
+.e.eq { stroke: var(--accent); stroke-width: 2.2; }
+.e.warn { stroke: var(--warn); stroke-width: 1.8; }
+.e.ghost { stroke: var(--warn); stroke-dasharray: 3 3; }
+.e.uniq { stroke: var(--fg); stroke-dasharray: 3 3; }
+.e.map { stroke: var(--accent); stroke-dasharray: 2 3; stroke-width: 1.3; }
+.e.glued { stroke: var(--kern); stroke-width: 1.6; }
+.mk-acl, .mk-uniq { fill: var(--fg); } .mk-muted { fill: var(--muted); }
+.mk-incl, .mk-eq, .mk-map { fill: var(--accent); } .mk-kern, .mk-glued { fill: var(--kern); }
+.mk-warn, .mk-ghost { fill: var(--warn); }
+.lbg { fill: var(--surface); }
+.lb { font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.c-acl, .c-muted, .c-uniq { fill: var(--muted); } .c-fg { fill: var(--fg); }
+.c-incl, .c-eq, .c-map, .c-pl { fill: var(--accent); }
+.c-kern, .c-glued { fill: var(--kern); } .c-warn, .c-ghost { fill: var(--warn); }
+.rg { fill: var(--region); stroke: var(--line); }
+.rg.pl { fill: var(--accentfill); stroke: var(--accent); stroke-dasharray: 3 3; }
+.rg.kern { fill: var(--kernfill); stroke: var(--kern); stroke-dasharray: 3 3; }
+.rg.warn { fill: var(--warnfill); stroke: var(--warn); stroke-dasharray: 3 3; }
+.rg.plain { fill: none; stroke: var(--line); }
+.rgl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--muted); letter-spacing: 0.04em; }
+.rgl.pl { fill: var(--accent); } .rgl.kern { fill: var(--kern); } .rgl.warn { fill: var(--warn); }
+.hull { fill: none; stroke: var(--fg); stroke-dasharray: 2 3; stroke-width: 1; }
+.hl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.note { font: 400 11px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; fill: var(--muted); }
+.note.fg { fill: var(--fg); }
+.mono { font: 400 11px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.mono.m { fill: var(--muted); } .mono.acc { fill: var(--accent); } .mono.warn { fill: var(--warn); }
+.mono.kern { fill: var(--kern); }
+.br { fill: none; stroke: var(--muted); stroke-width: 1; }
+.br.acc { stroke: var(--accent); }
+</style><defs><marker id="pushout-acl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-incl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-incl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-kern" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-kern" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-eq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-eq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-warn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-warn" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-ghost" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ghost" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-uniq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-uniq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-map" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-map" d="M0,0 L10,5 L0,10 z"/></marker><marker id="pushout-glued" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-glued" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="bgr" width="820" height="430"/><g class="n kern"><rect x="45.0" y="50.0" width="150" height="40" rx="5"/><text class="t" x="120.0" y="67.0" text-anchor="middle">Customers</text><text class="s" x="120.0" y="82.0" text-anchor="middle">kernel</text></g><g class="n "><rect x="395.0" y="50.0" width="150" height="40" rx="5"/><text class="t" x="470.0" y="67.0" text-anchor="middle">Orders</text><text class="s" x="470.0" y="82.0" text-anchor="middle">5 entity types</text></g><g class="n "><rect x="45.0" y="230.0" width="150" height="40" rx="5"/><text class="t" x="120.0" y="247.0" text-anchor="middle">Shipping</text><text class="s" x="120.0" y="262.0" text-anchor="middle">5 entity types</text></g><g class="n glued"><rect x="385.0" y="230.0" width="170" height="40" rx="5"/><text class="t" x="470.0" y="247.0" text-anchor="middle">Orders ⊔ Shipping</text><text class="s" x="470.0" y="262.0" text-anchor="middle">8 entity types</text></g><g class="n "><rect x="690.0" y="320.0" width="60" height="30" rx="5"/><text class="t" x="720.0" y="339.5" text-anchor="middle">X</text></g><line class="e kern" x1="197.5" y1="70.0" x2="391.0" y2="70.0" marker-end="url(#pushout-kern)"/><line class="e kern" x1="120.0" y1="92.5" x2="120.0" y2="226.0" marker-end="url(#pushout-kern)"/><line class="e glued" x1="470.0" y1="92.5" x2="470.0" y2="226.0" marker-end="url(#pushout-glued)"/><line class="e glued" x1="197.5" y1="250.0" x2="381.0" y2="250.0" marker-end="url(#pushout-glued)"/><path class="e acl" d="M511.5,92.5 Q638.6,161.3 711.1,316.0" marker-end="url(#pushout-acl)"/><path class="e acl" d="M190.1,272.5 Q412.7,344.0 686.0,336.0" marker-end="url(#pushout-acl)"/><line class="e uniq" x1="536.2" y1="272.5" x2="686.0" y2="323.4" marker-end="url(#pushout-uniq)"/><path class="br" d="M436,212 L436,198 L450,198"/><rect class="lbg" x="249.3" y="51.0" width="89.9" height="13" rx="2"/><text class="lb c-kern" x="294.2" y="61.5" text-anchor="middle">ι₁ = D.map f₁</text><rect class="lbg" x="26.1" y="150.2" width="89.9" height="13" rx="2"/><text class="lb c-kern" x="112.0" y="160.8" text-anchor="end">ι₂ = D.map f₂</text><rect class="lbg" x="474.0" y="150.2" width="26.9" height="13" rx="2"/><text class="lb c-glued" x="478.0" y="160.8" text-anchor="start">inl</text><rect class="lbg" x="275.8" y="252.0" width="26.9" height="13" rx="2"/><text class="lb c-glued" x="289.2" y="262.5" text-anchor="middle">inr</text><rect class="lbg" x="628.3" y="166.9" width="20.6" height="13" rx="2"/><text class="lb c-acl" x="632.3" y="177.4" text-anchor="start">F₁</text><rect class="lbg" x="413.7" y="325.0" width="20.6" height="13" rx="2"/><text class="lb c-acl" x="424.0" y="335.5" text-anchor="middle">F₂</text><rect class="lbg" x="561.9" y="277.0" width="89.9" height="13" rx="2"/><text class="lb c-uniq" x="606.8" y="287.5" text-anchor="middle">desc (unique)</text><text class="mono" x="24.0" y="380.0" text-anchor="start">f₁ = customers_orders, f₂ = customers_shipping; condition: ι₁ ⋙ F₁ = ι₂ ⋙ F₂</text><text class="mono m" x="24.0" y="398.0" text-anchor="start">isPushout_kernel, from Gluing.isPushout</text><text class="note" x="24.0" y="416.0" text-anchor="start">glued: entities of both, Customer and Address once; equations of both</text></svg>

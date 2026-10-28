@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 420" width="860" height="420" role="img" aria-label="The example context map: seven contexts in the four Showcase domains, with inclusions out of published languages and the kernel, and two anti-corruption translations."><style>svg { --surface: #ffffff; --region: #f3f5f8; --fg: #1b232c; --muted: #5a6675; --line: #c9d1da; --accent: #17708f; --accentfill: rgba(23,112,143,0.10); --kern: #2f7a4b; --kernfill: rgba(47,122,75,0.10); --warn: #b4421b; --warnfill: rgba(180,66,27,0.08); } @media (prefers-color-scheme: dark) { svg { --surface: #19212a; --region: #202a35; --fg: #e3e9ef; --muted: #9aa7b5; --line: #34414f; --accent: #5db4d3; --accentfill: rgba(93,180,211,0.14); --kern: #6cc28d; --kernfill: rgba(108,194,141,0.13); --warn: #f08c5e; --warnfill: rgba(240,140,94,0.11); } }
+.bgr { fill: var(--surface); }
+.n rect { fill: var(--surface); stroke: var(--fg); stroke-width: 1.2; }
+.n.pl rect { fill: var(--accentfill); stroke: var(--accent); stroke-width: 1.5; }
+.n.kern rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.glued rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.muted rect { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 3; }
+.n.warn rect { fill: var(--warnfill); stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.n.val rect { fill: var(--region); stroke: var(--muted); }
+.n.chip rect { fill: var(--surface); stroke: var(--muted); }
+.n.chip.s rect { fill: var(--accentfill); stroke: var(--accent); }
+.n.dot rect { fill: var(--region); stroke: var(--muted); }
+.n .t { fill: var(--fg); font: 500 12.5px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+.n .s { fill: var(--muted); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .a { fill: var(--fg); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n.chip .t, .n.val .t, .n.dot .t { font: 400 11.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .hr { stroke: var(--line); stroke-width: 1; }
+.badge { font: 500 10px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.b-pl { fill: var(--accent); } .b-kern { fill: var(--kern); } .b-warn { fill: var(--warn); }
+.b-muted { fill: var(--muted); }
+.e { fill: none; stroke-width: 1.4; }
+.e.acl { stroke: var(--fg); }
+.e.muted { stroke: var(--muted); }
+.e.incl { stroke: var(--accent); stroke-dasharray: 6 4; }
+.e.kern { stroke: var(--kern); stroke-dasharray: 6 4; stroke-width: 1.6; }
+.e.eq { stroke: var(--accent); stroke-width: 2.2; }
+.e.warn { stroke: var(--warn); stroke-width: 1.8; }
+.e.ghost { stroke: var(--warn); stroke-dasharray: 3 3; }
+.e.uniq { stroke: var(--fg); stroke-dasharray: 3 3; }
+.e.map { stroke: var(--accent); stroke-dasharray: 2 3; stroke-width: 1.3; }
+.e.glued { stroke: var(--kern); stroke-width: 1.6; }
+.mk-acl, .mk-uniq { fill: var(--fg); } .mk-muted { fill: var(--muted); }
+.mk-incl, .mk-eq, .mk-map { fill: var(--accent); } .mk-kern, .mk-glued { fill: var(--kern); }
+.mk-warn, .mk-ghost { fill: var(--warn); }
+.lbg { fill: var(--surface); }
+.lb { font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.c-acl, .c-muted, .c-uniq { fill: var(--muted); } .c-fg { fill: var(--fg); }
+.c-incl, .c-eq, .c-map, .c-pl { fill: var(--accent); }
+.c-kern, .c-glued { fill: var(--kern); } .c-warn, .c-ghost { fill: var(--warn); }
+.rg { fill: var(--region); stroke: var(--line); }
+.rg.pl { fill: var(--accentfill); stroke: var(--accent); stroke-dasharray: 3 3; }
+.rg.kern { fill: var(--kernfill); stroke: var(--kern); stroke-dasharray: 3 3; }
+.rg.warn { fill: var(--warnfill); stroke: var(--warn); stroke-dasharray: 3 3; }
+.rg.plain { fill: none; stroke: var(--line); }
+.rgl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--muted); letter-spacing: 0.04em; }
+.rgl.pl { fill: var(--accent); } .rgl.kern { fill: var(--kern); } .rgl.warn { fill: var(--warn); }
+.hull { fill: none; stroke: var(--fg); stroke-dasharray: 2 3; stroke-width: 1; }
+.hl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.note { font: 400 11px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; fill: var(--muted); }
+.note.fg { fill: var(--fg); }
+.mono { font: 400 11px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.mono.m { fill: var(--muted); } .mono.acc { fill: var(--accent); } .mono.warn { fill: var(--warn); }
+.mono.kern { fill: var(--kern); }
+.br { fill: none; stroke: var(--muted); stroke-width: 1; }
+.br.acc { stroke: var(--accent); }
+</style><defs><marker id="context-map-acl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-incl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-incl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-kern" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-kern" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-eq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-eq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-warn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-warn" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-ghost" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ghost" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-uniq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-uniq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-map" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-map" d="M0,0 L10,5 L0,10 z"/></marker><marker id="context-map-glued" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-glued" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="bgr" width="860" height="420"/><rect class="rg " x="20" y="20" width="210" height="260" rx="8"/><text class="rgl " x="30" y="37">DOMAIN CATALOG</text><rect class="rg " x="262" y="20" width="316" height="384" rx="8"/><text class="rgl " x="272" y="37">DOMAIN ORDERS</text><rect class="rg " x="610" y="20" width="230" height="260" rx="8"/><text class="rgl " x="620" y="37">DOMAIN PAYMENTS</text><rect class="rg " x="610" y="296" width="230" height="108" rx="8"/><text class="rgl " x="620" y="313">DOMAIN SHIPPING</text><g class="n pl"><rect x="40.0" y="72.0" width="170" height="40" rx="5"/><text class="t" x="125.0" y="89.0" text-anchor="middle">CatalogPL</text><text class="s" x="125.0" y="104.0" text-anchor="middle">Product, Variant</text></g><g class="n "><rect x="40.0" y="200.0" width="170" height="40" rx="5"/><text class="t" x="125.0" y="217.0" text-anchor="middle">Catalog</text><text class="s" x="125.0" y="232.0" text-anchor="middle">4 entity types</text></g><g class="n pl"><rect x="320.0" y="72.0" width="200" height="40" rx="5"/><text class="t" x="420.0" y="89.0" text-anchor="middle">OrdersPL</text><text class="s" x="420.0" y="104.0" text-anchor="middle">Customer, Address, Order</text></g><g class="n "><rect x="320.0" y="200.0" width="200" height="40" rx="5"/><text class="t" x="420.0" y="217.0" text-anchor="middle">Orders</text><text class="s" x="420.0" y="232.0" text-anchor="middle">5 entity types</text></g><g class="n kern"><rect x="320.0" y="330.0" width="200" height="40" rx="5"/><text class="t" x="420.0" y="347.0" text-anchor="middle">Customers</text><text class="s" x="420.0" y="362.0" text-anchor="middle">Customer, Address</text><text class="badge b-kern" x="322.0" y="325.0">kernel</text></g><g class="n "><rect x="640.0" y="200.0" width="170" height="40" rx="5"/><text class="t" x="725.0" y="217.0" text-anchor="middle">Payments</text><text class="s" x="725.0" y="232.0" text-anchor="middle">6 entity types</text></g><g class="n "><rect x="640.0" y="330.0" width="170" height="40" rx="5"/><text class="t" x="725.0" y="347.0" text-anchor="middle">Shipping</text><text class="s" x="725.0" y="362.0" text-anchor="middle">5 entity types</text></g><line class="e incl" x1="125.0" y1="114.5" x2="125.0" y2="196.0" marker-end="url(#context-map-incl)"/><line class="e acl" x1="176.9" y1="114.5" x2="364.7" y2="196.0" marker-end="url(#context-map-acl)"/><line class="e incl" x1="420.0" y1="114.5" x2="420.0" y2="196.0" marker-end="url(#context-map-incl)"/><line class="e acl" x1="473.6" y1="114.5" x2="667.8" y2="196.0" marker-end="url(#context-map-acl)"/><line class="e kern" x1="420.0" y1="327.5" x2="420.0" y2="244.0" marker-end="url(#context-map-kern)"/><line class="e kern" x1="522.5" y1="350.0" x2="636.0" y2="350.0" marker-end="url(#context-map-kern)"/><rect class="lbg" x="129.0" y="146.2" width="64.7" height="13" rx="2"/><text class="lb c-incl" x="133.0" y="156.8" text-anchor="start">inclusion</text><rect class="lbg" x="206.0" y="150.7" width="89.9" height="13" rx="2"/><text class="lb c-acl" x="251.0" y="161.2" text-anchor="middle">catalogOrders</text><rect class="lbg" x="424.0" y="146.2" width="64.7" height="13" rx="2"/><text class="lb c-incl" x="428.0" y="156.8" text-anchor="start">inclusion</text><rect class="lbg" x="527.3" y="135.2" width="96.2" height="13" rx="2"/><text class="lb c-acl" x="575.4" y="145.7" text-anchor="middle">ordersPayments</text><rect class="lbg" x="424.0" y="276.8" width="64.7" height="13" rx="2"/><text class="lb c-kern" x="428.0" y="287.2" text-anchor="start">inclusion</text><rect class="lbg" x="546.9" y="331.0" width="64.7" height="13" rx="2"/><text class="lb c-kern" x="579.2" y="341.5" text-anchor="middle">inclusion</text></svg>

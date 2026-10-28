@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 420" width="800" height="420" role="img" aria-label="The Orders schema: five entity types, six references, attributes into value types, two equations and one aggregate with a member."><style>svg { --surface: #ffffff; --region: #f3f5f8; --fg: #1b232c; --muted: #5a6675; --line: #c9d1da; --accent: #17708f; --accentfill: rgba(23,112,143,0.10); --kern: #2f7a4b; --kernfill: rgba(47,122,75,0.10); --warn: #b4421b; --warnfill: rgba(180,66,27,0.08); } @media (prefers-color-scheme: dark) { svg { --surface: #19212a; --region: #202a35; --fg: #e3e9ef; --muted: #9aa7b5; --line: #34414f; --accent: #5db4d3; --accentfill: rgba(93,180,211,0.14); --kern: #6cc28d; --kernfill: rgba(108,194,141,0.13); --warn: #f08c5e; --warnfill: rgba(240,140,94,0.11); } }
+.bgr { fill: var(--surface); }
+.n rect { fill: var(--surface); stroke: var(--fg); stroke-width: 1.2; }
+.n.pl rect { fill: var(--accentfill); stroke: var(--accent); stroke-width: 1.5; }
+.n.kern rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.glued rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.muted rect { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 3; }
+.n.warn rect { fill: var(--warnfill); stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.n.val rect { fill: var(--region); stroke: var(--muted); }
+.n.chip rect { fill: var(--surface); stroke: var(--muted); }
+.n.chip.s rect { fill: var(--accentfill); stroke: var(--accent); }
+.n.dot rect { fill: var(--region); stroke: var(--muted); }
+.n .t { fill: var(--fg); font: 500 12.5px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+.n .s { fill: var(--muted); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .a { fill: var(--fg); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n.chip .t, .n.val .t, .n.dot .t { font: 400 11.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .hr { stroke: var(--line); stroke-width: 1; }
+.badge { font: 500 10px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.b-pl { fill: var(--accent); } .b-kern { fill: var(--kern); } .b-warn { fill: var(--warn); }
+.b-muted { fill: var(--muted); }
+.e { fill: none; stroke-width: 1.4; }
+.e.acl { stroke: var(--fg); }
+.e.muted { stroke: var(--muted); }
+.e.incl { stroke: var(--accent); stroke-dasharray: 6 4; }
+.e.kern { stroke: var(--kern); stroke-dasharray: 6 4; stroke-width: 1.6; }
+.e.eq { stroke: var(--accent); stroke-width: 2.2; }
+.e.warn { stroke: var(--warn); stroke-width: 1.8; }
+.e.ghost { stroke: var(--warn); stroke-dasharray: 3 3; }
+.e.uniq { stroke: var(--fg); stroke-dasharray: 3 3; }
+.e.map { stroke: var(--accent); stroke-dasharray: 2 3; stroke-width: 1.3; }
+.e.glued { stroke: var(--kern); stroke-width: 1.6; }
+.mk-acl, .mk-uniq { fill: var(--fg); } .mk-muted { fill: var(--muted); }
+.mk-incl, .mk-eq, .mk-map { fill: var(--accent); } .mk-kern, .mk-glued { fill: var(--kern); }
+.mk-warn, .mk-ghost { fill: var(--warn); }
+.lbg { fill: var(--surface); }
+.lb { font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.c-acl, .c-muted, .c-uniq { fill: var(--muted); } .c-fg { fill: var(--fg); }
+.c-incl, .c-eq, .c-map, .c-pl { fill: var(--accent); }
+.c-kern, .c-glued { fill: var(--kern); } .c-warn, .c-ghost { fill: var(--warn); }
+.rg { fill: var(--region); stroke: var(--line); }
+.rg.pl { fill: var(--accentfill); stroke: var(--accent); stroke-dasharray: 3 3; }
+.rg.kern { fill: var(--kernfill); stroke: var(--kern); stroke-dasharray: 3 3; }
+.rg.warn { fill: var(--warnfill); stroke: var(--warn); stroke-dasharray: 3 3; }
+.rg.plain { fill: none; stroke: var(--line); }
+.rgl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--muted); letter-spacing: 0.04em; }
+.rgl.pl { fill: var(--accent); } .rgl.kern { fill: var(--kern); } .rgl.warn { fill: var(--warn); }
+.hull { fill: none; stroke: var(--fg); stroke-dasharray: 2 3; stroke-width: 1; }
+.hl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.note { font: 400 11px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; fill: var(--muted); }
+.note.fg { fill: var(--fg); }
+.mono { font: 400 11px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.mono.m { fill: var(--muted); } .mono.acc { fill: var(--accent); } .mono.warn { fill: var(--warn); }
+.mono.kern { fill: var(--kern); }
+.br { fill: none; stroke: var(--muted); stroke-width: 1; }
+.br.acc { stroke: var(--accent); }
+</style><defs><marker id="schema-orders-acl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-incl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-incl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-kern" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-kern" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-eq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-eq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-warn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-warn" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-ghost" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ghost" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-uniq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-uniq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-map" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-map" d="M0,0 L10,5 L0,10 z"/></marker><marker id="schema-orders-glued" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-glued" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="bgr" width="800" height="420"/><rect class="hull" x="292" y="120" width="476" height="150" rx="10"/><text class="hl" x="302" y="113">aggregate: root Order, member OrderLine</text><g class="n "><rect x="55.0" y="58.0" width="150" height="44" rx="5"/><text class="t" x="130.0" y="75.0" text-anchor="middle">Customer</text><line class="hr" x1="55.0" y1="82.0" x2="205.0" y2="82.0"/><text class="a" x="63.0" y="96.0">name : string</text></g><g class="n "><rect x="55.0" y="271.0" width="150" height="58" rx="5"/><text class="t" x="130.0" y="288.0" text-anchor="middle">Address</text><line class="hr" x1="55.0" y1="295.0" x2="205.0" y2="295.0"/><text class="a" x="63.0" y="309.0">street : string</text><text class="a" x="63.0" y="323.0">city : string</text><text class="badge b-muted" x="57.0" y="342.0">value object</text></g><g class="n "><rect x="310.0" y="159.0" width="170" height="72" rx="5"/><text class="t" x="395.0" y="176.0" text-anchor="middle">Order</text><line class="hr" x1="310.0" y1="183.0" x2="480.0" y2="183.0"/><text class="a" x="318.0" y="197.0">id : uuid</text><text class="a" x="318.0" y="211.0">placedOn : date</text><text class="a" x="318.0" y="225.0">status : OrderStatus</text></g><g class="n "><rect x="575.0" y="159.0" width="170" height="72" rx="5"/><text class="t" x="660.0" y="176.0" text-anchor="middle">OrderLine</text><line class="hr" x1="575.0" y1="183.0" x2="745.0" y2="183.0"/><text class="a" x="583.0" y="197.0">quantity : int</text><text class="a" x="583.0" y="211.0">unitPrice : decimal</text><text class="a" x="583.0" y="225.0">sku : string</text></g><g class="n "><rect x="575.0" y="309.0" width="170" height="72" rx="5"/><text class="t" x="660.0" y="326.0" text-anchor="middle">Product</text><line class="hr" x1="575.0" y1="333.0" x2="745.0" y2="333.0"/><text class="a" x="583.0" y="347.0">sku : string</text><text class="a" x="583.0" y="361.0">name : string</text><text class="a" x="583.0" y="375.0">listPrice : decimal</text></g><line class="e eq" x1="307.5" y1="157.0" x2="189.9" y2="106.0" marker-end="url(#schema-orders-eq)"/><line class="e eq" x1="130.0" y1="104.5" x2="130.0" y2="267.0" marker-end="url(#schema-orders-eq)"/><line class="e eq" x1="307.5" y1="229.7" x2="209.0" y2="268.7" marker-end="url(#schema-orders-eq)"/><path class="e acl" d="M307.5,189.0 Q237.5,184.3 160.6,267.0" marker-end="url(#schema-orders-acl)"/><line class="e acl" x1="572.5" y1="195.0" x2="484.0" y2="195.0" marker-end="url(#schema-orders-acl)"/><line class="e acl" x1="660.0" y1="233.5" x2="660.0" y2="305.0" marker-end="url(#schema-orders-acl)"/><rect class="lbg" x="219.8" y="137.9" width="58.4" height="13" rx="2"/><text class="lb c-eq" x="249.0" y="148.4" text-anchor="middle">customer</text><rect class="lbg" x="73.9" y="176.8" width="52.1" height="13" rx="2"/><text class="lb c-eq" x="122.0" y="187.2" text-anchor="end">address</text><rect class="lbg" x="226.0" y="231.0" width="45.8" height="13" rx="2"/><text class="lb c-eq" x="248.9" y="241.5" text-anchor="middle">billTo</text><rect class="lbg" x="201.8" y="192.0" width="45.8" height="13" rx="2"/><text class="lb c-acl" x="224.7" y="202.5" text-anchor="middle">shipTo</text><rect class="lbg" x="483.3" y="198.0" width="89.9" height="13" rx="2"/><text class="lb c-acl" x="528.2" y="208.5" text-anchor="middle">order (owner)</text><rect class="lbg" x="603.9" y="268.8" width="52.1" height="13" rx="2"/><text class="lb c-acl" x="652.0" y="279.3" text-anchor="end">product</text><text class="mono m" x="24.0" y="404.0" text-anchor="start">equations:</text><text class="mono acc" x="100.0" y="404.0" text-anchor="start">billTo = customer.address</text><text class="mono" x="300.0" y="404.0" text-anchor="start">sku = product.sku  (out of OrderLine, ends in string)</text></svg>

@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 260" width="820" height="260" role="img" aria-label="A declared route equation identifies two routes in J, and D must send them to the same functor; an undeclared diamond keeps two morphisms and one reference per route."><style>svg { --surface: #ffffff; --region: #f3f5f8; --fg: #1b232c; --muted: #5a6675; --line: #c9d1da; --accent: #17708f; --accentfill: rgba(23,112,143,0.10); --kern: #2f7a4b; --kernfill: rgba(47,122,75,0.10); --warn: #b4421b; --warnfill: rgba(180,66,27,0.08); } @media (prefers-color-scheme: dark) { svg { --surface: #19212a; --region: #202a35; --fg: #e3e9ef; --muted: #9aa7b5; --line: #34414f; --accent: #5db4d3; --accentfill: rgba(93,180,211,0.14); --kern: #6cc28d; --kernfill: rgba(108,194,141,0.13); --warn: #f08c5e; --warnfill: rgba(240,140,94,0.11); } }
+.bgr { fill: var(--surface); }
+.n rect { fill: var(--surface); stroke: var(--fg); stroke-width: 1.2; }
+.n.pl rect { fill: var(--accentfill); stroke: var(--accent); stroke-width: 1.5; }
+.n.kern rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.glued rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.muted rect { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 3; }
+.n.warn rect { fill: var(--warnfill); stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.n.val rect { fill: var(--region); stroke: var(--muted); }
+.n.chip rect { fill: var(--surface); stroke: var(--muted); }
+.n.chip.s rect { fill: var(--accentfill); stroke: var(--accent); }
+.n.dot rect { fill: var(--region); stroke: var(--muted); }
+.n .t { fill: var(--fg); font: 500 12.5px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+.n .s { fill: var(--muted); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .a { fill: var(--fg); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n.chip .t, .n.val .t, .n.dot .t { font: 400 11.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .hr { stroke: var(--line); stroke-width: 1; }
+.badge { font: 500 10px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.b-pl { fill: var(--accent); } .b-kern { fill: var(--kern); } .b-warn { fill: var(--warn); }
+.b-muted { fill: var(--muted); }
+.e { fill: none; stroke-width: 1.4; }
+.e.acl { stroke: var(--fg); }
+.e.muted { stroke: var(--muted); }
+.e.incl { stroke: var(--accent); stroke-dasharray: 6 4; }
+.e.kern { stroke: var(--kern); stroke-dasharray: 6 4; stroke-width: 1.6; }
+.e.eq { stroke: var(--accent); stroke-width: 2.2; }
+.e.warn { stroke: var(--warn); stroke-width: 1.8; }
+.e.ghost { stroke: var(--warn); stroke-dasharray: 3 3; }
+.e.uniq { stroke: var(--fg); stroke-dasharray: 3 3; }
+.e.map { stroke: var(--accent); stroke-dasharray: 2 3; stroke-width: 1.3; }
+.e.glued { stroke: var(--kern); stroke-width: 1.6; }
+.mk-acl, .mk-uniq { fill: var(--fg); } .mk-muted { fill: var(--muted); }
+.mk-incl, .mk-eq, .mk-map { fill: var(--accent); } .mk-kern, .mk-glued { fill: var(--kern); }
+.mk-warn, .mk-ghost { fill: var(--warn); }
+.lbg { fill: var(--surface); }
+.lb { font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.c-acl, .c-muted, .c-uniq { fill: var(--muted); } .c-fg { fill: var(--fg); }
+.c-incl, .c-eq, .c-map, .c-pl { fill: var(--accent); }
+.c-kern, .c-glued { fill: var(--kern); } .c-warn, .c-ghost { fill: var(--warn); }
+.rg { fill: var(--region); stroke: var(--line); }
+.rg.pl { fill: var(--accentfill); stroke: var(--accent); stroke-dasharray: 3 3; }
+.rg.kern { fill: var(--kernfill); stroke: var(--kern); stroke-dasharray: 3 3; }
+.rg.warn { fill: var(--warnfill); stroke: var(--warn); stroke-dasharray: 3 3; }
+.rg.plain { fill: none; stroke: var(--line); }
+.rgl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--muted); letter-spacing: 0.04em; }
+.rgl.pl { fill: var(--accent); } .rgl.kern { fill: var(--kern); } .rgl.warn { fill: var(--warn); }
+.hull { fill: none; stroke: var(--fg); stroke-dasharray: 2 3; stroke-width: 1; }
+.hl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.note { font: 400 11px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; fill: var(--muted); }
+.note.fg { fill: var(--fg); }
+.mono { font: 400 11px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.mono.m { fill: var(--muted); } .mono.acc { fill: var(--accent); } .mono.warn { fill: var(--warn); }
+.mono.kern { fill: var(--kern); }
+.br { fill: none; stroke: var(--muted); stroke-width: 1; }
+.br.acc { stroke: var(--accent); }
+</style><defs><marker id="routes-acl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-incl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-incl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-kern" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-kern" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-eq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-eq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-warn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-warn" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-ghost" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ghost" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-uniq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-uniq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-map" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-map" d="M0,0 L10,5 L0,10 z"/></marker><marker id="routes-glued" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-glued" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="bgr" width="820" height="260"/><rect class="rg pl" x="20" y="20" width="390" height="220" rx="8"/><text class="rgl pl" x="30" y="37">DECLARED: routeEqns p q</text><rect class="rg " x="430" y="20" width="390" height="220" rx="8"/><text class="rgl " x="440" y="37">FREE: no declaration</text><g class="n "><rect x="58.0" y="113.0" width="44" height="34" rx="5"/><text class="t" x="80.0" y="134.5" text-anchor="middle">U</text></g><g class="n "><rect x="193.0" y="53.0" width="44" height="34" rx="5"/><text class="t" x="215.0" y="74.5" text-anchor="middle">A</text></g><g class="n "><rect x="193.0" y="173.0" width="44" height="34" rx="5"/><text class="t" x="215.0" y="194.5" text-anchor="middle">B</text></g><g class="n "><rect x="328.0" y="113.0" width="44" height="34" rx="5"/><text class="t" x="350.0" y="134.5" text-anchor="middle">D</text></g><line class="e acl" x1="104.5" y1="119.1" x2="189.0" y2="81.6" marker-end="url(#routes-acl)"/><line class="e acl" x1="239.5" y1="80.9" x2="324.0" y2="118.4" marker-end="url(#routes-acl)"/><line class="e acl" x1="104.5" y1="140.9" x2="189.0" y2="178.4" marker-end="url(#routes-acl)"/><line class="e acl" x1="239.5" y1="179.1" x2="324.0" y2="141.6" marker-end="url(#routes-acl)"/><g class="n "><rect x="468.0" y="113.0" width="44" height="34" rx="5"/><text class="t" x="490.0" y="134.5" text-anchor="middle">U</text></g><g class="n "><rect x="603.0" y="53.0" width="44" height="34" rx="5"/><text class="t" x="625.0" y="74.5" text-anchor="middle">A</text></g><g class="n "><rect x="603.0" y="173.0" width="44" height="34" rx="5"/><text class="t" x="625.0" y="194.5" text-anchor="middle">B</text></g><g class="n "><rect x="738.0" y="113.0" width="44" height="34" rx="5"/><text class="t" x="760.0" y="134.5" text-anchor="middle">D</text></g><line class="e acl" x1="514.5" y1="119.1" x2="599.0" y2="81.6" marker-end="url(#routes-acl)"/><line class="e acl" x1="649.5" y1="80.9" x2="734.0" y2="118.4" marker-end="url(#routes-acl)"/><line class="e acl" x1="514.5" y1="140.9" x2="599.0" y2="178.4" marker-end="url(#routes-acl)"/><line class="e acl" x1="649.5" y1="179.1" x2="734.0" y2="141.6" marker-end="url(#routes-acl)"/><rect class="lbg" x="135.9" y="83.1" width="14.3" height="13" rx="2"/><text class="lb c-acl" x="143.1" y="93.6" text-anchor="middle">f</text><rect class="lbg" x="278.3" y="82.4" width="14.3" height="13" rx="2"/><text class="lb c-acl" x="285.4" y="92.9" text-anchor="middle">g</text><rect class="lbg" x="132.8" y="158.9" width="20.6" height="13" rx="2"/><text class="lb c-acl" x="143.1" y="169.4" text-anchor="middle">f&#x27;</text><rect class="lbg" x="275.1" y="159.6" width="20.6" height="13" rx="2"/><text class="lb c-acl" x="285.4" y="170.1" text-anchor="middle">g&#x27;</text><rect class="lbg" x="545.9" y="83.1" width="14.3" height="13" rx="2"/><text class="lb c-acl" x="553.1" y="93.6" text-anchor="middle">f</text><rect class="lbg" x="688.3" y="82.4" width="14.3" height="13" rx="2"/><text class="lb c-acl" x="695.4" y="92.9" text-anchor="middle">g</text><rect class="lbg" x="542.8" y="158.9" width="20.6" height="13" rx="2"/><text class="lb c-acl" x="553.1" y="169.4" text-anchor="middle">f&#x27;</text><rect class="lbg" x="685.1" y="159.6" width="20.6" height="13" rx="2"/><text class="lb c-acl" x="695.4" y="170.1" text-anchor="middle">g&#x27;</text><text class="mono acc" x="215.0" y="126.0" text-anchor="middle">p = f ≫ g</text><text class="mono acc" x="215.0" y="141.0" text-anchor="middle">q = f&#x27; ≫ g&#x27;</text><text class="mono acc" x="215.0" y="228.0" text-anchor="middle">coherent: D.map p = D.map q</text><text class="mono" x="625.0" y="126.0" text-anchor="middle">p ≠ q in J</text><text class="mono m" x="625.0" y="228.0" text-anchor="middle">y ↦ D p y and D q y: two references</text></svg>
