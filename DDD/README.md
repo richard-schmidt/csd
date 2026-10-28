@@ -324,7 +324,8 @@ Revision after the decision review of phases 1 to 3 (see Decisions), in order:
 3. `Schema.lean`: value-object annotations and their check; the gluing check
    reports the names that clash (`gluingClashes`). Done.
 4. `States.lean`: attributed states with specified bijections to `K v`;
-   `restrictState` and data gluing follow.
+   `restrictState` and data gluing follow (`State.ext'`, `State.values_eq`).
+   Done.
 5. `PathEq.lean`, `Glue.lean`: classes of equal paths computed once per
    source; `decide +kernel` in the examples.
 6. `ContextMap.lean`: `J` presented by declared equations between routes, `D`
