@@ -35,7 +35,7 @@ open CategoryTheory
 
 variable (S : Schema)
 
-/-- The objects of a schema: declared entity types and all value types. -/
+/-- `o` is an object of the schema: a declared entity type, or a value type. -/
 def IsOb : Ob → Prop
   | .entity e => e ∈ S.entities
   | .value _ => True
