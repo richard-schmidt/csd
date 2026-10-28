@@ -18,8 +18,9 @@ The shallow embedding of a schema `S`:
 
 A deep path, a source and a list of names, and a path of the quiver correspond
 through `Schema.names`: a path is determined by its source and its names
-(`names_injective`), and in a well-formed schema every list of names with a
-target is the list of names of a path (`exists_path`).
+(`names_injective`), it splits along every split of its names (`exists_split`),
+and in a well-formed schema every list of names with a target is the list of
+names of a path (`exists_path`).
 
 `S.PathEq a l l'` says that the paths named `l` and `l'` out of `a` exist, are
 parallel and present the same morphism of `S.cat`. Every equation of a
@@ -92,6 +93,27 @@ theorem names_injective {a : S.Obj} :
     obtain rfl := names_injective p q h₁
     obtain rfl : e = e' := Subtype.ext (List.singleton_inj.mp h₂)
     rfl
+
+/-- A path whose names are `u ++ v` is a path named `u` followed by a path named `v`. -/
+theorem exists_split {a : S.Obj} :
+    ∀ {b : S.Obj} (p : Quiver.Path a b) (u v : List String), names p = u ++ v →
+      ∃ (c : S.Obj) (p₁ : Quiver.Path a c) (p₂ : Quiver.Path c b),
+        p = p₁.comp p₂ ∧ names p₁ = u ∧ names p₂ = v
+  | _, p, u, v, h => by
+    rcases List.eq_nil_or_concat v with rfl | ⟨v', n, rfl⟩
+    · exact ⟨_, p, .nil, rfl, by simpa using h, rfl⟩
+    · cases p with
+      | nil => simp at h
+      | cons p e =>
+        rw [names_cons, List.concat_eq_append, ← List.append_assoc] at h
+        obtain ⟨h₁, h₂⟩ := List.append_inj' h rfl
+        obtain ⟨c, p₁, p₂, rfl, hu, hv⟩ := exists_split p u v' h₁
+        exact ⟨c, p₁, p₂.cons e, rfl, hu, by simp [hv, List.singleton_inj.mp h₂]⟩
+
+/-- `names` on composites in the path category. -/
+@[simp] theorem names_paths_comp {a b c : Paths S.Obj} (p : a ⟶ b) (q : b ⟶ c) :
+    names (S := S) (p ≫ q) = names (S := S) p ++ names (S := S) q :=
+  names_comp p q
 
 variable (S)
 
