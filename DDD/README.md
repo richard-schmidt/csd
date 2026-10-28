@@ -241,6 +241,28 @@ Phase 1 is complete, with no `sorry`:
    equalities and inequalities, and a schema that violates an aggregate
    boundary in each, checked with `decide`.
 
+Phase 2 work items:
+
+1. `Translation.lean`: deep translations (images of entity types and of
+   generators; unlisted ones keep their names, so an inclusion between
+   schemas with the same names is the empty translation), validity with its
+   checker and soundness lemma, the induced functor between the schema
+   categories, and restriction `Δ_T`.
+2. `ContextMap.lean`: a context map as a quiver of contexts with a schema per
+   context and a valid translation per arrow; the diagram `D : Paths J ⥤ Cat`;
+   the lax integration `(Grothendieck (D ⋙ Cat.opFunctor))ᵒᵖ` with the
+   embedding of each context; lax non-interference.
+3. `Examples/Payments.lean`, `Examples/Shipping.lean`: the two remaining
+   schemas, checked with `decide`.
+4. `Examples/Integration.lean`: the translations Catalog → Orders,
+   Orders → Payments and Orders → Shipping, checked with `decide`; the
+   four-context map on the arrows of `Showcase/ContextMapNotifications.lean` as
+   a functor; non-interference for it; a reference across contexts in the lax
+   integration.
+
+The check that declared composite translations agree is vacuous for this map,
+which is a tree, and waits for a map with two paths between the same contexts.
+
 ## Decisions
 
 - Default integration: lax. Strict integration is an explicit merge.

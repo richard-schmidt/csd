@@ -19,7 +19,8 @@ object, name paths that present the same morphism of `Schema.cat`?
   path up in it (`pathEqAcyclic_iff`).
 
 `pathEqFree` and `pathEqAcyclic` are sound in every well-formed schema; the
-hypotheses `eqns = []` and `Acyclic` are needed for the converse only. A schema
+hypotheses `eqns = []` and `Acyclic` are needed for the converse only. `pathEq`
+tries both. A schema
 with both cycles and equations needs a rewriting system, supplied as a
 certificate.
 -/
@@ -420,6 +421,30 @@ theorem pathEqAcyclic_complete (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj)
 theorem pathEqAcyclic_iff (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj)
     (l l' : List String) : S.pathEqAcyclic a.1 l l' = true ↔ S.PathEq a l l' :=
   ⟨pathEqAcyclic_sound hS a, pathEqAcyclic_complete hS hA a⟩
+
+/-! ## Both procedures -/
+
+variable (S)
+
+/-- Path equality by `pathEqFree` or `pathEqAcyclic`. -/
+def pathEq (o : Ob) (l l' : List String) : Bool :=
+  S.pathEqFree o l l' || S.pathEqAcyclic o l l'
+
+variable {S}
+
+theorem pathEq_sound (hS : S.WellFormed) (a : S.Obj) {l l' : List String}
+    (h : S.pathEq a.1 l l' = true) : S.PathEq a l l' := by
+  rcases Bool.or_eq_true_iff.mp h with h | h
+  · exact pathEqFree_sound hS a h
+  · exact pathEqAcyclic_sound hS a h
+
+theorem pathEq_iff_of_free (hS : S.WellFormed) (hfree : S.eqns = []) (a : S.Obj)
+    (l l' : List String) : S.pathEq a.1 l l' = true ↔ S.PathEq a l l' :=
+  ⟨pathEq_sound hS a, fun h => by simp [pathEq, pathEqFree_complete hfree a h]⟩
+
+theorem pathEq_iff_of_acyclic (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj)
+    (l l' : List String) : S.pathEq a.1 l l' = true ↔ S.PathEq a l l' :=
+  ⟨pathEq_sound hS a, fun h => by simp [pathEq, pathEqAcyclic_complete hS hA a h]⟩
 
 end Schema
 

@@ -187,6 +187,39 @@ theorem pathEq_of_mem_eqns (hS : S.WellFormed) {q : Equation} (hq : q ∈ S.eqns
   obtain rfl : b = b' := Subtype.ext hb.symm
   exact ⟨b, p, p', hp, hp', CategoryTheory.Quotient.sound _ ⟨q, hq, rfl, hp, hp'⟩⟩
 
+/-- In a well-formed schema, the path named `l` from `a` to `b`, given that `l`
+leads from `a` to `b`. -/
+def pathOf (hS : S.WellFormed) :
+    ∀ (a b : S.Obj) (l : List String), S.tgt? a.1 l = some b.1 → Quiver.Path a b
+  | a, b, [], h => (Subtype.ext (Option.some.inj h) : a = b) ▸ Quiver.Path.nil
+  | a, b, n :: ns, h =>
+    match hs : S.step? a.1 n with
+    | none => absurd h (by simp [hs])
+    | some o =>
+      (Quiver.Hom.toPath (show a ⟶ ⟨o, isOb_of_step? hS hs⟩ from ⟨n, hs⟩)).comp
+        (pathOf hS ⟨o, isOb_of_step? hS hs⟩ b ns (by simpa [hs] using h))
+
+@[simp] theorem names_pathOf (hS : S.WellFormed) :
+    ∀ (a b : S.Obj) (l : List String) (h : S.tgt? a.1 l = some b.1),
+      names (pathOf hS a b l h) = l
+  | a, b, [], h => by
+    obtain rfl : a = b := Subtype.ext (Option.some.inj h)
+    rfl
+  | a, b, n :: ns, h => by
+    unfold pathOf
+    split
+    · rename_i hs
+      simp [hs] at h
+    · simp [names_pathOf]
+
+/-- Paths whose names satisfy `PathEq` present the same morphism. -/
+theorem PathEq.mor_eq {a b : S.Obj} {p q : Quiver.Path a b}
+    (h : S.PathEq a (names p) (names q)) : mor p = mor q := by
+  obtain ⟨b', p', q', hp, hq, hm⟩ := h
+  obtain rfl : b' = b :=
+    Subtype.ext (Option.some.inj ((tgt?_names p').symm.trans (hp ▸ tgt?_names p)))
+  rwa [names_injective p' p hp, names_injective q' q hq] at hm
+
 end Schema
 
 end DDD
