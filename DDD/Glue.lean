@@ -697,4 +697,136 @@ theorem isPushout : IsPushout (C := Cat.{0, 0}) D.ι₁ D.ι₂ D.inl D.inr :=
 
 end Gluing
 
+/-! ## Strict non-interference
+
+A merge can impose an equation of one schema on the other, or more generally a
+translation can identify paths or add morphisms between images. The check below
+decides, for acyclic schemas, that the functor of a translation is full and
+faithful. -/
+
+namespace Schema
+
+/-- The objects of a schema, as a list: the declared entity types, then the value
+types. -/
+def obs (S : Schema) : List Ob := S.entities.map .entity ++ ValueType.all.map .value
+
+theorem mem_obs {S : Schema} {o : Ob} (h : S.IsOb o) : o ∈ S.obs := by
+  cases o with
+  | entity e => exact List.mem_append_left _ (List.mem_map.mpr ⟨e, h, rfl⟩)
+  | value v => exact List.mem_append_right _ (List.mem_map.mpr ⟨v, ValueType.mem_all v, rfl⟩)
+
+/-- Only the empty path leaves a value type. -/
+theorem eq_nil_of_tgt?_value {S : Schema} {v : ValueType} {l : List String} {x : Ob}
+    (h : S.tgt? (.value v) l = some x) : l = [] ∧ x = .value v := by
+  cases l with
+  | nil => exact ⟨rfl, (Option.some.inj h).symm⟩
+  | cons n ns => simp [step?] at h
+
+end Schema
+
+namespace Translation
+
+open Schema
+
+variable (T : Translation)
+
+/-- Faithfulness at the entity type `e`: parallel paths out of `e` whose images are
+equal in `S'` are equal in `S`. -/
+def faithfulAt (S S' : Schema) (e : String) : Bool :=
+  (S.paths (.entity e) S.entities.length).all fun l =>
+    (S.paths (.entity e) S.entities.length).all fun l' =>
+      !(decide (S.tgt? (.entity e) l = S.tgt? (.entity e) l') &&
+          S'.pathEq (T.ob (.entity e)) (T.mapPath S (.entity e) l) (T.mapPath S (.entity e) l')) ||
+        S.pathEq (.entity e) l l'
+
+/-- Fullness at the entity type `e`: every path of `S'` from the image of `e` to the
+image of an object `o` of `S` is equal to the image of a path from `e` to `o`. -/
+def fullAt (S S' : Schema) (e : String) : Bool :=
+  (S'.paths (T.ob (.entity e)) S'.entities.length).all fun g => S.obs.all fun o =>
+    !decide (S'.tgt? (T.ob (.entity e)) g = some (T.ob o)) ||
+      (S.paths (.entity e) S.entities.length).any fun l =>
+        decide (S.tgt? (.entity e) l = some o) &&
+          S'.pathEq (T.ob (.entity e)) (T.mapPath S (.entity e) l) g
+
+/-- The check for strict non-interference: the functor of `T` is faithful and full,
+for acyclic `S` and `S'`. -/
+def checkFullyFaithful (S S' : Schema) : Bool :=
+  S.entities.all fun e => T.faithfulAt S S' e && T.fullAt S S' e
+
+variable {T} {S S' : Schema}
+
+theorem checkFullyFaithful_sound (hS : S.WellFormed) (hS' : S'.WellFormed) (hA : S.Acyclic)
+    (hA' : S'.Acyclic) (hT : T.Valid S S') (h : T.checkFullyFaithful S S' = true) :
+    (functor hS' hT).Full ∧ (functor hS' hT).Faithful := by
+  simp only [checkFullyFaithful, List.all_eq_true, Bool.and_eq_true] at h
+  constructor
+  · refine ⟨fun {X Y} f => ?_⟩
+    obtain ⟨a, rfl⟩ := S.obj_surjective X
+    obtain ⟨b, rfl⟩ := S.obj_surjective Y
+    obtain ⟨g, rfl⟩ := S'.mor_surjective (a := obj hT a) (b := obj hT b) f
+    obtain ⟨o, ho⟩ := a
+    cases o with
+    | value v =>
+      obtain ⟨hg, hb⟩ := eq_nil_of_tgt?_value (tgt?_names g)
+      have hb' : b = ⟨.value v, ho⟩ := by
+        obtain ⟨ob, hob⟩ := b
+        cases ob with
+        | entity e' => simp [obj, ob] at hb
+        | value w => simp only [obj, ob, Ob.value.injEq] at hb; subst hb; rfl
+      subst hb'
+      refine ⟨𝟙 _, ?_⟩
+      rw [CategoryTheory.Functor.map_id]
+      have : g = Quiver.Path.nil := names_injective _ _ hg
+      subst this
+      exact mor_nil.symm
+    | entity e =>
+      have hfull := (h e ho).2
+      simp only [fullAt, List.all_eq_true, Bool.or_eq_true, Bool.not_eq_true',
+        decide_eq_false_iff_not, List.any_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hfull
+      have hg' : S'.tgt? (T.ob (.entity e)) (names g) = some (T.ob b.1) := tgt?_names g
+      have hgP : names g ∈ S'.paths (T.ob (.entity e)) S'.entities.length :=
+        (mem_paths _ _ _).mpr ⟨by simp [hg'],
+          hA' ⟨T.ob (.entity e), isOb_ob hT ho⟩ _ (by simp [hg'])⟩
+      obtain ⟨l, -, hl, hpe⟩ := (hfull (names g) hgP b.1 (mem_obs b.2)).resolve_left
+        (not_not.mpr hg')
+      let p := S.pathOf hS ⟨.entity e, ho⟩ b l hl
+      refine ⟨mor p, ?_⟩
+      rw [functor_map_mor]
+      apply PathEq.mor_eq
+      rw [names_functorPath, names_pathOf]
+      exact pathEq_sound hS' _ hpe
+  · refine ⟨fun {X Y} f₁ f₂ hf => ?_⟩
+    obtain ⟨a, rfl⟩ := S.obj_surjective X
+    obtain ⟨b, rfl⟩ := S.obj_surjective Y
+    obtain ⟨p, rfl⟩ := S.mor_surjective f₁
+    obtain ⟨q, rfl⟩ := S.mor_surjective f₂
+    rw [functor_map_mor, functor_map_mor] at hf
+    obtain ⟨o, ho⟩ := a
+    cases o with
+    | value v =>
+      have hp := (eq_nil_of_tgt?_value (tgt?_names p)).1
+      have hq := (eq_nil_of_tgt?_value (tgt?_names q)).1
+      rw [names_injective p q (hp.trans hq.symm)]
+    | entity e =>
+      have hfaith := (h e ho).1
+      simp only [faithfulAt, List.all_eq_true, Bool.or_eq_true, Bool.not_eq_true',
+        Bool.and_eq_false_iff, decide_eq_false_iff_not] at hfaith
+      have hp : S.tgt? (.entity e) (names p) = some b.1 := tgt?_names p
+      have hq : S.tgt? (.entity e) (names q) = some b.1 := tgt?_names q
+      have memp : names p ∈ S.paths (.entity e) S.entities.length :=
+        (mem_paths _ _ _).mpr ⟨by simp [hp], hA ⟨.entity e, ho⟩ _ (by simp [hp])⟩
+      have memq : names q ∈ S.paths (.entity e) S.entities.length :=
+        (mem_paths _ _ _).mpr ⟨by simp [hq], hA ⟨.entity e, ho⟩ _ (by simp [hq])⟩
+      have hpe' : S'.pathEq (T.ob (.entity e)) (T.mapPath S (.entity e) (names p))
+          (T.mapPath S (.entity e) (names q)) = true := by
+        rw [← names_functorPath hS' hT p, ← names_functorPath hS' hT q]
+        exact (pathEq_iff_of_acyclic hS' hA' _ _ _).mpr ⟨_, _, _, rfl, rfl, hf⟩
+      rcases hfaith (names p) memp (names q) memq with (hne | hne) | hpe
+      · exact absurd (hp.trans hq.symm) hne
+      · rw [hpe'] at hne
+        exact absurd hne (by simp)
+      · exact PathEq.mor_eq (pathEq_sound hS _ hpe)
+
+end Translation
+
 end DDD

@@ -21,4 +21,10 @@ inductive ValueType where
   | int | decimal | string | date | uuid
 deriving DecidableEq, Repr, Fintype
 
+/-- All value types, as a list. -/
+def ValueType.all : List ValueType := [.int, .decimal, .string, .date, .uuid]
+
+theorem ValueType.mem_all (v : ValueType) : v ∈ ValueType.all := by
+  cases v <;> simp [ValueType.all]
+
 end DDD
