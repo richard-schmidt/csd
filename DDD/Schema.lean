@@ -192,6 +192,57 @@ theorem checkWellFormed_iff : S.checkWellFormed = true ↔ S.WellFormed := by
 
 instance : Decidable S.WellFormed := decidable_of_iff _ S.checkWellFormed_iff
 
+theorem tgt?_singleton (o : Ob) (n : String) : S.tgt? o [n] = S.step? o n := by
+  simp only [tgt?_cons, tgt?_nil]
+  cases S.step? o n <;> rfl
+
+variable {S}
+
+/-- In a well-formed schema, a listed reference is the generator its source and
+name find. -/
+theorem step?_of_mem_refs (hS : S.WellFormed) {r : Ref} (hr : r ∈ S.refs) :
+    S.step? (.entity r.src) r.name = some (.entity r.tgt) := by
+  have hsome : (S.ref? r.src r.name).isSome := by
+    unfold ref?
+    rw [List.find?_isSome]
+    exact ⟨r, hr, by simp⟩
+  obtain ⟨r', hr'⟩ := Option.isSome_iff_exists.mp hsome
+  have hp := List.find?_some hr'
+  simp only [Bool.and_eq_true, beq_iff_eq] at hp
+  have hnd := hS.names_nodup r.src (hS.ref_src r hr)
+  unfold outNames at hnd
+  have h₁ := (List.nodup_append.mp hnd).1
+  have : r' = r := List.inj_on_of_nodup_map h₁
+    (List.mem_filter.mpr ⟨List.mem_of_find?_eq_some hr', by simp [hp.1]⟩)
+    (List.mem_filter.mpr ⟨hr, by simp⟩) hp.2
+  simp [step?, hr', this]
+
+/-- In a well-formed schema, a listed attribute is the generator its source and
+name find. -/
+theorem step?_of_mem_attrs (hS : S.WellFormed) {a : Attr} (ha : a ∈ S.attrs) :
+    S.step? (.entity a.src) a.name = some (.value a.tgt) := by
+  have hnd := hS.names_nodup a.src (hS.attr_src a ha)
+  unfold outNames at hnd
+  obtain ⟨-, h₂, hdisj⟩ := List.nodup_append.mp hnd
+  have hnone : S.ref? a.src a.name = none := by
+    unfold ref?
+    rw [List.find?_eq_none]
+    intro r hr hp
+    simp only [Bool.and_eq_true, beq_iff_eq] at hp
+    exact hdisj r.name (List.mem_map.mpr ⟨r, List.mem_filter.mpr ⟨hr, by simp [hp.1]⟩, rfl⟩)
+      a.name (List.mem_map.mpr ⟨a, List.mem_filter.mpr ⟨ha, by simp⟩, rfl⟩) hp.2
+  have hsome : (S.attr? a.src a.name).isSome := by
+    unfold attr?
+    rw [List.find?_isSome]
+    exact ⟨a, ha, by simp⟩
+  obtain ⟨a', ha'⟩ := Option.isSome_iff_exists.mp hsome
+  have hp := List.find?_some ha'
+  simp only [Bool.and_eq_true, beq_iff_eq] at hp
+  have : a' = a := List.inj_on_of_nodup_map h₂
+    (List.mem_filter.mpr ⟨List.mem_of_find?_eq_some ha', by simp [hp.1]⟩)
+    (List.mem_filter.mpr ⟨ha, by simp⟩) hp.2
+  simp [step?, hnone, ha', this]
+
 end Schema
 
 end DDD

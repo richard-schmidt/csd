@@ -212,6 +212,51 @@ def pathOf (hS : S.WellFormed) :
       simp [hs] at h
     · simp [names_pathOf]
 
+/-- In a well-formed schema, a generator starts at a declared object. -/
+theorem isOb_src_of_step? (hS : S.WellFormed) {o o' : Ob} {n : String}
+    (h : S.step? o n = some o') : S.IsOb o := by
+  cases o with
+  | value => trivial
+  | entity e =>
+    simp only [step?] at h
+    split at h
+    · rename_i r hr
+      unfold ref? at hr
+      have hp := List.find?_some hr
+      simp only [Bool.and_eq_true, beq_iff_eq] at hp
+      exact hp.1 ▸ hS.ref_src r (List.mem_of_find?_eq_some hr)
+    · obtain ⟨a, ha, -⟩ := Option.map_eq_some_iff.mp h
+      unfold attr? at ha
+      have hp := List.find?_some ha
+      simp only [Bool.and_eq_true, beq_iff_eq] at hp
+      exact hp.1 ▸ hS.attr_src a (List.mem_of_find?_eq_some ha)
+
+/-- Every object of `S.cat` is the object of an object of `S`. -/
+theorem obj_surjective (X : S.cat) : ∃ a, S.obj a = X := ⟨X.as, rfl⟩
+
+/-- Every morphism of `S.cat` is presented by a path. -/
+theorem mor_surjective {a b : S.Obj} (f : S.obj a ⟶ S.obj b) :
+    ∃ p : Quiver.Path a b, mor p = f :=
+  (CategoryTheory.Quotient.functor S.rel).map_surjective f
+
+/-- Paths with the same names present the same morphism, up to the equalities of
+their endpoints. -/
+theorem mor_eq_of_names {a a' b b' : S.Obj} (ha : a = a') (hb : b = b') (p : Quiver.Path a b)
+    (p' : Quiver.Path a' b') (h : names p = names p') :
+    mor p = eqToHom (congrArg S.obj ha) ≫ mor p' ≫ eqToHom (congrArg S.obj hb).symm := by
+  subst ha hb
+  obtain rfl := names_injective p p' h
+  simp
+
+/-- Two functors out of `S.cat` are equal when they agree on objects and on
+generators. -/
+theorem ext_functor {X : Type*} [Category X] {F G : S.cat ⥤ X}
+    (h_obj : ∀ a, F.obj (S.obj a) = G.obj (S.obj a))
+    (h_map : ∀ (a b : S.Obj) (e : a ⟶ b), F.map (mor e.toPath) =
+      eqToHom (h_obj a) ≫ G.map (mor e.toPath) ≫ eqToHom (h_obj b).symm) : F = G := by
+  apply CategoryTheory.Quotient.lift_unique'
+  exact Paths.ext_functor (funext h_obj) h_map
+
 /-- Paths whose names satisfy `PathEq` present the same morphism. -/
 theorem PathEq.mor_eq {a b : S.Obj} {p q : Quiver.Path a b}
     (h : S.PathEq a (names p) (names q)) : mor p = mor q := by

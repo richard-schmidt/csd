@@ -267,6 +267,24 @@ Phase 2 is complete, with no `sorry`:
 The check that declared composite translations agree is vacuous for this map,
 which is a tree, and waits for a map with two paths between the same contexts.
 
+Phase 3 work items:
+
+1. `Glue.lean`: the pushout of presentations along inclusions that keep names
+   (`Schema.glue`: the union of the generators, identified along the kernel,
+   and the union of the equations), the conditions for it (`Gluable`) with
+   their check, and the legs into the glued schema. The bridge theorem: the
+   glued schema category is a pushout in `Cat`, with the universal property
+   stated for functors into every category. The strict non-interference
+   check: the functor of a translation is fully faithful, decided for acyclic
+   schemas, with its soundness lemma.
+2. `States.lean`: entity-only states (functors `S.cat ⥤ Type`) with `Δ_T` and
+   its adjoints `Σ_T` and `Π_T`; data gluing for them, from the bridge.
+   Attributed states in the strict formulation, their morphisms and `Δ_T`;
+   data gluing for attributed states.
+3. `Examples/Gluing.lean`: Orders and Shipping glued along a Customer/Address
+   kernel and checked; a kernel whose merge imposes an equation on Orders, so
+   that the check fails and the leg from Orders is not faithful.
+
 ## Decisions
 
 - Default integration: lax. Strict integration is an explicit merge.

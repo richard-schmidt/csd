@@ -225,6 +225,36 @@ def restrict (hS' : S'.WellFormed) (hT : T.Valid S S') : (S'.cat ⥤ Type) ⥤ (
 theorem restrict_obj (hS' : S'.WellFormed) (hT : T.Valid S S') (X : S'.cat ⥤ Type) :
     (restrict hS' hT).obj X = functor hS' hT ⋙ X := rfl
 
+/-! ## The empty translation
+
+The empty translation keeps every name. When it is valid from `S` to `S'`, `S` is
+a sub-presentation of `S'`, and its functor is the identity on names. -/
+
+@[simp] theorem ent_empty (e : String) : ({} : Translation).ent e = e := rfl
+
+@[simp] theorem ob_empty (o : Ob) : ({} : Translation).ob o = o := by cases o <;> rfl
+
+@[simp] theorem gen_empty (o : Ob) (n : String) : ({} : Translation).gen o n = [n] := by
+  cases o <;> rfl
+
+theorem mapPath_empty : ∀ {o x : Ob} {l : List String}, S.tgt? o l = some x →
+    ({} : Translation).mapPath S o l = l
+  | _, _, [], _ => rfl
+  | o, x, n :: ns, h => by
+    cases hs : S.step? o n with
+    | none => simp [hs] at h
+    | some o' =>
+      simp only [Schema.tgt?_cons, hs, Option.bind_some] at h
+      simp [mapPath, hs, mapPath_empty h]
+
+theorem names_functorPath_empty (hS' : S'.WellFormed) (hT : ({} : Translation).Valid S S')
+    {a b : S.Obj} (p : Quiver.Path a b) : Schema.names (functorPath hS' hT p) = Schema.names p := by
+  rw [names_functorPath, mapPath_empty (Schema.tgt?_names p)]
+
+theorem obj_empty (hT : ({} : Translation).Valid S S') (a : S.Obj) :
+    obj hT a = ⟨a.1, ob_empty a.1 ▸ isOb_ob hT a.2⟩ :=
+  Subtype.ext (ob_empty _)
+
 end Translation
 
 end DDD
