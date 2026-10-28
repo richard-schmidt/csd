@@ -9,7 +9,8 @@ two presentations along a common kernel `K` that both include with the same
 names: the union of the generators, identified along the kernel, and the union of
 the equations. `Schema.Gluable K B₁ B₂` states the conditions: `K` is included in
 both, by the empty translation, and `B₁` and `B₂` share only entity types and
-generators of `K`. `checkGluable` is its check.
+generators of `K`. `checkGluable` is its check; `gluingClashes` lists the names
+they share outside `K`.
 
 A `Gluing` bundles a kernel, two schemas, and the conditions, with the legs
 `inl` and `inr` of the glued schema and the square `ι₁ ⋙ inl = ι₂ ⋙ inr`.
@@ -63,6 +64,7 @@ def glue (B₁ B₂ : Schema) : Schema where
   attrs := B₁.attrs ++ B₂.attrs.filter fun a => (a.src, a.name) ∉ B₁.gens
   eqns := B₁.eqns ++ B₂.eqns
   aggregates := mergeAggregates B₁.aggregates B₂.aggregates
+  valueObjects := B₁.valueObjects ++ B₂.valueObjects.filter fun e => e ∉ B₁.valueObjects
 
 variable {B₁ B₂ : Schema}
 
@@ -164,22 +166,32 @@ structure Gluable (K B₁ B₂ : Schema) : Prop where
   entities : ∀ e ∈ B₁.entities, e ∈ B₂.entities → e ∈ K.entities
   gens : ∀ g ∈ B₁.gens, g ∈ B₂.gens → g ∈ K.gens
 
+/-- The names that `B₁` and `B₂` share outside the kernel `K`: entity types by
+name, generators as `Entity.name`. Gluing needs this list empty; a non-empty
+list names what to rename. -/
+def gluingClashes (K B₁ B₂ : Schema) : List String :=
+  (B₁.entities.filter fun e => e ∈ B₂.entities ∧ e ∉ K.entities) ++
+    (B₁.gens.filter fun g => g ∈ B₂.gens ∧ g ∉ K.gens).map fun g => g.1 ++ "." ++ g.2
+
+theorem gluingClashes_eq_nil_iff {K : Schema} : gluingClashes K B₁ B₂ = [] ↔
+    (∀ e ∈ B₁.entities, e ∈ B₂.entities → e ∈ K.entities) ∧
+      (∀ g ∈ B₁.gens, g ∈ B₂.gens → g ∈ K.gens) := by
+  simp only [gluingClashes, List.append_eq_nil_iff, List.map_eq_nil_iff, List.filter_eq_nil_iff,
+    decide_eq_true_eq, not_and, not_not]
+
 /-- The check for `Gluable`. -/
 def checkGluable (K B₁ B₂ : Schema) : Bool :=
   ({} : Translation).checkValid K B₁ B₁.pathEq &&
   ({} : Translation).checkValid K B₂ B₂.pathEq &&
-  B₁.entities.all (fun e => !decide (e ∈ B₂.entities) || decide (e ∈ K.entities)) &&
-  B₁.gens.all (fun g => !decide (g ∈ B₂.gens) || decide (g ∈ K.gens))
+  (gluingClashes K B₁ B₂).isEmpty
 
 theorem checkGluable_sound {K : Schema} (h₁ : B₁.WellFormed) (h₂ : B₂.WellFormed)
     (h : checkGluable K B₁ B₂ = true) : Gluable K B₁ B₂ := by
-  simp only [checkGluable, Bool.and_eq_true, List.all_eq_true, Bool.or_eq_true,
-    Bool.not_eq_true', decide_eq_false_iff_not, decide_eq_true_eq] at h
-  obtain ⟨⟨⟨hl, hr⟩, he⟩, hg⟩ := h
+  simp only [checkGluable, Bool.and_eq_true, List.isEmpty_iff] at h
+  obtain ⟨⟨hl, hr⟩, hc⟩ := h
+  obtain ⟨he, hg⟩ := gluingClashes_eq_nil_iff.mp hc
   exact ⟨Translation.checkValid_sound (fun a _ _ h => pathEq_sound h₁ a h) hl,
-    Translation.checkValid_sound (fun a _ _ h => pathEq_sound h₂ a h) hr,
-    fun e h₁ h₂ => (he e h₁).resolve_left (not_not.mpr h₂),
-    fun g h₁ h₂ => (hg g h₁).resolve_left (not_not.mpr h₂)⟩
+    Translation.checkValid_sound (fun a _ _ h => pathEq_sound h₂ a h) hr, he, hg⟩
 
 /-- Where both schemas have a generator, it has the same target in both. -/
 theorem Gluable.step?_eq {K : Schema} (h : Gluable K B₁ B₂) {o x y : Ob} {n : String}

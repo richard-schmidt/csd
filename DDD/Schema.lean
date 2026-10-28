@@ -12,7 +12,8 @@ well-formedness check. A schema lists
 - attributes `a : e ⟶ v` from an entity type to a value type;
 - equations between parallel paths, possibly ending in an attribute;
 - aggregates: a root entity type, and members, each with an ownership reference
-  to the root.
+  to the root;
+- value objects: entity types identified by their attributes.
 
 References and attributes are the generators. A generator is identified by its
 source entity type and its name, so two entity types may each have a generator
@@ -22,8 +23,9 @@ presents.
 
 `Schema.checkWellFormed` decides `Schema.WellFormed` (`checkWellFormed_iff`):
 unique names, references between declared entity types, equations between
-parallel paths, and aggregate annotations that are consistent and respected by
-every reference from outside an aggregate.
+parallel paths, aggregate annotations that are consistent and respected by
+every reference from outside an aggregate, and value objects that are declared
+and have attributes.
 -/
 
 namespace DDD
@@ -79,6 +81,7 @@ structure Schema where
   attrs : List Attr := []
   eqns : List Equation := []
   aggregates : List Aggregate := []
+  valueObjects : List String := []
 deriving DecidableEq, Repr
 
 namespace Schema
@@ -150,6 +153,9 @@ structure WellFormed : Prop where
   outside, references target the root only. -/
   agg_boundary : ∀ r ∈ S.refs, ∀ A ∈ S.aggregates,
     r.tgt ∈ A.members.map (·.entity) → r.src ∈ A.entities
+  /-- Value objects are declared entity types with at least one attribute. -/
+  vo_entities : ∀ e ∈ S.valueObjects, e ∈ S.entities
+  vo_attrs : ∀ e ∈ S.valueObjects, ∃ a ∈ S.attrs, a.src = e
 
 /-- The check for `Parallel`. -/
 def parallel (q : Equation) : Bool :=
@@ -173,22 +179,26 @@ def checkWellFormed : Bool :=
   S.aggregates.all (fun A => A.members.all fun m =>
     decide (⟨m.owner, m.entity, A.root⟩ ∈ S.refs)) &&
   S.refs.all (fun r => S.aggregates.all fun A =>
-    !decide (r.tgt ∈ A.members.map (·.entity)) || decide (r.src ∈ A.entities))
+    !decide (r.tgt ∈ A.members.map (·.entity)) || decide (r.src ∈ A.entities)) &&
+  S.valueObjects.all (fun e => decide (e ∈ S.entities) && S.attrs.any fun a => a.src == e)
 
 theorem checkWellFormed_iff : S.checkWellFormed = true ↔ S.WellFormed := by
   simp only [checkWellFormed, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true,
-    parallel_iff, Bool.or_eq_true, Bool.not_eq_true', decide_eq_false_iff_not]
+    parallel_iff, Bool.or_eq_true, Bool.not_eq_true', decide_eq_false_iff_not,
+    List.any_eq_true, beq_iff_eq]
   constructor
-  · rintro ⟨⟨⟨⟨⟨⟨⟨⟨h₁, h₂⟩, h₃⟩, h₄⟩, h₅⟩, h₆⟩, h₇⟩, h₈⟩, h₉⟩
+  · rintro ⟨⟨⟨⟨⟨⟨⟨⟨⟨h₁, h₂⟩, h₃⟩, h₄⟩, h₅⟩, h₆⟩, h₇⟩, h₈⟩, h₉⟩, h₁₀⟩
     exact ⟨h₁, h₂, fun r hr => (h₃ r hr).1, fun r hr => (h₃ r hr).2, h₄,
       fun q hq => (h₅ q hq).1, fun q hq => (h₅ q hq).2, h₆, h₇, h₈,
-      fun r hr A hA hm => (h₉ r hr A hA).resolve_left (not_not.mpr hm)⟩
+      fun r hr A hA hm => (h₉ r hr A hA).resolve_left (not_not.mpr hm),
+      fun e he => (h₁₀ e he).1, fun e he => (h₁₀ e he).2⟩
   · intro h
-    exact ⟨⟨⟨⟨⟨⟨⟨⟨h.entities_nodup, h.names_nodup⟩,
+    exact ⟨⟨⟨⟨⟨⟨⟨⟨⟨h.entities_nodup, h.names_nodup⟩,
       fun r hr => ⟨h.ref_src r hr, h.ref_tgt r hr⟩⟩, h.attr_src⟩,
       fun q hq => ⟨h.eqn_src q hq, h.eqn_parallel q hq⟩⟩, h.agg_entities⟩, h.agg_disjoint⟩,
       h.agg_owner⟩, fun r hr A hA => or_iff_not_imp_left.mpr fun hm =>
-        h.agg_boundary r hr A hA (not_not.mp hm)⟩
+        h.agg_boundary r hr A hA (not_not.mp hm)⟩,
+      fun e he => ⟨h.vo_entities e he, h.vo_attrs e he⟩⟩
 
 instance : Decidable S.WellFormed := decidable_of_iff _ S.checkWellFormed_iff
 
