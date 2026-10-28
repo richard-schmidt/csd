@@ -618,36 +618,43 @@ def data_gluing():
 # 12. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 860, 350,
+    f = Fig("modules", 880, 350,
             "Imports between the modules of the DDD library: a chain from value types to "
             "context maps and states, and the examples on top.")
-    f.text(20, 22, "on Mathlib: Paths, Quotient, Grothendieck, IsPushout, Kan extensions", "note")
+    f.text(20, 18, "on Mathlib: Paths, Quotient, Grothendieck, IsPushout, Kan extensions", "note")
     core = [("Values", 60), ("Schema", 170), ("Semantics", 285), ("PathEq", 400),
-            ("Translation", 520), ("Glue", 640)]
+            ("Translation", 520)]
     for name, x in core:
         f.node(name, x, 75, name, w=100, h=30)
     for (a, _), (b, _) in zip(core, core[1:]):
         f.arrow(a, b, "", "acl")
-    f.node("ContextMap", 785, 45, "ContextMap", w=110, h=30)
-    f.node("States", 785, 115, "States", w=110, h=30)
+    f.node("Glue", 650, 45, "Glue", w=100, h=30)
+    f.node("Compose", 650, 105, "Compose", w=100, h=30)
+    f.node("States", 790, 45, "States", w=100, h=30)
+    f.node("ContextMap", 790, 105, "ContextMap", w=110, h=30)
+    f.arrow("Translation", "Compose", "", "acl")
+    f.arrow("Translation", "Glue", "", "acl")
+    f.arrow("Compose", "ContextMap", "", "acl")
     f.arrow("Glue", "ContextMap", "", "acl")
     f.arrow("Glue", "States", "", "acl")
-    f.region(20, 160, 820, 175, "EXAMPLES")
-    f.raw('<rect class="rg plain" x="50" y="196" width="490" height="48" rx="6"/>', "back")
-    for name, x in [("Catalog", 110), ("Orders", 230), ("Payments", 350), ("Shipping", 470)]:
-        f.node("x" + name, x, 220, name, w=100, h=30)
-    f.poly([(400, 92), (400, 194)], "muted")
-    f.node("xIntegration", 640, 220, "Integration", "pl", w=110, h=30)
-    f.node("xGluing", 785, 220, "Gluing", "kern", w=100, h=30)
-    f.node("xShowcase", 640, 290, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
-    f.node("xValues", 110, 290, "Values", w=100, h=30)
-    f.poly([(541, 220), (583, 220)], "muted")
-    f.poly([(740, 62), (650, 203)], "muted")
+    f.region(20, 160, 830, 175, "EXAMPLES")
+    f.raw('<rect class="rg plain" x="44" y="194" width="424" height="44" rx="6"/>', "back")
+    for name, x in [("Catalog", 98), ("Orders", 202), ("Payments", 310), ("Shipping", 414)]:
+        f.node("x" + name, x, 216, name, w=96, h=30)
+    f.poly([(400, 92), (400, 192)], "muted")
+    f.node("xIntegration", 580, 216, "Integration", "pl", w=110, h=30)
+    f.node("xRoutes", 790, 216, "Routes", w=100, h=30)
+    f.node("xGluing", 580, 284, "Gluing", "kern", w=100, h=30)
+    f.node("xShowcase", 330, 284, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
+    f.node("xValues", 98, 284, "Values", w=96, h=30)
+    f.poly([(469, 216), (523, 216)], "muted")
+    f.arrow("ContextMap", "xIntegration", "", "muted")
+    f.arrow("ContextMap", "xRoutes", "", "muted")
     f.arrow("xIntegration", "xGluing", "", "muted")
-    f.poly([(785, 132), (785, 203)], "muted")
     f.arrow("xShowcase", "xIntegration", "", "muted")
-    f.poly([(110, 306), (110, 322), (800, 322), (800, 237)], "muted")
-    f.text(850, 344, "arrows point from a module to the modules that import it", "note", "end")
+    f.poly([(840, 45), (866, 45), (866, 318), (600, 318), (600, 301)], "muted")
+    f.poly([(98, 300), (98, 318), (560, 318), (560, 301)], "muted")
+    f.text(860, 346, "arrows point from a module to the modules that import it", "note", "end")
     return f
 
 

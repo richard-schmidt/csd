@@ -213,6 +213,7 @@ DDD/
   Semantics.lean     quiver, Paths, Quotient, Schema.cat
   PathEq.lean        path equality for free and acyclic schemas
   Translation.lean   translations, validity, induced functor, Δ
+  Compose.lean       composite translations, equality of induced functors
   Glue.lean          pushouts of presentations, bridge theorem, strict
                      non-interference
   ContextMap.lean    J, D : J ⥤ Cat, lax integration, strict integration
@@ -220,7 +221,7 @@ DDD/
   States.lean        states, migrations, gluing
   Certificate.lean   JSON import, checkers, soundness lemmas
   Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
-                     Gluing
+                     Gluing, Routes
   docs/              approach.md, its figures, and figures.py, which draws them
 julia/               Catlab side
 ```
@@ -364,6 +365,8 @@ Revision after the decision review of phases 1 to 3 (see Decisions), in order:
 The revision is complete, with no `sorry`. Where it changes a module, it
 supersedes the description under phases 1 to 3.
 
+Next step 1, coherence by check, is complete, with no `sorry` (see Next steps).
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -372,20 +375,25 @@ In order. Each item states what it defines and proves, and when it is done.
 
 ### 1. Coherence by check
 
-The obligation `coherent` of a context map is a proof. It becomes a check:
+Done. The obligation `coherent` of a context map can be discharged by a check
+(`Compose.lean`, `ContextMap.lean`):
 
-- `Translation.comp T U`: the composite of deep translations, entity images
+- `Translation.comp T S S' U`: the composite of deep translations, entity images
   composed and each generator sent to the image under `U` of its image path
-  under `T`; its validity, and `functor_comp`: the functor of the composite is
-  the composite of the functors (by `Schema.ext_functor`).
+  under `T`; `comp_valid`, and `functor_comp`: the functor of the composite is
+  the composite of the functors. The empty translation from a schema to itself
+  has the identity functor (`functor_empty_self`).
 - `Translation.checkSameFunctor`: two translations between the same schemas
   have the same entity images and, for each generator, image paths equal in the
-  target by `pathEq`; soundness: they induce the same functor.
-- `ContextMap.routeTranslation p`, the composite along a route, and a check on
-  the declared pairs of routes whose soundness gives `coherent`.
-
-Done when: an example with a declared diamond is accepted by `decide`, and one
-whose two composites differ is refuted.
+  target; `checkSameFunctor_sound`, and `checkSameFunctor_iff` when path
+  equality in the target is decided.
+- `routeTranslation p`, the composite along a route, with
+  `routeDiagram_map`: the functor of a route is the functor of its composite.
+  `RouteEqn` lists declared equations, `checkRouteEqn` checks one, and
+  `coherent_of_check` gives `coherent` from the checks; `routeDiagram_map_ne`
+  refutes an equation whose check fails.
+- `Examples/Routes.lean`: a diamond whose declaration the check accepts by
+  `decide`, and a variant whose composites differ, with different functors.
 
 ### 2. Phase 4: Julia and certificates
 
@@ -463,7 +471,7 @@ merged, and its merged map is checked.
   system supplied as a certificate, if a model needs it. It is not part of
   phase 4.
 
-Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
+Dependencies: item 3 uses the composite translations of item 1 (done); phase 5 uses
 the gluing of item 3 and the states of item 4; the state certificates of
 phase 4 use its finite states. Item 1 comes first because it is small and makes
 declared diamonds checkable; phase 4 comes next because its exit criterion

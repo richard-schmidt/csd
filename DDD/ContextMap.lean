@@ -1,3 +1,4 @@
+import DDD.Compose
 import DDD.Glue
 import Mathlib.CategoryTheory.Category.Cat.Op
 import Mathlib.CategoryTheory.Grothendieck
@@ -18,6 +19,11 @@ kernels.
   schema category, each arrow to the functor of its translation, and each route
   to the composite. It is defined on the quotient because routes declared equal
   have the same composite (`coherent`).
+- Coherence by check: `routeTranslation p` is the composite translation along a
+  route, and its functor is the functor of the route (`routeDiagram_map`).
+  Equations declared as a list of `RouteEqn` are checked by `checkRouteEqn`;
+  `coherent_of_check` gives `coherent` from the checks, and
+  `routeDiagram_map_ne` refutes an equation whose check fails.
 - `ContextMap.Lax`: the lax integration, `(Grothendieck (D ⋙ Cat.opFunctor))ᵒᵖ`.
   `embed c` includes the schema of the context `c`. A reference from `x` in a
   downstream context `d` to `y` in an upstream context `u` is a morphism
@@ -93,6 +99,105 @@ def routeDiagram (schema : C → Schema) (translation : ∀ {u d : C}, (u ⟶ d)
   Paths.lift
     { obj c := (schema c).cat
       map f := (translation f).functor (wellFormed _) (valid f) }
+
+/-- The composite of the translations along a route, as finite data. -/
+def routeTranslation (schema : C → Schema) (translation : ∀ {u d : C}, (u ⟶ d) → Translation)
+    {u : C} : ∀ {d : C}, Quiver.Path u d → Translation
+  | _, .nil => {}
+  | _, .cons (b := b) p f =>
+    (routeTranslation schema translation p).comp (schema u) (schema b) (translation f)
+
+@[simp] theorem routeTranslation_nil (schema : C → Schema)
+    (translation : ∀ {u d : C}, (u ⟶ d) → Translation) (u : C) :
+    routeTranslation schema translation (Quiver.Path.nil : Quiver.Path u u) = {} := rfl
+
+@[simp] theorem routeTranslation_cons (schema : C → Schema)
+    (translation : ∀ {u d : C}, (u ⟶ d) → Translation) {u b d : C} (p : Quiver.Path u b)
+    (f : b ⟶ d) :
+    routeTranslation schema translation (p.cons f) =
+      (routeTranslation schema translation p).comp (schema u) (schema b) (translation f) := rfl
+
+variable {schema : C → Schema} {translation : ∀ {u d : C}, (u ⟶ d) → Translation}
+
+theorem routeTranslation_valid (wellFormed : ∀ c, (schema c).WellFormed)
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d)) :
+    {u : C} → ∀ {d : C} (p : Quiver.Path u d),
+      (routeTranslation schema translation p).Valid (schema u) (schema d)
+  | u, _, .nil => by
+    rw [routeTranslation_nil]
+    exact Translation.empty_valid_self (wellFormed u)
+  | u, _, .cons p f => by
+    rw [routeTranslation_cons]
+    exact Translation.comp_valid (wellFormed u) (wellFormed _)
+      (routeTranslation_valid wellFormed valid p) (valid f)
+
+/-- The functor of a route is the functor of the composite translation along it. -/
+theorem routeDiagram_map (wellFormed : ∀ c, (schema c).WellFormed)
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d))
+    {u d : C} (p : Quiver.Path u d) :
+    (routeDiagram schema translation wellFormed valid).map p =
+      Translation.functor (wellFormed d) (routeTranslation_valid wellFormed valid p) := by
+  induction p with
+  | nil =>
+    refine (Paths.lift_nil _ _).trans ?_
+    rw [Translation.functor_congr (wellFormed u) _ (Translation.empty_valid_self (wellFormed u))
+      (routeTranslation_nil schema translation u), Translation.functor_empty_self]
+    rfl
+  | cons p f ih =>
+    refine (Paths.lift_cons _ _ _).trans ?_
+    change (routeDiagram schema translation wellFormed valid).map p ≫ _ = _
+    rw [ih, Translation.functor_congr (wellFormed _) _
+      (Translation.comp_valid (wellFormed u) (wellFormed _)
+        (routeTranslation_valid wellFormed valid p) (valid f))
+        (routeTranslation_cons schema translation p f),
+      Translation.functor_comp (wellFormed u) (wellFormed _) (wellFormed _)]
+    rfl
+
+/-- An equation between two routes with the same endpoints. -/
+structure RouteEqn (C : Type) [Quiver.{1} C] where
+  src : C
+  tgt : C
+  lhs : Quiver.Path src tgt
+  rhs : Quiver.Path src tgt
+
+/-- The relation on routes that a list of equations declares. -/
+def RouteEqn.rel (eqns : List (RouteEqn C)) : HomRel (Paths C) :=
+  fun u d p q => (⟨u, d, p, q⟩ : RouteEqn C) ∈ eqns
+
+variable (schema translation) in
+/-- The check for a declared equation: the composite translations along its two
+routes induce the same functor. -/
+def checkRouteEqn (e : RouteEqn C) : Bool :=
+  (routeTranslation schema translation e.lhs).checkSameFunctor
+    (routeTranslation schema translation e.rhs) (schema e.src) (schema e.tgt).pathEq
+
+/-- Coherence by check: when every declared equation passes `checkRouteEqn`, the
+translations respect the declarations. -/
+theorem coherent_of_check (wellFormed : ∀ c, (schema c).WellFormed)
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d))
+    (eqns : List (RouteEqn C)) (h : ∀ e ∈ eqns, checkRouteEqn schema translation e = true) :
+    ∀ ⦃u d : Paths C⦄ (p q : u ⟶ d), RouteEqn.rel eqns p q →
+      (routeDiagram schema translation wellFormed valid).map p =
+        (routeDiagram schema translation wellFormed valid).map q := by
+  intro u d p q hpq
+  rw [routeDiagram_map wellFormed valid p, routeDiagram_map wellFormed valid q]
+  exact Translation.checkSameFunctor_sound (wellFormed d) _ _
+    (fun a _ _ h => Schema.pathEq_sound (wellFormed d) a h) (h _ hpq)
+
+/-- When path equality in the target is decided, a failed check refutes the
+equation: the two routes have different functors. -/
+theorem routeDiagram_map_ne (wellFormed : ∀ c, (schema c).WellFormed)
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d))
+    (e : RouteEqn C)
+    (hpeq : ∀ (a : (schema e.tgt).Obj) (l l' : List String),
+      (schema e.tgt).pathEq a.1 l l' = true ↔ (schema e.tgt).PathEq a l l')
+    (h : checkRouteEqn schema translation e = false) :
+    (routeDiagram schema translation wellFormed valid).map e.lhs ≠
+      (routeDiagram schema translation wellFormed valid).map e.rhs := by
+  intro hm
+  rw [routeDiagram_map wellFormed valid, routeDiagram_map wellFormed valid] at hm
+  have := (Translation.checkSameFunctor_iff (wellFormed e.src) (wellFormed e.tgt) _ _ hpeq).mpr hm
+  simp [checkRouteEqn, this] at h
 
 end Routes
 

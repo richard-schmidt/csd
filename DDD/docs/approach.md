@@ -222,6 +222,14 @@ the equations hold. On a path, it is the path of the images of the generators
 (`names_functorPath`); it sends each value type to itself (`obj_value`).
 Restriction `Δ_T` precomposes a state of `S'` with this functor.
 
+Translations compose (`DDD/Compose.lean`). `Translation.comp T S S' U` lists, for
+each entity type and generator of `S`, the image under `U` of its image under
+`T`. It is valid (`comp_valid`), and its functor is the composite of the two
+functors (`functor_comp`); the empty translation from a schema to itself has
+the identity functor (`functor_empty_self`). `checkSameFunctor` decides whether
+two translations between the same schemas induce the same functor, given a
+decision procedure for path equality in the target (`checkSameFunctor_iff`).
+
 ## 5. Context maps
 
 ### The structure
@@ -288,9 +296,18 @@ of `J`, an object `y` of `U` has two images in `D`, and a reference from `D`
 can go along either route, for example a sold item and a search hit of the same
 product variant.*
 
-The obligation `coherent` is a proof today; a decidable check on composite
-translations is listed in the next steps. Cycles are not declared. The example
-map declares no equation, so its `J` is the free category on its arrows.
+The obligation `coherent` can be discharged by a check. `routeTranslation p`
+composes the translations along a route as finite data, and its functor is the
+functor of the route (`routeDiagram_map`). `checkRouteEqn` compares the two
+composites of a declared equation with `checkSameFunctor`: the same entity
+images, and generator images equal in the target. `coherent_of_check` turns
+passing checks into `coherent`; when path equality in the target is decided, a
+failing check proves that the two routes have different functors
+(`routeDiagram_map_ne`). In `Examples/Routes.lean` a variant reaches Reporting
+through Sales and through Search; the declaration is accepted by `decide`, and
+a variant map in which Search reports the SKU as a query is refuted. Cycles are
+not declared. The example map of Figure 5 declares no equation, so its `J` is
+the free category on its arrows.
 
 ## 6. Lax integration
 
@@ -488,20 +505,21 @@ share the namespace `DDD`; each example module has its own.*
 | `Semantics.lean` | `Schema.cat`, `PathEq`, the correspondence of deep and quiver paths |
 | `PathEq.lean` | `pathEqFree`, `Acyclic`, `Rewrite`, `classOf`, `pathEqAcyclic`, their iff lemmas |
 | `Translation.lean` | `Translation`, `Valid`, `checkValid_iff`, `functor`, `restrict` |
+| `Compose.lean` | `Translation.comp`, `functor_comp`, `checkSameFunctor_iff` |
 | `Glue.lean` | `glue`, `Gluable`, `Gluing`, the bridge theorem, `checkFullyFaithful_sound` |
-| `ContextMap.lean` | `ContextMap`, `J`, `diagram`, `Lax`, `nonInterference`, `Publishes`, `kernelGluing`, `isPushout_kernel` |
+| `ContextMap.lean` | `ContextMap`, `J`, `diagram`, `coherent_of_check`, `Lax`, `nonInterference`, `Publishes`, `kernelGluing`, `isPushout_kernel` |
 | `States.lean` | entity-only and attributed states, `Σ`, `Δ`, `Π`, data gluing |
 | `Examples/Catalog.lean` | a free schema with a cycle; CatalogPL |
 | `Examples/Orders.lean` | an acyclic schema with two equations; OrdersPL and a failing one |
 | `Examples/Payments.lean`, `Shipping.lean` | the other two contexts |
 | `Examples/Integration.lean` | the seven-context map, its projection onto the Showcase map, non-interference, references |
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, the failing kernel |
+| `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
 ## 11. Limits of the current approach
 
 - Path equality is decided for free and for acyclic schemas only.
-- Composite translations are compared by proof, not by a check.
 - Strict integration glues two contexts along one kernel; a kernel with more
   inclusions, or several kernels, is not covered.
 - Gluing needs the same names on both sides; names that clash outside the
