@@ -109,16 +109,19 @@ theorem run_serial (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) (m n inputs
 
 [`DDD/`](DDD/) models bounded contexts as finitely presented categories, context maps as diagrams of them, and the integration of contexts into larger systems, with a Julia side (Catlab) whose results Lean checks. [`DDD/README.md`](DDD/README.md) describes the structures, the theorems and checks, and the roadmap. `sorry` is allowed.
 
-Phases 1 to 3 are done. A schema is a finite presentation (entity types, references, attributes into shared value types, equations, aggregates) with a well-formedness check that `decide` runs, and `Schema.cat` is the category it presents. Path equality is decided for schemas without equations and for acyclic schemas. A translation between schemas is checked valid the same way and induces a functor; a context map sends each context to its schema category and each arrow to such a functor, and its lax integration is a Grothendieck construction into which every context of a map without cycles embeds fully faithfully. Two schemas glued along a shared kernel give a pushout in `Cat` (the bridge theorem); states of the glued schema are pairs of states that agree on the kernel (data gluing), and a decidable check tells whether a merge leaves each context unchanged. The Catalog, Orders, Payments and Shipping schemas in [`Examples/`](DDD/Examples/), the translations of the context map of `ContextMapNotifications.lean`, and the gluing of Orders and Shipping are checked this way.
+Phases 1 to 3 are done, revised after a review of their decisions. A schema is a finite presentation (entity types, references, attributes into shared value types, equations, aggregates, value objects) with a well-formedness check that `decide` runs, and `Schema.cat` is the category it presents. Path equality is decided for schemas without equations and for acyclic schemas. A translation between schemas is checked valid the same way and induces a functor. A context map sends each context to its schema category and each arrow to such a functor, on the category of contexts presented by its arrows and declared equations between routes; its lax integration is a Grothendieck construction into which every context of a map without cycles embeds fully faithfully. Published languages are contexts that contain aggregate roots only. Two schemas glued along a shared kernel give a pushout in `Cat` (the bridge theorem), and the two arrows out of a kernel context glue their targets into the pushout of their images; states of the glued schema are pairs of states that agree on the kernel (data gluing), and a decidable check tells whether a merge leaves each context unchanged. The Catalog, Orders, Payments and Shipping schemas in [`Examples/`](DDD/Examples/), a context map with their published languages and a shared kernel that refines the map of `ContextMapNotifications.lean`, and the gluing of Orders and Shipping along that kernel are checked this way.
 
 ```lean
 def Schema.cat (S : Schema) : Cat := Cat.of (CategoryTheory.Quotient S.rel)
 theorem pathEqAcyclic_iff (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj) (l l' : List String) :
     S.pathEqAcyclic a.1 l l' = true ↔ S.PathEq a l l'
 def Translation.functor (hS' : S'.WellFormed) (hT : T.Valid S S') : S.cat ⥤ S'.cat
-theorem ContextMap.nonInterference (hJ : ∀ (c : Paths C) (f : c ⟶ c), f = 𝟙 c) (c : C) :
+theorem ContextMap.nonInterference (hJ : ∀ (c : M.J) (f : c ⟶ c), f = 𝟙 c) (c : C) :
     (M.embed c).Full ∧ (M.embed c).Faithful ∧ Function.Injective (M.embed c).obj
 theorem Gluing.isPushout : IsPushout (C := Cat.{0, 0}) D.ι₁ D.ι₂ D.inl D.inr
+theorem ContextMap.isPushout_kernel :
+    IsPushout (M.diagram.map (M.arrow f₁)) (M.diagram.map (M.arrow f₂))
+      (M.kernelGluing f₁ f₂ hk hc hwf).inl (M.kernelGluing f₁ f₂ hk hc hwf).inr
 def Gluing.stateEquiv : D.glued.State K ≃ { P : D.left.State K × D.right.State K //
     restrictState _ _ P.1 = restrictState _ _ P.2 }
 ```
