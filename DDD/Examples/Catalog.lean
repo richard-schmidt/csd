@@ -25,8 +25,7 @@ def schema : Schema where
   entities := ["Category", "Product", "Variant"]
   refs := [⟨"parent", "Category", "Category"⟩, ⟨"category", "Product", "Category"⟩,
     ⟨"product", "Variant", "Product"⟩]
-  attrs := [⟨"name", "Category", .string⟩, ⟨"id", "Product", .uuid⟩,
-    ⟨"name", "Product", .string⟩, ⟨"listedOn", "Product", .date⟩,
+  attrs := [⟨"name", "Category", .string⟩, ⟨"name", "Product", .string⟩,
     ⟨"sku", "Variant", .string⟩, ⟨"price", "Variant", .decimal⟩]
   aggregates := [⟨"Category", []⟩, ⟨"Product", [⟨"Variant", "product"⟩]⟩]
 

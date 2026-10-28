@@ -3,7 +3,9 @@ import DDD.PathEq
 /-!
 # Example: the Orders context
 
-Customers, addresses, orders, order lines, and the products they refer to.
+Customers, addresses, orders, order lines, and the products they refer to. A
+product here is the Orders view of a catalog variant: its SKU, name, list price
+and category name.
 
 Two equations:
 
@@ -36,7 +38,8 @@ def schema : Schema where
     ⟨"city", "Address", .string⟩, ⟨"id", "Order", .uuid⟩, ⟨"placedOn", "Order", .date⟩,
     ⟨"quantity", "OrderLine", .int⟩, ⟨"unitPrice", "OrderLine", .decimal⟩,
     ⟨"sku", "OrderLine", .string⟩, ⟨"sku", "Product", .string⟩,
-    ⟨"name", "Product", .string⟩]
+    ⟨"name", "Product", .string⟩, ⟨"listPrice", "Product", .decimal⟩,
+    ⟨"category", "Product", .string⟩]
   eqns := [⟨"Order", ["billTo"], ["customer", "address"]⟩,
     ⟨"OrderLine", ["sku"], ["product", "sku"]⟩]
   aggregates := [⟨"Customer", []⟩, ⟨"Address", []⟩, ⟨"Order", [⟨"OrderLine", "order"⟩]⟩,

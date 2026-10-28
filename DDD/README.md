@@ -241,24 +241,28 @@ Phase 1 is complete, with no `sorry`:
    equalities and inequalities, and a schema that violates an aggregate
    boundary in each, checked with `decide`.
 
-Phase 2 work items:
+Phase 2 is complete, with no `sorry`:
 
 1. `Translation.lean`: deep translations (images of entity types and of
    generators; unlisted ones keep their names, so an inclusion between
-   schemas with the same names is the empty translation), validity with its
-   checker and soundness lemma, the induced functor between the schema
-   categories, and restriction `Δ_T`.
-2. `ContextMap.lean`: a context map as a quiver of contexts with a schema per
-   context and a valid translation per arrow; the diagram `D : Paths J ⥤ Cat`;
-   the lax integration `(Grothendieck (D ⋙ Cat.opFunctor))ᵒᵖ` with the
-   embedding of each context; lax non-interference.
-3. `Examples/Payments.lean`, `Examples/Shipping.lean`: the two remaining
-   schemas, checked with `decide`.
+   schemas with the same names is the empty translation), `Translation.Valid`,
+   decided by `checkValid` given a procedure for path equality in the target
+   (`checkValid_iff`), the induced functor `S.cat ⥤ S'.cat`, which maps a path
+   to the path of the images of its generators (`names_functorPath`) and value
+   types to themselves, and restriction `Δ_T`.
+2. `ContextMap.lean`: `ContextMap` (a schema per context, a valid translation
+   per arrow), the diagram `D : Paths J ⥤ Cat`, the lax integration
+   `(Grothendieck (D ⋙ Cat.opFunctor))ᵒᵖ` with the embedding of each context,
+   references across contexts (`ref`) and the projection to `Jᵒᵖ`. Lax
+   non-interference (`nonInterference`), with `endo_eq_id_of_rank` for maps
+   without cycles.
+3. `Examples/Payments.lean` (acyclic, one equation) and
+   `Examples/Shipping.lean` (free, acyclic), checked with `decide`.
 4. `Examples/Integration.lean`: the translations Catalog → Orders,
-   Orders → Payments and Orders → Shipping, checked with `decide`; the
-   four-context map on the arrows of `Showcase/ContextMapNotifications.lean` as
-   a functor; non-interference for it; a reference across contexts in the lax
-   integration.
+   Orders → Payments and Orders → Shipping, checked with `decide`, and one that
+   breaks an equation and fails; the four-context map as a functor;
+   non-interference for it; a refund in Payments referring to its order in
+   Orders.
 
 The check that declared composite translations agree is vacuous for this map,
 which is a tree, and waits for a map with two paths between the same contexts.
@@ -279,5 +283,11 @@ which is a tree, and waits for a map with two paths between the same contexts.
   with the checker.
 - Amounts: `Decimal`, not `ℚ`. Every value has a finite decimal notation, as
   amounts do; `ℚ` would admit `1/3`.
+- Translations: entity types and generators a translation does not list keep
+  their names. Every entity type of the upstream schema has an image, so a
+  downstream schema models all of its upstream; the examples use
+  anti-corruption layers that send several upstream entity types to one.
+- `J`: the free category on the arrows of the context map. For a tree it is the
+  order `Reaches`.
 - Acyclic: no path has more generators than there are entity types. This is
   the finiteness `pathEqAcyclic` needs, and it is decided by enumerating paths.

@@ -109,13 +109,15 @@ theorem run_serial (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) (m n inputs
 
 [`DDD/`](DDD/) models bounded contexts as finitely presented categories, context maps as diagrams of them, and the integration of contexts into larger systems, with a Julia side (Catlab) whose results Lean checks. [`DDD/README.md`](DDD/README.md) describes the structures, the theorems and checks, and the roadmap. `sorry` is allowed.
 
-Phase 1, schemas, is done. A schema is a finite presentation (entity types, references, attributes into shared value types, equations, aggregates) with a well-formedness check that `decide` runs. `Schema.cat` is the category it presents. Path equality is decided for schemas without equations and for acyclic schemas, and the Catalog and Orders schemas in [`Examples/`](DDD/Examples/) are checked this way.
+Phases 1 and 2 are done. A schema is a finite presentation (entity types, references, attributes into shared value types, equations, aggregates) with a well-formedness check that `decide` runs, and `Schema.cat` is the category it presents. Path equality is decided for schemas without equations and for acyclic schemas. A translation between schemas is checked valid the same way and induces a functor; a context map sends each context to its schema category and each arrow to such a functor, and its lax integration is a Grothendieck construction into which every context of a map without cycles embeds fully faithfully. The Catalog, Orders, Payments and Shipping schemas in [`Examples/`](DDD/Examples/), and the translations of the context map of `ContextMapNotifications.lean`, are checked this way.
 
 ```lean
 def Schema.cat (S : Schema) : Cat := Cat.of (CategoryTheory.Quotient S.rel)
-theorem checkWellFormed_iff : S.checkWellFormed = true ↔ S.WellFormed
 theorem pathEqAcyclic_iff (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj) (l l' : List String) :
     S.pathEqAcyclic a.1 l l' = true ↔ S.PathEq a l l'
+def Translation.functor (hS' : S'.WellFormed) (hT : T.Valid S S') : S.cat ⥤ S'.cat
+theorem ContextMap.nonInterference (hJ : ∀ (c : Paths C) (f : c ⟶ c), f = 𝟙 c) (c : C) :
+    (M.embed c).Full ∧ (M.embed c).Faithful ∧ Function.Injective (M.embed c).obj
 ```
 
 ## Sketches
