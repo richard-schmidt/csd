@@ -331,6 +331,7 @@ theorem countP_eq_imp {α : Type} {p q : α → Bool} :
     simp only [List.countP_cons] at hcount
     have hl : l.countP p = l.countP q := by
       by_cases hpx : p x <;> by_cases hqx : q x <;> simp_all
+      omega
     intro y hy hqy
     rcases List.mem_cons.mp hy with rfl | hy
     · by_contra hpy

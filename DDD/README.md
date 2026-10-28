@@ -17,10 +17,14 @@ Composability properties are stated either as theorems or as decidable checks.
 
 ### Value types
 
-A finite set of value types with a fixed interpretation `K : ValueType → Type`.
-All contexts share `K`, and translations leave value types unchanged. Per-model
-checks compare values, so every `K v` has decidable equality. `Float` does not
-qualify: its equality is IEEE equality, which is not reflexive on NaN.
+A finite set of value types, `ValueType`. Schemas refer to value types only,
+and translations leave them unchanged. Their interpretation
+`K : ValueType → Type` is a parameter of the state layer, fixed for an
+integration, so all contexts share it; the general theorems hold for every `K`.
+Per-model checks compare values, so they require decidable equality on every
+`K v` that is equality of values. `Float` does not qualify: its equality is
+IEEE equality, which is not reflexive on NaN. The examples use the
+interpretation in `Examples/Values.lean`.
 
 ### Schemas
 
@@ -173,7 +177,7 @@ untrusted; correctness rests on the Lean checkers and their soundness lemmas.
 
 ```
 DDD/
-  Values.lean        value types and K
+  Values.lean        value types
   Schema.lean        presentations, well-formedness
   Semantics.lean     quiver, Paths, Quotient, Schema.cat
   PathEq.lean        path equality for free and acyclic schemas
@@ -182,7 +186,7 @@ DDD/
   Glue.lean          pushouts of presentations, strict integration
   States.lean        states, migrations, gluing
   Certificate.lean   JSON import, checkers, soundness lemmas
-  Examples/          Catalog, Orders, Payments, Shipping, Integration
+  Examples/          Values, Catalog, Orders, Payments, Shipping, Integration
 julia/               Catlab side
 ```
 
@@ -217,11 +221,11 @@ Phase 0 is complete: library entry in `lakefile.toml` and this note, on branch
 
 Phase 1 is complete, with no `sorry`:
 
-1. `Values.lean`: `ValueType` (`int`, `decimal`, `string`, `date`, `uuid`) and
-   `K`, with `DecidableEq` for every `K v`. `Decimal` replaces `Float`: finite
-   decimals in lowest terms, equal exactly when they denote the same rational
-   number (`Decimal.toRat_injective`). `Date` is the number of days since
-   1970-01-01 in the proleptic Gregorian calendar, `Uuid` is `BitVec 128`.
+1. `Values.lean`: `ValueType` (`int`, `decimal`, `string`, `date`, `uuid`).
+   `Examples/Values.lean`: the interpretation `K` of the examples, with
+   `DecidableEq` for every `K v`. `Decimal` replaces `Float`: finite decimals
+   in lowest terms. `Date` is the number of days since 1970-01-01 in the
+   proleptic Gregorian calendar, `Uuid` is `BitVec 128`.
 2. `Schema.lean`: the deep presentation and `Schema.WellFormed`, decided by
    `checkWellFormed` (`checkWellFormed_iff`), so `decide` proves and refutes
    well-formedness.
@@ -247,6 +251,10 @@ Phase 1 is complete, with no `sorry`:
 - Generators: a reference or attribute is identified by its source entity type
   and its name, so names are unique per entity type, not per schema. A deep
   path is a source and a list of names.
+- Interpretation of value types: a parameter `K` of the state layer, not part
+  of the core. Representations matter only for checks on concrete values and
+  for the exchange format, so they live with the examples and, in phase 4,
+  with the checker.
 - Amounts: `Decimal`, not `ℚ`. Every value has a finite decimal notation, as
   amounts do; `ℚ` would admit `1/3`.
 - Acyclic: no path has more generators than there are entity types. This is
