@@ -706,14 +706,21 @@ faithful. -/
 
 namespace Schema
 
-/-- The objects of a schema, as a list: the declared entity types, then the value
-types. -/
-def obs (S : Schema) : List Ob := S.entities.map .entity ++ ValueType.all.map .value
+/-- The objects of a schema that a path can end at, given its target `t` in
+another schema: the declared entity types, and the value type `t` names, if it
+names one. -/
+def obsFor (S : Schema) (t : Option Ob) : List Ob :=
+  S.entities.map .entity ++ match t with
+    | some (.value v) => [.value v]
+    | _ => []
 
-theorem mem_obs {S : Schema} {o : Ob} (h : S.IsOb o) : o ∈ S.obs := by
+theorem mem_obsFor {S : Schema} {o : Ob} (h : S.IsOb o) {t : Option Ob}
+    (ht : ∀ v, o = .value v → t = some (.value v)) : o ∈ S.obsFor t := by
   cases o with
   | entity e => exact List.mem_append_left _ (List.mem_map.mpr ⟨e, h, rfl⟩)
-  | value v => exact List.mem_append_right _ (List.mem_map.mpr ⟨v, ValueType.mem_all v, rfl⟩)
+  | value v =>
+    obtain rfl := ht v rfl
+    simp [obsFor]
 
 /-- Only the empty path leaves a value type. -/
 theorem eq_nil_of_tgt?_value {S : Schema} {v : ValueType} {l : List String} {x : Ob}
@@ -742,7 +749,8 @@ def faithfulAt (S S' : Schema) (e : String) : Bool :=
 /-- Fullness at the entity type `e`: every path of `S'` from the image of `e` to the
 image of an object `o` of `S` is equal to the image of a path from `e` to `o`. -/
 def fullAt (S S' : Schema) (e : String) : Bool :=
-  (S'.paths (T.ob (.entity e)) S'.entities.length).all fun g => S.obs.all fun o =>
+  (S'.paths (T.ob (.entity e)) S'.entities.length).all fun g =>
+    (S.obsFor (S'.tgt? (T.ob (.entity e)) g)).all fun o =>
     !decide (S'.tgt? (T.ob (.entity e)) g = some (T.ob o)) ||
       (S.paths (.entity e) S.entities.length).any fun l =>
         decide (S.tgt? (.entity e) l = some o) &&
@@ -787,7 +795,9 @@ theorem checkFullyFaithful_sound (hS : S.WellFormed) (hS' : S'.WellFormed) (hA :
       have hgP : names g ∈ S'.paths (T.ob (.entity e)) S'.entities.length :=
         (mem_paths _ _ _).mpr ⟨by simp [hg'],
           hA' ⟨T.ob (.entity e), isOb_ob hT ho⟩ _ (by simp [hg'])⟩
-      obtain ⟨l, -, hl, hpe⟩ := (hfull (names g) hgP b.1 (mem_obs b.2)).resolve_left
+      have hb : b.1 ∈ S.obsFor (S'.tgt? (T.ob (.entity e)) (names g)) :=
+        mem_obsFor b.2 fun v hv => by rw [hg', hv]; rfl
+      obtain ⟨l, -, hl, hpe⟩ := (hfull (names g) hgP b.1 hb).resolve_left
         (not_not.mpr hg')
       let p := S.pathOf hS ⟨.entity e, ho⟩ b l hl
       refine ⟨mor p, ?_⟩

@@ -320,7 +320,7 @@ Revision after the decision review of phases 1 to 3 (see Decisions), in order:
 
 1. `CLAUDE.md`: the namespace rule. Done.
 2. `Values.lean`: `bool` and `named n`; the strict non-interference check
-   enumerates only the value types its schemas use.
+   considers the value type a path reaches instead of all value types. Done.
 3. `Schema.lean`: value-object annotations and their check; the gluing check
    reports the names that clash.
 4. `States.lean`: attributed states with specified bijections to `K v`;

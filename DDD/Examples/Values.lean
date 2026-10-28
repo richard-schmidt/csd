@@ -9,7 +9,10 @@ equality of values, since each value has one representation:
 - `Decimal`, in place of `Float`: a finite decimal number in lowest terms;
 - `Date`: the number of days since 1970-01-01 in the proleptic Gregorian
   calendar;
-- `Uuid`: 128 bits.
+- `Uuid`: 128 bits;
+- `bool`: `Bool`;
+- a named type: the names of its elements, as strings. The examples do not
+  restrict them to a declared list.
 -/
 
 namespace DDD.Examples.Values
@@ -40,6 +43,8 @@ abbrev K : ValueType → Type
   | .string => String
   | .date => Date
   | .uuid => Uuid
+  | .bool => Bool
+  | .named _ => String
 
 instance : (v : ValueType) → DecidableEq (K v)
   | .int => inferInstanceAs (DecidableEq Int)
@@ -47,5 +52,7 @@ instance : (v : ValueType) → DecidableEq (K v)
   | .string => inferInstanceAs (DecidableEq String)
   | .date => inferInstanceAs (DecidableEq Date)
   | .uuid => inferInstanceAs (DecidableEq Uuid)
+  | .bool => inferInstanceAs (DecidableEq Bool)
+  | .named _ => inferInstanceAs (DecidableEq String)
 
 end DDD.Examples.Values
