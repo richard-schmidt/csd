@@ -178,9 +178,10 @@ routed along `J`.
   theorems are stated here.
 - The soundness lemmas of the checkers connect the two.
 
-`decide` is checked by the kernel and is used for the examples. `native_decide`
-and the `csd-check` executable trust the compiler; they are used for large
-certificates, and each use is marked.
+`decide` is checked by the kernel and is used for the examples; `decide +kernel`
+leaves out the evaluation by the elaborator and is used for the larger checks.
+`native_decide` and the `csd-check` executable trust the compiler; they are used
+for large certificates, and each use is marked.
 
 ## Julia
 
@@ -327,7 +328,7 @@ Revision after the decision review of phases 1 to 3 (see Decisions), in order:
    `restrictState` and data gluing follow (`State.ext'`, `State.values_eq`).
    Done.
 5. `PathEq.lean`, `Glue.lean`: classes of equal paths computed once per
-   source; `decide +kernel` in the examples.
+   source; `decide +kernel` in the examples. Done.
 6. `ContextMap.lean`: `J` presented by declared equations between routes, `D`
    on the quotient; kernel contexts, and strict integration as the colimit of
    `D` along their inclusions.
@@ -381,9 +382,9 @@ Decision review after phase 3:
   decidable check on composite translations later.
 - Attributed states: a specified bijection between the set at each value type
   and `K v`, instead of an equality of types.
-- Scale: tens of entity types per context. `decide` for the examples, with
-  classes of equal paths computed once per source; beyond that,
-  `native_decide` or `csd-check`, each use marked. No rewriting-system
+- Scale: tens of entity types per context. `decide` and `decide +kernel` for
+  the examples, with classes of equal paths computed once per source; beyond
+  that, `native_decide` or `csd-check`, each use marked. No rewriting-system
   certificates in phase 4.
 - Gluing: along a kernel that both schemas include with the same names, and
   that is all they share. Names that clash outside the kernel are an error

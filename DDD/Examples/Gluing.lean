@@ -13,8 +13,8 @@ include it with the same names, and they share nothing else, so they can be glue
 address once, and the equations of both.
 
 Checked with `decide`: the gluing conditions, well-formedness and acyclicity of
-the glued schema, and strict non-interference: both legs are fully faithful
-(`orders_fullyFaithful`, `shipping_fullyFaithful`). In the glued schema the
+the glued schema; with `decide +kernel`: strict non-interference, both legs are
+fully faithful (`orders_fullyFaithful`, `shipping_fullyFaithful`). In the glued schema the
 billing city of an order is still its customer's city. By the data gluing
 theorem, a state of the glued schema with values in `Values.K` is a pair of
 states of Orders and Shipping that agree on customers and addresses.
@@ -57,12 +57,12 @@ theorem glued_acyclic : gluing.glued.Acyclic := by decide
 /-- Strict non-interference for Orders. -/
 theorem orders_fullyFaithful : gluing.inl.Full ∧ gluing.inl.Faithful :=
   Translation.checkFullyFaithful_sound Orders.wellFormed gluing.wf_glued Orders.acyclic
-    glued_acyclic gluing.inl_valid (by decide)
+    glued_acyclic gluing.inl_valid (by decide +kernel)
 
 /-- Strict non-interference for Shipping. -/
 theorem shipping_fullyFaithful : gluing.inr.Full ∧ gluing.inr.Faithful :=
   Translation.checkFullyFaithful_sound Shipping.wellFormed gluing.wf_glued Shipping.acyclic
-    glued_acyclic gluing.inr_valid (by decide)
+    glued_acyclic gluing.inr_valid (by decide +kernel)
 
 /-- The equation of Orders still holds in the glued schema. -/
 theorem billing_city :
@@ -114,7 +114,7 @@ theorem failing_acyclic : failing.glued.Acyclic := by decide
 
 /-- The check fails for Orders. -/
 theorem delivery_check : ({} : Translation).checkFullyFaithful orders₂ failing.glued = false := by
-  decide
+  decide +kernel
 
 /-- The address of a customer, as a morphism of Orders. -/
 def address : orders₂.obj ⟨.entity "Customer", by decide⟩ ⟶

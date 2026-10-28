@@ -753,20 +753,21 @@ variable (T : Translation)
 equal in `S'` are equal in `S`. -/
 def faithfulAt (S S' : Schema) (e : String) : Bool :=
   (S.paths (.entity e) S.entities.length).all fun l =>
+    let C := S.classOf (.entity e) l
+    let C' := S'.classOf (T.ob (.entity e)) (T.mapPath S (.entity e) l)
     (S.paths (.entity e) S.entities.length).all fun l' =>
       !(decide (S.tgt? (.entity e) l = S.tgt? (.entity e) l') &&
-          S'.pathEq (T.ob (.entity e)) (T.mapPath S (.entity e) l) (T.mapPath S (.entity e) l')) ||
-        S.pathEq (.entity e) l l'
+          decide (T.mapPath S (.entity e) l' ∈ C')) || decide (l' ∈ C)
 
 /-- Fullness at the entity type `e`: every path of `S'` from the image of `e` to the
 image of an object `o` of `S` is equal to the image of a path from `e` to `o`. -/
 def fullAt (S S' : Schema) (e : String) : Bool :=
+  let images := (S.paths (.entity e) S.entities.length).map fun l =>
+    (S.tgt? (.entity e) l, S'.classOf (T.ob (.entity e)) (T.mapPath S (.entity e) l))
   (S'.paths (T.ob (.entity e)) S'.entities.length).all fun g =>
     (S.obsFor (S'.tgt? (T.ob (.entity e)) g)).all fun o =>
-    !decide (S'.tgt? (T.ob (.entity e)) g = some (T.ob o)) ||
-      (S.paths (.entity e) S.entities.length).any fun l =>
-        decide (S.tgt? (.entity e) l = some o) &&
-          S'.pathEq (T.ob (.entity e)) (T.mapPath S (.entity e) l) g
+      !decide (S'.tgt? (T.ob (.entity e)) g = some (T.ob o)) ||
+        images.any fun li => decide (li.1 = some o) && decide (g ∈ li.2)
 
 /-- The check for strict non-interference: the functor of `T` is faithful and full,
 for acyclic `S` and `S'`. -/
@@ -801,8 +802,9 @@ theorem checkFullyFaithful_sound (hS : S.WellFormed) (hS' : S'.WellFormed) (hA :
       exact mor_nil.symm
     | entity e =>
       have hfull := (h e ho).2
-      simp only [fullAt, List.all_eq_true, Bool.or_eq_true, Bool.not_eq_true',
-        decide_eq_false_iff_not, List.any_eq_true, Bool.and_eq_true, decide_eq_true_eq] at hfull
+      simp only [fullAt, List.any_map, Function.comp_def, List.all_eq_true, Bool.or_eq_true,
+        Bool.not_eq_true', decide_eq_false_iff_not, List.any_eq_true, Bool.and_eq_true,
+        decide_eq_true_eq] at hfull
       have hg' : S'.tgt? (T.ob (.entity e)) (names g) = some (T.ob b.1) := tgt?_names g
       have hgP : names g ∈ S'.paths (T.ob (.entity e)) S'.entities.length :=
         (mem_paths _ _ _).mpr ⟨by simp [hg'],
@@ -816,7 +818,7 @@ theorem checkFullyFaithful_sound (hS : S.WellFormed) (hS' : S'.WellFormed) (hA :
       rw [functor_map_mor]
       apply PathEq.mor_eq
       rw [names_functorPath, names_pathOf]
-      exact pathEq_sound hS' _ hpe
+      exact pathEqAcyclic_sound hS' _ (by simpa [pathEqAcyclic] using hpe)
   · refine ⟨fun {X Y} f₁ f₂ hf => ?_⟩
     obtain ⟨a, rfl⟩ := S.obj_surjective X
     obtain ⟨b, rfl⟩ := S.obj_surjective Y
@@ -832,22 +834,24 @@ theorem checkFullyFaithful_sound (hS : S.WellFormed) (hS' : S'.WellFormed) (hA :
     | entity e =>
       have hfaith := (h e ho).1
       simp only [faithfulAt, List.all_eq_true, Bool.or_eq_true, Bool.not_eq_true',
-        Bool.and_eq_false_iff, decide_eq_false_iff_not] at hfaith
+        Bool.and_eq_false_iff, decide_eq_false_iff_not, decide_eq_true_eq] at hfaith
       have hp : S.tgt? (.entity e) (names p) = some b.1 := tgt?_names p
       have hq : S.tgt? (.entity e) (names q) = some b.1 := tgt?_names q
       have memp : names p ∈ S.paths (.entity e) S.entities.length :=
         (mem_paths _ _ _).mpr ⟨by simp [hp], hA ⟨.entity e, ho⟩ _ (by simp [hp])⟩
       have memq : names q ∈ S.paths (.entity e) S.entities.length :=
         (mem_paths _ _ _).mpr ⟨by simp [hq], hA ⟨.entity e, ho⟩ _ (by simp [hq])⟩
-      have hpe' : S'.pathEq (T.ob (.entity e)) (T.mapPath S (.entity e) (names p))
-          (T.mapPath S (.entity e) (names q)) = true := by
-        rw [← names_functorPath hS' hT p, ← names_functorPath hS' hT q]
-        exact (pathEq_iff_of_acyclic hS' hA' _ _ _).mpr ⟨_, _, _, rfl, rfl, hf⟩
+      have hpe' : T.mapPath S (.entity e) (names q) ∈
+          S'.classOf (T.ob (.entity e)) (T.mapPath S (.entity e) (names p)) := by
+        have h' := pathEqAcyclic_complete hS' hA' (obj hT ⟨.entity e, ho⟩)
+          (l := names (functorPath hS' hT p)) (l' := names (functorPath hS' hT q))
+          ⟨_, _, _, rfl, rfl, hf⟩
+        rw [names_functorPath, names_functorPath] at h'
+        simpa [pathEqAcyclic] using h'
       rcases hfaith (names p) memp (names q) memq with (hne | hne) | hpe
       · exact absurd (hp.trans hq.symm) hne
-      · rw [hpe'] at hne
-        exact absurd hne (by simp)
-      · exact PathEq.mor_eq (pathEq_sound hS _ hpe)
+      · exact absurd hpe' hne
+      · exact PathEq.mor_eq (pathEqAcyclic_sound hS _ (by simpa [pathEqAcyclic] using hpe))
 
 end Translation
 
