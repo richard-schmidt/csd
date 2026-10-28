@@ -338,7 +338,9 @@ Revision after the decision review of phases 1 to 3 (see Decisions), in order:
    of a kernel glue (`kernelGluing`), and the glued schema category is the
    pushout in `Cat` of their images under `D` (`isPushout_kernel`). Done.
 7. Published languages: the check that a published language contains roots
-   only.
+   only (`Schema.RootsOnly`, decided by `checkRootsOnly`, and
+   `ContextMap.Publishes` for the arrow from a published language to its
+   owner). Done.
 8. Examples: a context type with CatalogPL, OrdersPL and the Customer/Address
    kernel, projected onto the four domains of the Showcase module; Variant an
    aggregate root in Catalog; translations out of published languages;

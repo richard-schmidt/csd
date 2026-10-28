@@ -26,6 +26,9 @@ unique names, references between declared entity types, equations between
 parallel paths, aggregate annotations that are consistent and respected by
 every reference from outside an aggregate, and value objects that are declared
 and have attributes.
+
+`Schema.RootsOnly P S`, decided by `checkRootsOnly`: no entity type of `P` is a
+member of an aggregate of `S`, the condition on a published language `P` of `S`.
 -/
 
 namespace DDD
@@ -252,6 +255,24 @@ theorem step?_of_mem_attrs (hS : S.WellFormed) {a : Attr} (ha : a ∈ S.attrs) :
     (List.mem_filter.mpr ⟨List.mem_of_find?_eq_some ha', by simp [hp.1]⟩)
     (List.mem_filter.mpr ⟨ha, by simp⟩) hp.2
   simp [step?, hnone, ha', this]
+
+/-! ## Published languages -/
+
+/-- `P` contains roots of `S` only: no entity type of `P` is a member of an
+aggregate of `S`. A published language included in its owner `S` satisfies it, so
+references into it from other contexts target roots. -/
+def RootsOnly (P S : Schema) : Prop :=
+  ∀ e ∈ P.entities, ∀ A ∈ S.aggregates, e ∉ A.members.map (·.entity)
+
+/-- The check for `RootsOnly`. -/
+def checkRootsOnly (P S : Schema) : Bool :=
+  P.entities.all fun e => S.aggregates.all fun A => !decide (e ∈ A.members.map (·.entity))
+
+theorem checkRootsOnly_iff (P S : Schema) : P.checkRootsOnly S = true ↔ P.RootsOnly S := by
+  simp only [checkRootsOnly, RootsOnly, List.all_eq_true, Bool.not_eq_true',
+    decide_eq_false_iff_not]
+
+instance (P S : Schema) : Decidable (P.RootsOnly S) := decidable_of_iff _ (P.checkRootsOnly_iff S)
 
 end Schema
 

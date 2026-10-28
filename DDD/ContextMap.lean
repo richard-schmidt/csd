@@ -29,6 +29,9 @@ kernels.
   `endo_eq_id_of_rank` gives the hypothesis on the free category for every
   context map with a rank that increases along its arrows, so for every map
   without cycles, and `ContextMap.endo_eq_id` carries it to `J`.
+- Published languages: `Publishes f` for an arrow `f : p ⟶ o` states that `f`
+  includes `p` in its owner `o` and that `p` contains roots of `o` only
+  (`Schema.RootsOnly`); it is decidable.
 - Strict integration: every arrow out of a context marked as a kernel is the
   empty translation, an inclusion that keeps names. Two arrows out of a kernel
   whose targets share nothing outside it glue (`kernelGluing`); the kernel span
@@ -224,6 +227,16 @@ theorem nonInterference (hJ : ∀ (c : M.J) (f : c ⟶ c), f = 𝟙 c) (c : C) :
   refine ⟨?_, inferInstance, M.embed_injective c⟩
   exact @Functor.rightOp_full _ _ _ _ (Grothendieck.ι (M.diagram ⋙ Cat.opFunctor) (M.ctx c))
     (Grothendieck.ι_full (M.diagram ⋙ Cat.opFunctor) hJ (M.ctx c))
+
+/-! ## Published languages -/
+
+/-- The arrow `f : p ⟶ o` presents `p` as a published language of `o`: `f` is
+the empty translation, and `p` contains roots of `o` only. -/
+def Publishes {p o : C} (f : p ⟶ o) : Prop :=
+  M.translation f = {} ∧ (M.schema p).RootsOnly (M.schema o)
+
+instance {p o : C} (f : p ⟶ o) : Decidable (M.Publishes f) :=
+  inferInstanceAs (Decidable (_ ∧ _))
 
 /-! ## Strict integration along kernels -/
 
