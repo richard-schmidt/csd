@@ -112,6 +112,25 @@ inverted.
 - Theorem (data gluing): the states of `B₁ ⊔_K B₂` correspond to pairs of
   states of `B₁` and `B₂` with equal restrictions to `K`.
 
+Attributed states (values pinned to `K`) do not form a plain functor category,
+which has three consequences:
+
+- Mathlib's pointwise limits and colimits in `C ⥤ Type` do not apply directly.
+  The pointwise coproduct of two states has `K v ⊔ K v` at a value type `v`, so
+  it is not a state. Limits and colimits are constructed with entities computed
+  pointwise and values fixed, and their universal properties are proved.
+- `Σ_T` is not a plain left Kan extension. If the target schema has an
+  attribute path from a translated entity type that the source schema lacks,
+  the Kan extension adds formal values instead of taking them from `K`. `Δ_T`
+  is unaffected.
+- The data gluing theorem is proved for entity-only states from the universal
+  property in `Cat`, and again for attributed states.
+
+The library uses the strict formulation (values equal to `K`, morphisms the
+identity on values). The alternative, states over a fixed object built from
+`K`, gets colimits from Mathlib's `Over`, but a state then carries value slots
+that may repeat a value.
+
 ### Open systems
 
 Structured cospans `I ⟶ S ⟵ O` of schemas, with interface schemas as published
@@ -185,16 +204,34 @@ Each module has its own namespace. `sorry` is allowed in this library.
 | 0. Setup        | library entry in `lakefile.toml`, this note | CI green |
 | 1. Schemas      | Values, Schema, Semantics, PathEq          | Catalog and Orders schemas checked with `decide` |
 | 2. Context map  | Translation, ContextMap                    | the four-context map as a functor; lax non-interference proved |
-| 3. Gluing       | Glue, States                               | Orders and Shipping glued along a Customer/Address kernel and checked; a failing kernel; bridge and data gluing proved |
+| 3. Gluing       | Glue, States, then attributed states       | Orders and Shipping glued along a Customer/Address kernel and checked; a failing kernel; bridge and data gluing proved, data gluing also for attributed states |
 | 4. Julia        | JSON, Certificate, `csd-check`, `julia/`   | Julia reproduces phase 3 and Lean accepts its certificate |
 | 5. Open systems | structured cospans, wiring, behaviour      | link to `Production` machines and `Svc` events |
+
+## Status
+
+Phase 0 is complete: library entry in `lakefile.toml` and this note, on branch
+`claude/ddd-design`, CI green.
+
+Phase 1 work items:
+
+1. `Values.lean`: `ValueType`, `K`, and `DecidableEq` for every `K v`. `Float`
+   is replaced by an exact type for amounts; the representations of `Date`
+   and `Uuid` are fixed here.
+2. `Schema.lean`: the deep presentation (entity types, value types,
+   references, attributes, equations, aggregate annotations) and the
+   well-formedness checker with its soundness lemma.
+3. `Semantics.lean`: the quiver of a schema, `Paths`, the `HomRel` of the
+   equations, `Quotient`, and `Schema.cat : Cat`.
+4. `PathEq.lean`: decision procedures for path equality in free and in acyclic
+   schemas, with soundness lemmas relating them to `Schema.cat`.
+5. `Examples/Catalog.lean`, `Examples/Orders.lean`: the two schemas, with
+   attributes, checked with `decide`.
 
 ## Decisions
 
 - Default integration: lax. Strict integration is an explicit merge.
 - Julia code: this repository, in `julia/`.
 - Library: a separate `lean_lib`, `DDD`.
-- Attributes: open. Attributes in schemas add little work. Attributed states
-  do not form a plain functor category, which makes them the costly part. The
-  options are attributes throughout from phase 1, or attributes in schemas from
-  phase 1 and attributed states before phase 4.
+- Attributes: in schemas from phase 1. Attributed states in phase 3, after the
+  entity-only states and before phase 4, in the strict formulation.
