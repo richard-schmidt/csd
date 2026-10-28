@@ -1,52 +1,46 @@
 import DDD.States
-import DDD.Examples.Orders
-import DDD.Examples.Shipping
+import DDD.Examples.Integration
 import DDD.Examples.Values
 
 /-!
-# Example: Orders and Shipping glued along customers and addresses
+# Example: Orders and Shipping glued along the Customers kernel
 
-Strict integration of two contexts. Orders and Shipping share a kernel: customers
-with a name and an address, addresses with a street and a city. Both schemas
-include it with the same names, and they share nothing else, so they can be glued
-(`gluing`). The glued schema has the entity types of both, the customer and
-address once, and the equations of both.
+Strict integration of two contexts of the map in `Integration.lean`. Orders and
+Shipping share the kernel `Customers`: customers with a name and an address,
+addresses with a street and a city. Both include it with the same names, and
+they share nothing else, so the two arrows out of the kernel glue (`gluing`,
+from `ContextMap.kernelGluing`). The glued schema has the entity types of both,
+the customer and address once, and the equations of both; its category is the
+pushout of the images of the two arrows under `D` (`isPushout`).
 
 Checked with `decide`: the gluing conditions, well-formedness and acyclicity of
 the glued schema; with `decide +kernel`: strict non-interference, both legs are
-fully faithful (`orders_fullyFaithful`, `shipping_fullyFaithful`). In the glued schema the
-billing city of an order is still its customer's city. By the data gluing
-theorem, a state of the glued schema with values in `Values.K` is a pair of
-states of Orders and Shipping that agree on customers and addresses.
+fully faithful (`orders_fullyFaithful`, `shipping_fullyFaithful`). In the glued
+schema the billing city of an order is still its customer's city. By the data
+gluing theorem, a state of the glued schema with values in `Values.K` is a pair
+of states of Orders and Shipping that agree on customers and addresses.
 
-A failing kernel: both contexts give customers a delivery address besides their
-address, and Shipping assumes the two are equal while Orders does not. The merge
-imposes Shipping's equation on Orders, so the leg from Orders is not faithful
-(`delivery_not_faithful`), and the check fails.
+A failing kernel, outside the map: both contexts give customers a delivery
+address besides their address, and Shipping assumes the two are equal while
+Orders does not. The merge imposes Shipping's equation on Orders, so the leg
+from Orders is not faithful (`delivery_not_faithful`), and the check fails.
 -/
 
 namespace DDD.Examples.Gluing
 
-open CategoryTheory Schema
-
-/-- The kernel: customers and their addresses. -/
-def kernel : Schema where
-  entities := ["Customer", "Address"]
-  refs := [⟨"address", "Customer", "Address"⟩]
-  attrs := [⟨"name", "Customer", .string⟩, ⟨"street", "Address", .string⟩,
-    ⟨"city", "Address", .string⟩]
-  aggregates := [⟨"Customer", []⟩, ⟨"Address", []⟩]
+open CategoryTheory Schema Integration
 
 /-- Orders and Shipping glued along the kernel. -/
-def gluing : Gluing where
-  kernel := kernel
-  left := Orders.schema
-  right := Shipping.schema
-  wf_kernel := by decide
-  wf_left := Orders.wellFormed
-  wf_right := Shipping.wellFormed
-  wf_glued := by decide
-  gluable := checkGluable_sound Orders.wellFormed Shipping.wellFormed (by decide)
+def gluing : Gluing :=
+  contextMap.kernelGluing Arrow.customers_orders Arrow.customers_shipping rfl (by decide)
+    (by decide)
+
+/-- The glued schema category is the pushout of the two inclusions of the
+kernel. -/
+theorem isPushout :
+    IsPushout (contextMap.diagram.map (contextMap.arrow .customers_orders))
+      (contextMap.diagram.map (contextMap.arrow .customers_shipping)) gluing.inl gluing.inr :=
+  contextMap.isPushout_kernel _ _ _ _ _
 
 theorem glued_entities : gluing.glued.entities =
     ["Customer", "Address", "Order", "OrderLine", "Product", "Shipment", "Item", "Carrier"] := by
@@ -83,7 +77,7 @@ example : gluing.glued.State Values.K ≃ { P : Orders.schema.State Values.K ×
 def delivery : Ref := ⟨"deliveryAddress", "Customer", "Address"⟩
 
 /-- The kernel with the delivery address. -/
-def kernel₂ : Schema := { kernel with refs := delivery :: kernel.refs }
+def kernel₂ : Schema := { customers with refs := delivery :: customers.refs }
 
 /-- Orders with a delivery address that may differ from the customer's address. -/
 def orders₂ : Schema := { Orders.schema with refs := delivery :: Orders.schema.refs }

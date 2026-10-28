@@ -3,9 +3,10 @@ import DDD.PathEq
 /-!
 # Example: the Shipping context
 
-Shipments with their items, customers, addresses and carriers. A shipment is the
-Shipping view of an order; its items carry what Shipping declares about the
-ordered products.
+Shipments with their items, customers, addresses and carriers. A shipment names
+the order it ships by the value `orderId`; its items carry what Shipping
+declares about the shipped goods. Whether a shipment needs a signature is a
+`bool`. Addresses are value objects.
 
 No equations, so the schema is free. Aggregates: a shipment with its items,
 owned through `shipment`; customers, addresses and carriers on their own.
@@ -26,13 +27,13 @@ def schema : Schema where
     ⟨"shipment", "Item", "Shipment"⟩]
   attrs := [⟨"name", "Customer", .string⟩, ⟨"street", "Address", .string⟩,
     ⟨"city", "Address", .string⟩, ⟨"orderId", "Shipment", .uuid⟩,
-    ⟨"orderedOn", "Shipment", .date⟩, ⟨"shippedOn", "Shipment", .date⟩,
-    ⟨"trackingCode", "Shipment", .string⟩, ⟨"quantity", "Item", .int⟩,
+    ⟨"shippedOn", "Shipment", .date⟩, ⟨"trackingCode", "Shipment", .string⟩,
+    ⟨"signatureRequired", "Shipment", .bool⟩, ⟨"quantity", "Item", .int⟩,
     ⟨"declaredValue", "Item", .decimal⟩, ⟨"sku", "Item", .string⟩,
-    ⟨"description", "Item", .string⟩, ⟨"category", "Item", .string⟩,
-    ⟨"name", "Carrier", .string⟩]
+    ⟨"description", "Item", .string⟩, ⟨"name", "Carrier", .string⟩]
   aggregates := [⟨"Customer", []⟩, ⟨"Address", []⟩, ⟨"Shipment", [⟨"Item", "shipment"⟩]⟩,
     ⟨"Carrier", []⟩]
+  valueObjects := ["Address"]
 
 theorem wellFormed : schema.WellFormed := by decide
 

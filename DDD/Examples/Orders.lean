@@ -4,8 +4,9 @@ import DDD.PathEq
 # Example: the Orders context
 
 Customers, addresses, orders, order lines, and the products they refer to. A
-product here is the Orders view of a catalog variant: its SKU, name, list price
-and category name.
+product here is the Orders view of a catalog variant: its SKU, name and list
+price. The status of an order is a project-defined value type, `OrderStatus`.
+Addresses are value objects: an address is its street and city.
 
 Two equations:
 
@@ -15,6 +16,11 @@ Two equations:
 
 Aggregates: an order with its lines, each owning reference `order` pointing to
 the root; customers, addresses and products on their own.
+
+The published language of Orders (`published`): customers, addresses and orders,
+with the first equation. It contains roots only (`published_rootsOnly`); order
+lines belong to the order aggregate, so a published language with them fails the
+check (`withLines_not_rootsOnly`).
 
 The references have no cycle, so path equality is decided by
 `Schema.pathEqAcyclic_iff`. Checked with `decide`: well-formedness, acyclicity,
@@ -36,14 +42,15 @@ def schema : Schema where
     ⟨"order", "OrderLine", "Order"⟩, ⟨"product", "OrderLine", "Product"⟩]
   attrs := [⟨"name", "Customer", .string⟩, ⟨"street", "Address", .string⟩,
     ⟨"city", "Address", .string⟩, ⟨"id", "Order", .uuid⟩, ⟨"placedOn", "Order", .date⟩,
-    ⟨"quantity", "OrderLine", .int⟩, ⟨"unitPrice", "OrderLine", .decimal⟩,
-    ⟨"sku", "OrderLine", .string⟩, ⟨"sku", "Product", .string⟩,
-    ⟨"name", "Product", .string⟩, ⟨"listPrice", "Product", .decimal⟩,
-    ⟨"category", "Product", .string⟩]
+    ⟨"status", "Order", .named "OrderStatus"⟩, ⟨"quantity", "OrderLine", .int⟩,
+    ⟨"unitPrice", "OrderLine", .decimal⟩, ⟨"sku", "OrderLine", .string⟩,
+    ⟨"sku", "Product", .string⟩, ⟨"name", "Product", .string⟩,
+    ⟨"listPrice", "Product", .decimal⟩]
   eqns := [⟨"Order", ["billTo"], ["customer", "address"]⟩,
     ⟨"OrderLine", ["sku"], ["product", "sku"]⟩]
   aggregates := [⟨"Customer", []⟩, ⟨"Address", []⟩, ⟨"Order", [⟨"OrderLine", "order"⟩]⟩,
     ⟨"Product", []⟩]
+  valueObjects := ["Address"]
 
 theorem wellFormed : schema.WellFormed := by decide
 
@@ -75,5 +82,36 @@ def withCustomerAddress : Schema :=
       ⟨"Product", []⟩] }
 
 theorem withCustomerAddress_not_wellFormed : ¬ withCustomerAddress.WellFormed := by decide
+
+/-! ## The published language -/
+
+/-- The published language of Orders: customers, addresses and orders. -/
+def published : Schema where
+  entities := ["Customer", "Address", "Order"]
+  refs := [⟨"address", "Customer", "Address"⟩, ⟨"customer", "Order", "Customer"⟩,
+    ⟨"billTo", "Order", "Address"⟩, ⟨"shipTo", "Order", "Address"⟩]
+  attrs := [⟨"name", "Customer", .string⟩, ⟨"street", "Address", .string⟩,
+    ⟨"city", "Address", .string⟩, ⟨"id", "Order", .uuid⟩, ⟨"placedOn", "Order", .date⟩]
+  eqns := [⟨"Order", ["billTo"], ["customer", "address"]⟩]
+  aggregates := [⟨"Customer", []⟩, ⟨"Address", []⟩, ⟨"Order", []⟩]
+  valueObjects := ["Address"]
+
+theorem published_wellFormed : published.WellFormed := by decide
+
+theorem published_acyclic : published.Acyclic := by decide
+
+/-- Customers, addresses and orders are roots of Orders. -/
+theorem published_rootsOnly : published.RootsOnly schema := by decide
+
+/-- The published language with order lines. -/
+def withLines : Schema :=
+  { published with
+    entities := published.entities ++ ["OrderLine"]
+    refs := published.refs ++ [⟨"order", "OrderLine", "Order"⟩]
+    attrs := published.attrs ++ [⟨"quantity", "OrderLine", .int⟩] }
+
+/-- Order lines are members of the order aggregate, so they cannot be
+published. -/
+theorem withLines_not_rootsOnly : ¬ withLines.RootsOnly schema := by decide
 
 end DDD.Examples.Orders

@@ -92,9 +92,10 @@ the free category on the arrows of the context map, quotiented by declared
 equations between routes, which `D` must respect. A diamond whose two routes
 deliver the same upstream concept is declared; one whose routes carry
 different roles (a sold item and a search hit of the same variant) stays free,
-with one reference per route. The arrows of
-`Showcase/ContextMapNotifications.lean` generate an example of `J`; `Reaches`
-is the order of its contexts, along which events are routed.
+with one reference per route. The example context map refines the map of
+`Showcase/ContextMapNotifications.lean`: each context lies in one of its
+domains, and each arrow refines one of its routes. `Reaches` is the order of
+its domains, along which events are routed.
 
 A downstream context sees only what its upstream publishes: a published
 language is a context of `J`, included in its owner and translated into each
@@ -208,11 +209,14 @@ DDD/
   Semantics.lean     quiver, Paths, Quotient, Schema.cat
   PathEq.lean        path equality for free and acyclic schemas
   Translation.lean   translations, validity, induced functor, Δ
-  ContextMap.lean    D : J ⥤ Cat, coherence, lax integration
-  Glue.lean          pushouts of presentations, strict integration
+  Glue.lean          pushouts of presentations, bridge theorem, strict
+                     non-interference
+  ContextMap.lean    J, D : J ⥤ Cat, lax integration, strict integration
+                     along kernels
   States.lean        states, migrations, gluing
   Certificate.lean   JSON import, checkers, soundness lemmas
-  Examples/          Values, Catalog, Orders, Payments, Shipping, Integration
+  Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
+                     Gluing
 julia/               Catlab side
 ```
 
@@ -226,7 +230,8 @@ this library.
   reference `Entity ⟶ Domain`, once morphisms carry the commuting condition.
 - `Sketches/Domains.lean`: `System.domainGraph` is the projection of the lax
   integration onto `J`, with fields as unnamed references.
-- `Showcase/ContextMapNotifications.lean`: supplies the example context map.
+- `Showcase/ContextMapNotifications.lean`: the domains and routes that the
+  example context map refines.
 - `Production/Wiring.lean`: composition of behaviour, connected in phase 5.
 
 ## Roadmap
@@ -341,11 +346,18 @@ Revision after the decision review of phases 1 to 3 (see Decisions), in order:
    only (`Schema.RootsOnly`, decided by `checkRootsOnly`, and
    `ContextMap.Publishes` for the arrow from a published language to its
    owner). Done.
-8. Examples: a context type with CatalogPL, OrdersPL and the Customer/Address
-   kernel, projected onto the four domains of the Showcase module; Variant an
-   aggregate root in Catalog; translations out of published languages;
-   Orders → Shipping removed; the gluing of Orders and Shipping as the strict
-   integration of the kernel's inclusions.
+8. Examples: `Examples/Integration.lean` has seven contexts, the four of the
+   Showcase module, the published languages CatalogPL and OrdersPL, and the
+   Customers kernel, with a projection onto the Showcase map (`toDomains`,
+   `reaches`). Variant is an aggregate root in Catalog; translations start at
+   published languages, which contain roots only; Orders → Shipping is
+   removed; the schemas lose what only Orders fed them and use `bool`,
+   `named` and value objects. `Examples/Gluing.lean` takes the gluing of
+   Orders and Shipping from the two arrows out of the kernel, with the pushout
+   of their images under `D`. Done.
+
+The revision is complete, with no `sorry`. Where it changes a module, it
+supersedes the description under phases 1 to 3.
 
 ## Decisions
 

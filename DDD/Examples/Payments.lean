@@ -4,8 +4,9 @@ import DDD.PathEq
 # Example: the Payments context
 
 Invoices with their lines, payers and addresses, payments of invoices, and
-refunds of payments. An invoice is the Payments view of an order; its lines
-carry what Payments keeps of the ordered products.
+refunds of payments. An invoice is the Payments view of an order of the
+published language of Orders. The method of a payment is a project-defined value
+type, `PaymentMethod`. Addresses are value objects.
 
 One equation: a refund's invoice is the invoice of its payment,
 `invoice = payment.invoice`.
@@ -31,14 +32,14 @@ def schema : Schema where
   attrs := [⟨"name", "Payer", .string⟩, ⟨"street", "Address", .string⟩,
     ⟨"city", "Address", .string⟩, ⟨"orderId", "Invoice", .uuid⟩,
     ⟨"orderedOn", "Invoice", .date⟩, ⟨"quantity", "InvoiceLine", .int⟩,
-    ⟨"unitPrice", "InvoiceLine", .decimal⟩, ⟨"listPrice", "InvoiceLine", .decimal⟩,
-    ⟨"sku", "InvoiceLine", .string⟩, ⟨"description", "InvoiceLine", .string⟩,
-    ⟨"taxCategory", "InvoiceLine", .string⟩, ⟨"amount", "Payment", .decimal⟩,
-    ⟨"paidOn", "Payment", .date⟩, ⟨"amount", "Refund", .decimal⟩,
+    ⟨"unitPrice", "InvoiceLine", .decimal⟩, ⟨"description", "InvoiceLine", .string⟩,
+    ⟨"amount", "Payment", .decimal⟩, ⟨"paidOn", "Payment", .date⟩,
+    ⟨"method", "Payment", .named "PaymentMethod"⟩, ⟨"amount", "Refund", .decimal⟩,
     ⟨"issuedOn", "Refund", .date⟩]
   eqns := [⟨"Refund", ["invoice"], ["payment", "invoice"]⟩]
   aggregates := [⟨"Payer", []⟩, ⟨"Address", []⟩, ⟨"Invoice", [⟨"InvoiceLine", "invoice"⟩]⟩,
     ⟨"Payment", [⟨"Refund", "payment"⟩]⟩]
+  valueObjects := ["Address"]
 
 theorem wellFormed : schema.WellFormed := by decide
 
