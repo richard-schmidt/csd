@@ -1,7 +1,7 @@
 name = "Categorical"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["Showcase", "Sketches", "Production"]
+defaultTargets = ["Showcase", "Sketches", "Production", "DDD"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
@@ -30,3 +30,9 @@ globs = ["Sketches.+"]
 [[lean_lib]]
 name = "Production"
 globs = ["Production.+"]
+
+# DDD: bounded contexts as finitely presented categories, context maps and
+# their integration. Design note: DDD/README.md. sorry is allowed.
+[[lean_lib]]
+name = "DDD"
+globs = ["DDD.+"]

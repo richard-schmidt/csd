@@ -105,6 +105,10 @@ theorem run_serial (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) (m n inputs
     (M ≫ₛ N).run (m, n) inputs = N.run n (M.run m inputs).dropLast
 ```
 
+## DDD
+
+[`DDD/`](DDD/) models bounded contexts as finitely presented categories, context maps as diagrams of them, and the integration of contexts into larger systems, with a Julia side (Catlab) whose results Lean checks. [`DDD/README.md`](DDD/README.md) describes the structures, the theorems and checks, and the roadmap. The library has no modules yet. `sorry` is allowed.
+
 ## Sketches
 
 The modules in [`Sketches/`](Sketches/) build, but are drafts. Some proofs are still `sorry`, and they say so.
@@ -131,10 +135,10 @@ The Lean toolchain (v4.26.0) and Mathlib are pinned in `lean-toolchain` and `lak
 
 ```sh
 lake exe cache get   # download prebuilt Mathlib
-lake build           # Showcase and Sketches
+lake build           # Showcase, Sketches, Production, DDD
 ```
 
-CI builds both libraries on each push and generates the API documentation.
+CI builds these libraries on each push and generates the API documentation.
 
 ## License
 
