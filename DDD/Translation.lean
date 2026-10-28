@@ -255,6 +255,19 @@ theorem obj_empty (hT : ({} : Translation).Valid S S') (a : S.Obj) :
     obj hT a = ⟨a.1, ob_empty a.1 ▸ isOb_ob hT a.2⟩ :=
   Subtype.ext (ob_empty _)
 
+/-- The functor of a valid empty translation sends a generator to the generator
+of the same name. -/
+theorem functor_empty_genMor (hS' : S'.WellFormed) (hT : ({} : Translation).Valid S S')
+    {a b : S.Obj} (n : String) (h : S.step? a.1 n = some b.1) (ha : S'.IsOb a.1)
+    (hb : S'.IsOb b.1) (h' : S'.step? a.1 n = some b.1) :
+    (functor hS' hT).map (S.genMor n h) =
+      eqToHom (congrArg S'.obj (Subtype.ext (ob_empty a.1) : obj hT a = ⟨a.1, ha⟩)) ≫
+        S'.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) n h' ≫
+        eqToHom (congrArg S'.obj (Subtype.ext (ob_empty b.1) : obj hT b = ⟨b.1, hb⟩)).symm := by
+  rw [functor_map_mor]
+  exact Schema.mor_eq_of_names (Subtype.ext (ob_empty a.1)) (Subtype.ext (ob_empty b.1)) _ _
+    (by rw [names_functorPath_empty]; rfl)
+
 end Translation
 
 end DDD

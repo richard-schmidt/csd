@@ -133,6 +133,9 @@ variable {S}
 def mor {a b : S.Obj} (p : Quiver.Path a b) : S.obj a ⟶ S.obj b :=
   (Quotient.functor S.rel).map (X := a) (Y := b) p
 
+@[simp] theorem mor_nil {a : S.Obj} : mor (Quiver.Path.nil : Quiver.Path a a) = 𝟙 (S.obj a) :=
+  (CategoryTheory.Quotient.functor S.rel).map_id (X := a)
+
 theorem mor_comp {a b c : S.Obj} (p : Quiver.Path a b) (q : Quiver.Path b c) :
     mor (p.comp q) = mor p ≫ mor q :=
   (Quotient.functor S.rel).map_comp (X := a) (Y := b) (Z := c) p q
@@ -231,6 +234,18 @@ theorem isOb_src_of_step? (hS : S.WellFormed) {o o' : Ob} {n : String}
       simp only [Bool.and_eq_true, beq_iff_eq] at hp
       exact hp.1 ▸ hS.attr_src a (List.mem_of_find?_eq_some ha)
 
+/-- In a well-formed schema, a path from a declared object ends at a declared
+object. -/
+theorem isOb_of_tgt? (hS : S.WellFormed) :
+    ∀ {o x : Ob} {l : List String}, S.IsOb o → S.tgt? o l = some x → S.IsOb x
+  | _, _, [], ho, h => Option.some.inj h ▸ ho
+  | o, x, n :: ns, _, h => by
+    cases hs : S.step? o n with
+    | none => simp [hs] at h
+    | some o' =>
+      simp only [tgt?_cons, hs, Option.bind_some] at h
+      exact isOb_of_tgt? hS (isOb_of_step? hS hs) h
+
 /-- Every object of `S.cat` is the object of an object of `S`. -/
 theorem obj_surjective (X : S.cat) : ∃ a, S.obj a = X := ⟨X.as, rfl⟩
 
@@ -244,6 +259,23 @@ their endpoints. -/
 theorem mor_eq_of_names {a a' b b' : S.Obj} (ha : a = a') (hb : b = b') (p : Quiver.Path a b)
     (p' : Quiver.Path a' b') (h : names p = names p') :
     mor p = eqToHom (congrArg S.obj ha) ≫ mor p' ≫ eqToHom (congrArg S.obj hb).symm := by
+  subst ha hb
+  obtain rfl := names_injective p p' h
+  simp
+
+/-- The path of the generator named `n` from `a` to `b`. -/
+abbrev genPath (a b : S.Obj) (n : String) (h : S.step? a.1 n = some b.1) : Quiver.Path a b :=
+  Quiver.Hom.toPath (show a ⟶ b from ⟨n, h⟩)
+
+/-- The generator named `n` from `a` to `b`, as a morphism of `S.cat`. -/
+abbrev genMor {a b : S.Obj} (n : String) (h : S.step? a.1 n = some b.1) : S.obj a ⟶ S.obj b :=
+  mor (S.genPath a b n h)
+
+/-- `mor_eq_of_names` under a functor. -/
+theorem map_mor_eq_of_names {X : Type*} [Category X] (F : S.cat ⥤ X) {a a' b b' : S.Obj}
+    (ha : a = a') (hb : b = b') (p : Quiver.Path a b) (p' : Quiver.Path a' b')
+    (h : names p = names p') :
+    F.map (mor p) = eqToHom (by rw [ha]) ≫ F.map (mor p') ≫ eqToHom (by rw [hb]) := by
   subst ha hb
   obtain rfl := names_injective p p' h
   simp

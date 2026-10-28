@@ -1,4 +1,5 @@
 import DDD.Translation
+import Mathlib.CategoryTheory.Limits.Shapes.Pullback.CommSq
 
 /-!
 # Gluing schemas
@@ -12,6 +13,13 @@ generators of `K`. `checkGluable` is its check.
 
 A `Gluing` bundles a kernel, two schemas, and the conditions, with the legs
 `inl` and `inr` of the glued schema and the square `ι₁ ⋙ inl = ι₂ ⋙ inr`.
+
+The bridge theorem: for every category `X`, functors from the glued schema
+category to `X` correspond to pairs of functors from the two schema categories
+that agree on the kernel (`Gluing.glueEquiv`), so the square is a pushout in
+`Cat` (`Gluing.isPushout`). The functor glued from `F₁` and `F₂` (`desc`) is
+`F₁` on the generators of the first schema and `F₂` on the others; it respects
+the equations because the glued equations are those of the two schemas.
 -/
 
 namespace DDD
@@ -192,6 +200,24 @@ theorem Gluable.step?_eq {K : Schema} (h : Gluable K B₁ B₂) {o x y : Ob} {n 
       simp only [Translation.ob_empty, Translation.gen_empty, tgt?_singleton] at e₁ e₂
       exact Option.some.inj (h₁.symm.trans (e₁.trans (e₂.symm.trans h₂)))
 
+/-- Where both schemas have a generator, the kernel has it too. -/
+theorem Gluable.kernel_step? {K : Schema} (h : Gluable K B₁ B₂) (hK : K.WellFormed)
+    {o x y : Ob} {n : String} (h₁ : B₁.step? o n = some x) (h₂ : B₂.step? o n = some y) :
+    K.step? o n = some x := by
+  cases o with
+  | value => simp [step?] at h₁
+  | entity e =>
+    have hk := h.gens (e, n) (step?_isSome_iff.mp (by simp [h₁]))
+      (step?_isSome_iff.mp (by simp [h₂]))
+    simp only [Schema.gens, List.mem_append, List.mem_map, Prod.mk.injEq] at hk
+    rcases hk with ⟨r, hr, rfl, rfl⟩ | ⟨a, ha, rfl, rfl⟩
+    · have e₁ := h.left.ref r hr
+      simp only [Translation.ob_empty, Translation.gen_empty, tgt?_singleton] at e₁
+      rw [step?_of_mem_refs hK hr, ← e₁, h₁]
+    · have e₁ := h.left.attr a ha
+      simp only [Translation.ob_empty, Translation.gen_empty, tgt?_singleton] at e₁
+      rw [step?_of_mem_attrs hK ha, ← e₁, h₁]
+
 theorem Gluable.glue_step?_of_right {K : Schema} (h : Gluable K B₁ B₂) {o x : Ob}
     {n : String} (h₂ : B₂.step? o n = some x) : (glue B₁ B₂).step? o n = some x := by
   rw [glue_step?, h₂]
@@ -283,6 +309,391 @@ theorem comm : D.ι₁ ⋙ D.inl = D.ι₂ ⋙ D.inr := by
   congr 1
   apply names_injective
   simp only [Translation.names_functorPath_empty]
+
+/-! ## The bridge theorem
+
+Functors out of the glued schema category correspond to pairs of functors out of
+the two schema categories that agree on the kernel. -/
+
+section Desc
+
+variable {X : Type*} [Category X] {F₁ : D.left.cat ⥤ X} {F₂ : D.right.cat ⥤ X}
+
+theorem isOb_right_of_not_left (a : D.glued.Obj) (h : ¬ D.left.IsOb a.1) :
+    D.right.IsOb a.1 := by
+  obtain ⟨o, ho⟩ := a
+  cases o with
+  | value => exact absurd trivial h
+  | entity e =>
+    simp only [IsOb, glue, List.mem_append, List.mem_filter, decide_eq_true_eq] at ho h ⊢
+    rcases ho with h' | ⟨h', -⟩
+    · exact absurd h' h
+    · exact h'
+
+theorem isOb_kernel {o : Ob} (h₁ : D.left.IsOb o) (h₂ : D.right.IsOb o) :
+    D.kernel.IsOb o := by
+  cases o with
+  | value => trivial
+  | entity e => exact D.gluable.entities e h₁ h₂
+
+variable (F₁ F₂) in
+/-- The object map of the glued functor: `F₁` on the objects of the first schema,
+`F₂` on the others. -/
+def descObj (a : D.glued.Obj) : X :=
+  if h : D.left.IsOb a.1 then F₁.obj (D.left.obj ⟨a.1, h⟩)
+  else F₂.obj (D.right.obj ⟨a.1, D.isOb_right_of_not_left a h⟩)
+
+theorem descObj_left (a : D.glued.Obj) (h : D.left.IsOb a.1) :
+    D.descObj F₁ F₂ a = F₁.obj (D.left.obj ⟨a.1, h⟩) := dif_pos h
+
+variable (hF : D.ι₁ ⋙ F₁ = D.ι₂ ⋙ F₂)
+
+include hF in
+/-- On the kernel, `F₁` and `F₂` agree. -/
+theorem obj_agree {o : Ob} (h₁ : D.left.IsOb o) (h₂ : D.right.IsOb o) :
+    F₁.obj (D.left.obj ⟨o, h₁⟩) = F₂.obj (D.right.obj ⟨o, h₂⟩) := by
+  have hk := D.isOb_kernel h₁ h₂
+  have e₁ : D.ι₁.obj (D.kernel.obj ⟨o, hk⟩) = D.left.obj ⟨o, h₁⟩ :=
+    congrArg D.left.obj (Subtype.ext (Translation.ob_empty o))
+  have e₂ : D.ι₂.obj (D.kernel.obj ⟨o, hk⟩) = D.right.obj ⟨o, h₂⟩ :=
+    congrArg D.right.obj (Subtype.ext (Translation.ob_empty o))
+  rw [← e₁, ← e₂]
+  exact Functor.congr_obj hF _
+
+include hF in
+theorem descObj_right (a : D.glued.Obj) (h : D.right.IsOb a.1) :
+    D.descObj F₁ F₂ a = F₂.obj (D.right.obj ⟨a.1, h⟩) := by
+  unfold descObj
+  split
+  · exact D.obj_agree hF _ _
+  · rfl
+
+/-- The map of the glued functor on a generator: through `F₁` if the generator is
+one of the first schema, through `F₂` otherwise. -/
+def descMap {a b : D.glued.Obj} (e : a ⟶ b) : D.descObj F₁ F₂ a ⟶ D.descObj F₁ F₂ b :=
+  match h : D.left.step? a.1 e.1 with
+  | some x =>
+    have hx : x = b.1 := by
+      have h' := e.2
+      rw [glue_step?, h] at h'
+      exact Option.some.inj h'
+    have ha : D.left.IsOb a.1 := isOb_src_of_step? D.wf_left h
+    have hb : D.left.IsOb b.1 := hx ▸ isOb_of_step? D.wf_left h
+    eqToHom (D.descObj_left a ha) ≫
+      F₁.map (D.left.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 (hx ▸ h)) ≫
+      eqToHom (D.descObj_left b hb).symm
+  | none =>
+    have h₂ : D.right.step? a.1 e.1 = some b.1 := by
+      have h' := e.2
+      rw [glue_step?, h, Option.none_or] at h'
+      exact h'
+    have ha : D.right.IsOb a.1 := isOb_src_of_step? D.wf_right h₂
+    have hb : D.right.IsOb b.1 := isOb_of_step? D.wf_right h₂
+    eqToHom (D.descObj_right hF a ha) ≫
+      F₂.map (D.right.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 h₂) ≫
+      eqToHom (D.descObj_right hF b hb).symm
+
+theorem descMap_left {a b : D.glued.Obj} (e : a ⟶ b) (ha : D.left.IsOb a.1)
+    (hb : D.left.IsOb b.1) (h : D.left.step? a.1 e.1 = some b.1) :
+    D.descMap hF e = eqToHom (D.descObj_left a ha) ≫
+      F₁.map (D.left.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 h) ≫
+      eqToHom (D.descObj_left b hb).symm := by
+  unfold descMap
+  split
+  · rename_i x hx
+    obtain rfl : x = b.1 := Option.some.inj (hx.symm.trans h)
+    rfl
+  · rename_i hx
+    simp [hx] at h
+
+/-- On a generator of the second schema, the glued functor is `F₂`; where the
+generator is also one of the first schema, it is a kernel generator, on which
+`F₁` and `F₂` agree. -/
+theorem descMap_right {a b : D.glued.Obj} (e : a ⟶ b) (ha : D.right.IsOb a.1)
+    (hb : D.right.IsOb b.1) (h : D.right.step? a.1 e.1 = some b.1) :
+    D.descMap hF e = eqToHom (D.descObj_right hF a ha) ≫
+      F₂.map (D.right.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 h) ≫
+      eqToHom (D.descObj_right hF b hb).symm := by
+  unfold descMap
+  split
+  · rename_i x hx
+    obtain rfl : x = b.1 := D.gluable.step?_eq hx h
+    have ha₁ : D.left.IsOb a.1 := isOb_src_of_step? D.wf_left hx
+    have hb₁ : D.left.IsOb b.1 := isOb_of_step? D.wf_left hx
+    have hk : D.kernel.step? a.1 e.1 = some b.1 := D.gluable.kernel_step? D.wf_kernel hx h
+    have ka : D.kernel.IsOb a.1 := isOb_src_of_step? D.wf_kernel hk
+    have kb : D.kernel.IsOb b.1 := isOb_of_step? D.wf_kernel hk
+    have g₁ := Translation.functor_empty_genMor D.wf_left D.gluable.left
+      (a := ⟨a.1, ka⟩) (b := ⟨b.1, kb⟩) e.1 hk ha₁ hb₁ hx
+    have g₂ := Translation.functor_empty_genMor D.wf_right D.gluable.right
+      (a := ⟨a.1, ka⟩) (b := ⟨b.1, kb⟩) e.1 hk ha hb h
+    have hc := Functor.congr_hom hF (D.kernel.genMor (a := ⟨a.1, ka⟩) (b := ⟨b.1, kb⟩) e.1 hk)
+    simp only [Functor.comp_map, ι₁, ι₂] at hc
+    have k₁ : D.left.genMor (a := ⟨a.1, ha₁⟩) (b := ⟨b.1, hb₁⟩) e.1 hx =
+        eqToHom (by rw [Translation.functor_obj, Translation.obj_empty]) ≫
+          (Translation.functor D.wf_left D.gluable.left).map
+            (D.kernel.genMor (a := ⟨a.1, ka⟩) (b := ⟨b.1, kb⟩) e.1 hk) ≫
+          eqToHom (by rw [Translation.functor_obj, Translation.obj_empty]) := by
+      rw [g₁]
+      simp
+    dsimp only
+    rw [k₁, Functor.map_comp, Functor.map_comp, hc, g₂]
+    simp [eqToHom_map]
+  · rfl
+
+/-- The prefunctor of the glued functor. -/
+def descPrefunctor : D.glued.Obj ⥤q X where
+  obj := D.descObj F₁ F₂
+  map := D.descMap hF
+
+/-- On a path of the glued schema whose names are a path of the first schema, the
+glued functor is `F₁`. -/
+theorem lift_map_left {a : D.glued.Obj} (ha : D.left.IsOb a.1) :
+    ∀ {b : D.glued.Obj} (p : Quiver.Path a b) (hb : D.left.IsOb b.1)
+      (h : D.left.tgt? a.1 (names p) = some b.1),
+      (Paths.lift (D.descPrefunctor hF)).map p = eqToHom (D.descObj_left a ha) ≫
+        F₁.map (D.left.mor (D.left.pathOf D.wf_left ⟨a.1, ha⟩ ⟨b.1, hb⟩ (names p) h)) ≫
+        eqToHom (D.descObj_left b hb).symm
+  | _, .nil, hb, h => by
+    have : D.left.pathOf D.wf_left ⟨a.1, ha⟩ ⟨a.1, hb⟩ (names Quiver.Path.nil) h =
+        Quiver.Path.nil := names_injective _ _ (by simp)
+    rw [this]
+    simp [Paths.lift_nil]
+    rfl
+  | b, .cons (b := c) p e, hb, h => by
+    have h' := h
+    rw [names_cons, tgt?_append] at h'
+    obtain ⟨c', hc', he⟩ := Option.bind_eq_some_iff.mp h'
+    obtain rfl : c' = c.1 :=
+      Option.some.inj ((glue_tgt?_of_left hc').symm.trans (tgt?_names p))
+    rw [tgt?_singleton] at he
+    have hc : D.left.IsOb c.1 := isOb_src_of_step? D.wf_left he
+    rw [Paths.lift_cons, lift_map_left ha p hc hc']
+    change _ ≫ D.descMap hF e = _
+    rw [D.descMap_left hF e hc hb he]
+    have hp : D.left.pathOf D.wf_left ⟨a.1, ha⟩ ⟨b.1, hb⟩ (names (p.cons e)) h =
+        (D.left.pathOf D.wf_left ⟨a.1, ha⟩ ⟨c.1, hc⟩ (names p) hc').comp
+          (D.left.genPath ⟨c.1, hc⟩ ⟨b.1, hb⟩ e.1 he) :=
+      names_injective _ _ (by simp)
+    rw [hp, mor_comp, Functor.map_comp]
+    simp
+
+/-- On a path of the glued schema whose names are a path of the second schema, the
+glued functor is `F₂`. -/
+theorem lift_map_right {a : D.glued.Obj} (ha : D.right.IsOb a.1) :
+    ∀ {b : D.glued.Obj} (p : Quiver.Path a b) (hb : D.right.IsOb b.1)
+      (h : D.right.tgt? a.1 (names p) = some b.1),
+      (Paths.lift (D.descPrefunctor hF)).map p = eqToHom (D.descObj_right hF a ha) ≫
+        F₂.map (D.right.mor (D.right.pathOf D.wf_right ⟨a.1, ha⟩ ⟨b.1, hb⟩ (names p) h)) ≫
+        eqToHom (D.descObj_right hF b hb).symm
+  | _, .nil, hb, h => by
+    have : D.right.pathOf D.wf_right ⟨a.1, ha⟩ ⟨a.1, hb⟩ (names Quiver.Path.nil) h =
+        Quiver.Path.nil := names_injective _ _ (by simp)
+    rw [this]
+    simp [Paths.lift_nil]
+    rfl
+  | b, .cons (b := c) p e, hb, h => by
+    have h' := h
+    rw [names_cons, tgt?_append] at h'
+    obtain ⟨c', hc', he⟩ := Option.bind_eq_some_iff.mp h'
+    obtain rfl : c' = c.1 :=
+      Option.some.inj ((D.gluable.glue_tgt?_of_right hc').symm.trans (tgt?_names p))
+    rw [tgt?_singleton] at he
+    have hc : D.right.IsOb c.1 := isOb_src_of_step? D.wf_right he
+    rw [Paths.lift_cons, lift_map_right ha p hc hc']
+    change _ ≫ D.descMap hF e = _
+    rw [D.descMap_right hF e hc hb he]
+    have hp : D.right.pathOf D.wf_right ⟨a.1, ha⟩ ⟨b.1, hb⟩ (names (p.cons e)) h =
+        (D.right.pathOf D.wf_right ⟨a.1, ha⟩ ⟨c.1, hc⟩ (names p) hc').comp
+          (D.right.genPath ⟨c.1, hc⟩ ⟨b.1, hb⟩ e.1 he) :=
+      names_injective _ _ (by simp)
+    rw [hp, mor_comp, Functor.map_comp]
+    simp
+
+/-- The functor glued from `F₁` and `F₂`. It respects the equations of both
+schemas, which are the equations of the glued schema. -/
+def desc : D.glued.cat ⥤ X :=
+  CategoryTheory.Quotient.lift D.glued.rel (Paths.lift (D.descPrefunctor hF)) (by
+    rintro a b f g ⟨q, hq, ha, h₁, h₂⟩
+    rcases List.mem_append.mp hq with hq | hq
+    · obtain ⟨o, hl, hr⟩ := D.wf_left.eqn_parallel q hq
+      have hqa : D.left.IsOb a.1 := ha ▸ D.wf_left.eqn_src q hq
+      rw [← ha, ← h₁] at hl
+      rw [← ha, ← h₂] at hr
+      obtain rfl : o = b.1 :=
+        Option.some.inj ((glue_tgt?_of_left hl).symm.trans (tgt?_names f))
+      have hb : D.left.IsOb b.1 := isOb_of_tgt? D.wf_left hqa hl
+      change (Paths.lift (D.descPrefunctor hF)).map f = (Paths.lift (D.descPrefunctor hF)).map g
+      rw [D.lift_map_left hF hqa f hb hl, D.lift_map_left hF hqa g hb hr]
+      have hm : D.left.mor (D.left.pathOf D.wf_left ⟨a.1, hqa⟩ ⟨b.1, hb⟩ (names f) hl) =
+          D.left.mor (D.left.pathOf D.wf_left ⟨a.1, hqa⟩ ⟨b.1, hb⟩ (names g) hr) := by
+        apply PathEq.mor_eq
+        rw [names_pathOf, names_pathOf, h₁, h₂]
+        have hpe := pathEq_of_mem_eqns D.wf_left hq
+        have hobj : (⟨a.1, hqa⟩ : D.left.Obj) = ⟨.entity q.src, D.wf_left.eqn_src q hq⟩ :=
+          Subtype.ext ha
+        rw [hobj]
+        exact hpe
+      rw [hm]
+    · obtain ⟨o, hl, hr⟩ := D.wf_right.eqn_parallel q hq
+      have hqa : D.right.IsOb a.1 := ha ▸ D.wf_right.eqn_src q hq
+      rw [← ha, ← h₁] at hl
+      rw [← ha, ← h₂] at hr
+      obtain rfl : o = b.1 :=
+        Option.some.inj ((D.gluable.glue_tgt?_of_right hl).symm.trans (tgt?_names f))
+      have hb : D.right.IsOb b.1 := isOb_of_tgt? D.wf_right hqa hl
+      change (Paths.lift (D.descPrefunctor hF)).map f = (Paths.lift (D.descPrefunctor hF)).map g
+      rw [D.lift_map_right hF hqa f hb hl, D.lift_map_right hF hqa g hb hr]
+      have hm : D.right.mor (D.right.pathOf D.wf_right ⟨a.1, hqa⟩ ⟨b.1, hb⟩ (names f) hl) =
+          D.right.mor (D.right.pathOf D.wf_right ⟨a.1, hqa⟩ ⟨b.1, hb⟩ (names g) hr) := by
+        apply PathEq.mor_eq
+        rw [names_pathOf, names_pathOf, h₁, h₂]
+        have hpe := pathEq_of_mem_eqns D.wf_right hq
+        have hobj : (⟨a.1, hqa⟩ : D.right.Obj) = ⟨.entity q.src, D.wf_right.eqn_src q hq⟩ :=
+          Subtype.ext ha
+        rw [hobj]
+        exact hpe
+      rw [hm])
+
+theorem desc_obj (a : D.glued.Obj) : (D.desc hF).obj (D.glued.obj a) = D.descObj F₁ F₂ a := rfl
+
+/-- The glued functor restricts to `F₁` on the first schema. -/
+theorem inl_desc : D.inl ⋙ D.desc hF = F₁ := by
+  have hobj : ∀ a : D.left.Obj, (D.inl ⋙ D.desc hF).obj (D.left.obj a) = F₁.obj (D.left.obj a) :=
+    fun a => by
+      change D.descObj F₁ F₂ (Translation.obj D.inl_valid a) = _
+      rw [Translation.obj_empty]
+      exact D.descObj_left _ a.2
+  refine ext_functor hobj fun a b e => ?_
+  have ha : D.left.IsOb (Translation.ob {} a.1) := (Translation.ob_empty a.1).symm ▸ a.2
+  have hb : D.left.IsOb (Translation.ob {} b.1) := (Translation.ob_empty b.1).symm ▸ b.2
+  have hp : D.left.tgt? (Translation.ob {} a.1)
+      (names (Translation.functorPath D.wf_glued D.inl_valid e.toPath)) =
+        some (Translation.ob {} b.1) := by
+    rw [Translation.names_functorPath_empty, Translation.ob_empty, Translation.ob_empty]
+    simpa [tgt?_singleton] using e.2
+  change (Paths.lift (D.descPrefunctor hF)).map
+      (Translation.functorPath D.wf_glued D.inl_valid e.toPath) = _
+  rw [D.lift_map_left hF ha _ hb hp,
+    map_mor_eq_of_names F₁ (Subtype.ext (Translation.ob_empty a.1))
+      (Subtype.ext (Translation.ob_empty b.1)) _ e.toPath
+        (by simp [Translation.names_functorPath_empty])]
+  simp
+
+/-- The glued functor restricts to `F₂` on the second schema. -/
+theorem inr_desc : D.inr ⋙ D.desc hF = F₂ := by
+  have hobj : ∀ a : D.right.Obj, (D.inr ⋙ D.desc hF).obj (D.right.obj a) = F₂.obj (D.right.obj a) :=
+    fun a => by
+      change D.descObj F₁ F₂ (Translation.obj D.inr_valid a) = _
+      rw [Translation.obj_empty]
+      exact D.descObj_right hF _ a.2
+  refine ext_functor hobj fun a b e => ?_
+  have ha : D.right.IsOb (Translation.ob {} a.1) := (Translation.ob_empty a.1).symm ▸ a.2
+  have hb : D.right.IsOb (Translation.ob {} b.1) := (Translation.ob_empty b.1).symm ▸ b.2
+  have hp : D.right.tgt? (Translation.ob {} a.1)
+      (names (Translation.functorPath D.wf_glued D.inr_valid e.toPath)) =
+        some (Translation.ob {} b.1) := by
+    rw [Translation.names_functorPath_empty, Translation.ob_empty, Translation.ob_empty]
+    simpa [tgt?_singleton] using e.2
+  change (Paths.lift (D.descPrefunctor hF)).map
+      (Translation.functorPath D.wf_glued D.inr_valid e.toPath) = _
+  rw [D.lift_map_right hF ha _ hb hp,
+    map_mor_eq_of_names F₂ (Subtype.ext (Translation.ob_empty a.1))
+      (Subtype.ext (Translation.ob_empty b.1)) _ e.toPath
+        (by simp [Translation.names_functorPath_empty])]
+  simp
+
+theorem desc_map_genPath {a b : D.glued.Obj} (e : a ⟶ b) :
+    (D.desc hF).map (D.glued.mor e.toPath) = D.descMap hF e :=
+  Paths.lift_toPath _ _
+
+/-- The glued functor is the only functor that restricts to `F₁` and `F₂`. -/
+theorem desc_unique (F : D.glued.cat ⥤ X) (h₁ : D.inl ⋙ F = F₁) (h₂ : D.inr ⋙ F = F₂) :
+    F = D.desc hF := by
+  have hobj : ∀ a : D.glued.Obj, F.obj (D.glued.obj a) = (D.desc hF).obj (D.glued.obj a) := by
+    intro a
+    rw [desc_obj]
+    by_cases ha : D.left.IsOb a.1
+    · have e : D.inl.obj (D.left.obj ⟨a.1, ha⟩) = D.glued.obj a :=
+        congrArg D.glued.obj (Subtype.ext (Translation.ob_empty a.1))
+      rw [← e, D.descObj_left a ha]
+      exact Functor.congr_obj h₁ _
+    · have ha₂ := D.isOb_right_of_not_left a ha
+      have e : D.inr.obj (D.right.obj ⟨a.1, ha₂⟩) = D.glued.obj a :=
+        congrArg D.glued.obj (Subtype.ext (Translation.ob_empty a.1))
+      rw [← e, D.descObj_right hF a ha₂]
+      exact Functor.congr_obj h₂ _
+  refine ext_functor hobj fun a b e => ?_
+  rw [desc_map_genPath]
+  cases hs : D.left.step? a.1 e.1 with
+  | some x =>
+    obtain rfl : x = b.1 := by
+      have h' := e.2
+      rw [glue_step?, hs] at h'
+      exact Option.some.inj h'
+    have ha : D.left.IsOb a.1 := isOb_src_of_step? D.wf_left hs
+    have hb : D.left.IsOb b.1 := isOb_of_step? D.wf_left hs
+    rw [D.descMap_left hF e ha hb hs]
+    have g := Translation.functor_empty_genMor D.wf_glued D.inl_valid
+      (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 hs a.2 b.2 e.2
+    have k : D.glued.mor e.toPath =
+        eqToHom (congrArg D.glued.obj (Subtype.ext (Translation.ob_empty a.1) :
+          Translation.obj D.inl_valid ⟨a.1, ha⟩ = ⟨a.1, a.2⟩)).symm ≫
+        D.inl.map (D.left.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 hs) ≫
+        eqToHom (congrArg D.glued.obj (Subtype.ext (Translation.ob_empty b.1) :
+          Translation.obj D.inl_valid ⟨b.1, hb⟩ = ⟨b.1, b.2⟩)) := by
+      simp only [inl]
+      rw [g]
+      simp
+      rfl
+    have hc := Functor.congr_hom h₁ (D.left.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 hs)
+    simp only [Functor.comp_map] at hc
+    rw [k, Functor.map_comp, Functor.map_comp, hc]
+    simp [eqToHom_map]
+  | none =>
+    have hs₂ : D.right.step? a.1 e.1 = some b.1 := by
+      have h' := e.2
+      rw [glue_step?, hs, Option.none_or] at h'
+      exact h'
+    have ha : D.right.IsOb a.1 := isOb_src_of_step? D.wf_right hs₂
+    have hb : D.right.IsOb b.1 := isOb_of_step? D.wf_right hs₂
+    rw [D.descMap_right hF e ha hb hs₂]
+    have g := Translation.functor_empty_genMor D.wf_glued D.inr_valid
+      (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 hs₂ a.2 b.2 e.2
+    have k : D.glued.mor e.toPath =
+        eqToHom (congrArg D.glued.obj (Subtype.ext (Translation.ob_empty a.1) :
+          Translation.obj D.inr_valid ⟨a.1, ha⟩ = ⟨a.1, a.2⟩)).symm ≫
+        D.inr.map (D.right.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 hs₂) ≫
+        eqToHom (congrArg D.glued.obj (Subtype.ext (Translation.ob_empty b.1) :
+          Translation.obj D.inr_valid ⟨b.1, hb⟩ = ⟨b.1, b.2⟩)) := by
+      simp only [inr]
+      rw [g]
+      simp
+      rfl
+    have hc := Functor.congr_hom h₂ (D.right.genMor (a := ⟨a.1, ha⟩) (b := ⟨b.1, hb⟩) e.1 hs₂)
+    simp only [Functor.comp_map] at hc
+    rw [k, Functor.map_comp, Functor.map_comp, hc]
+    simp [eqToHom_map]
+
+end Desc
+
+/-- The bridge theorem: functors out of the glued schema category correspond to
+pairs of functors out of the two schema categories that agree on the kernel. -/
+def glueEquiv (X : Type*) [Category X] :
+    (D.glued.cat ⥤ X) ≃ { F : (D.left.cat ⥤ X) × (D.right.cat ⥤ X) // D.ι₁ ⋙ F.1 = D.ι₂ ⋙ F.2 }
+    where
+  toFun F := ⟨(D.inl ⋙ F, D.inr ⋙ F), congrArg (· ⋙ F) D.comm⟩
+  invFun F := D.desc F.2
+  left_inv F := (D.desc_unique _ F rfl rfl).symm
+  right_inv F := Subtype.ext (Prod.ext (D.inl_desc F.2) (D.inr_desc F.2))
+
+/-- The bridge theorem in `Cat`: the glued schema category is the pushout of the two
+schema categories along the kernel. -/
+theorem isPushout : IsPushout (C := Cat.{0, 0}) D.ι₁ D.ι₂ D.inl D.inr :=
+  IsPushout.of_isColimit (c := Limits.PushoutCocone.mk (C := Cat.{0, 0}) D.inl D.inr D.comm)
+    (Limits.PushoutCocone.IsColimit.mk _ (fun s => D.desc s.condition)
+      (fun s => D.inl_desc s.condition) (fun s => D.inr_desc s.condition)
+      (fun s m h₁ h₂ => D.desc_unique s.condition m h₁ h₂))
 
 end Gluing
 
