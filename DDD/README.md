@@ -267,23 +267,31 @@ Phase 2 is complete, with no `sorry`:
 The check that declared composite translations agree is vacuous for this map,
 which is a tree, and waits for a map with two paths between the same contexts.
 
-Phase 3 work items:
+Phase 3 is complete, with no `sorry`:
 
-1. `Glue.lean`: the pushout of presentations along inclusions that keep names
-   (`Schema.glue`: the union of the generators, identified along the kernel,
-   and the union of the equations), the conditions for it (`Gluable`) with
-   their check, and the legs into the glued schema. The bridge theorem: the
-   glued schema category is a pushout in `Cat`, with the universal property
-   stated for functors into every category. The strict non-interference
-   check: the functor of a translation is fully faithful, decided for acyclic
-   schemas, with its soundness lemma.
-2. `States.lean`: entity-only states (functors `S.cat ⥤ Type`) with `Δ_T` and
-   its adjoints `Σ_T` and `Π_T`; data gluing for them, from the bridge.
-   Attributed states in the strict formulation, their morphisms and `Δ_T`;
-   data gluing for attributed states.
+1. `Glue.lean`: `Schema.glue`, the pushout of presentations along inclusions
+   that keep names (the union of the generators, identified along the kernel,
+   and the union of the equations); `Gluable` with `checkGluable`; a `Gluing`
+   with its legs `inl`, `inr` and the commuting square. The bridge theorem:
+   `Gluing.glueEquiv` (functors out of the glued schema category into any
+   category correspond to pairs of functors that agree on the kernel) and
+   `Gluing.isPushout` (the square is a pushout in `Cat`). The strict
+   non-interference check `Translation.checkFullyFaithful`, for acyclic
+   schemas, with `checkFullyFaithful_sound` (the functor is full and faithful).
+2. `States.lean`: entity-only states with `Σ_T` and `Π_T` (Kan extensions) and
+   their adjunctions with `Δ_T`; attributed states in the strict formulation,
+   their morphisms, and `Δ_T` on them. Data gluing for entity-only states
+   (`entityStateEquiv`) and for attributed states (`stateEquiv`).
 3. `Examples/Gluing.lean`: Orders and Shipping glued along a Customer/Address
-   kernel and checked; a kernel whose merge imposes an equation on Orders, so
-   that the check fails and the leg from Orders is not faithful.
+   kernel; the gluing conditions, the glued schema and both legs checked with
+   `decide`. A failing kernel: with a delivery address that Shipping equates
+   with the address and Orders does not, the check fails and the leg from
+   Orders is not faithful (`delivery_not_faithful`).
+
+Not yet done: limits and colimits of attributed states, `Σ_T` for attributed
+states, strict integration as the lax integration with the translation
+morphisms inverted, and the check that declared composite translations agree
+(vacuous for the example map, which is a tree).
 
 ## Decisions
 
@@ -305,6 +313,12 @@ Phase 3 work items:
   their names. Every entity type of the upstream schema has an image, so a
   downstream schema models all of its upstream; the examples use
   anti-corruption layers that send several upstream entity types to one.
+- Gluing: along a kernel that both schemas include with the same names (the
+  empty translation), and that is all they share. Inclusions that rename are
+  not covered.
+- Entity-only and attributed states are separate types; data gluing for
+  attributed states is derived from the entity-only case, since the legs send
+  value types to themselves.
 - `J`: the free category on the arrows of the context map. For a tree it is the
   order `Reaches`.
 - Acyclic: no path has more generators than there are entity types. This is
