@@ -18,6 +18,23 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: leanprover/lean-action@v1
+      # DDD phase 4: the exported workspace is up to date, the Julia side
+      # reproduces the examples, and Lean accepts its certificate.
+      - name: Export the DDD example workspace
+        run: |
+          lake env lean --run cli/CsdExport.lean julia/data/workspace.json
+          git diff --exit-code julia/data/workspace.json
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.10'
+      - uses: julia-actions/cache@v2
+      - name: Run the Julia side
+        run: |
+          julia --project=julia -e 'using Pkg; Pkg.instantiate()'
+          julia --project=julia julia/run.jl
+          julia --project=julia julia/test/runtests.jl
+      - name: Check the certificate with csd-check
+        run: lake env lean --run cli/CsdCheck.lean julia/out/certificate.json
       # API docs take ~30 min and deploy to GitHub Pages, which a private
       # repo cannot host: only on main, once the repository is public.
       - uses: leanprover-community/docgen-action@v1
