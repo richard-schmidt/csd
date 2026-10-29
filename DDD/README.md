@@ -185,21 +185,26 @@ routed along `J`.
 
 `decide` is checked by the kernel and is used for the examples; `decide +kernel`
 leaves out the evaluation by the elaborator and is used for the larger checks.
-`native_decide` and the `csd-check` executable trust the compiler; they are used
-for large certificates, and each use is marked.
+`native_decide` and `csd-check` (`cli/CsdCheck.lean`, run by the Lean
+interpreter) trust the compiler; they are used for large certificates, and each
+use is marked.
 
 ## Julia
 
-The Julia code lives in `julia/` in this repository (phase 4). Catlab and
-ACSets.jl compute; Lean checks.
+The Julia code lives in `julia/` in this repository (phase 4). Catlab
+computes; Lean checks.
 
-- A schema is stored as an acset on a schema of schemas (entity types, value
-  types, references, attributes) together with a list of equations. Gluing
-  schemas is then an acset pushout and a union of equations.
-- States are acsets. Restriction, pushouts and homomorphism search come from
-  Catlab.
-- Output is JSON: schemas, states, and certificates (results, their maps, and
-  normal forms of paths where needed).
+- A schema is stored as an acset on a schema of schemas (entity types,
+  references, attributes, with their names) together with its equations,
+  aggregates and value objects. Gluing schemas is an acset pushout and a union
+  of equations. Names that two sides share outside a kernel are qualified with
+  the context name first.
+- Finite states are columns per generator, as in `DDD/Data.lean`. Homomorphism
+  search comes from Catlab, on the acsets of the states. Restriction follows
+  the image path of each generator, as `FinState.restrict` does; Catlab's data
+  migration does not accept acsets whose schema is built at run time.
+- Output is JSON: schemas, states, and certificates of claims about them.
+- Catlab is pinned to 0.16.20: the pushout of acsets fails in 0.17.6.
 
 The JSON format is versioned and covered by round-trip tests. Julia output is
 untrusted; correctness rests on the Lean checkers and their soundness lemmas.
@@ -219,11 +224,14 @@ DDD/
   ContextMap.lean    J, D : J ⥤ Cat, lax integration, strict integration
                      along kernels
   States.lean        states, migrations, gluing
-  Certificate.lean   JSON import, checkers, soundness lemmas
+  Data.lean          finite states, homomorphisms and restriction as data
+  Json.lean          the exchange format csd-ddd/1
+  Certificate.lean   certificates, their checks and soundness
   Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
-                     Gluing, Routes
+                     Gluing, Routes, Exchange
   docs/              approach.md, its figures, and figures.py, which draws them
-julia/               Catlab side
+cli/                 csd-check and csd-export, run with lake env lean --run
+julia/               Catlab side: src/CsdDDD.jl, run.jl, test/, data/, out/
 ```
 
 The core modules share the namespace `DDD`, with the operations on schemas in
@@ -367,6 +375,10 @@ supersedes the description under phases 1 to 3.
 
 Next step 1, coherence by check, is complete, with no `sorry` (see Next steps).
 
+Next step 2, phase 4, is complete, with no `sorry`: Julia reproduces the
+phase 3 results on the example map, and `csd-check` accepts its certificate of
+32 claims, in CI.
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -397,31 +409,34 @@ Done. The obligation `coherent` of a context map can be discharged by a check
 
 ### 2. Phase 4: Julia and certificates
 
-Done when Julia reproduces the phase 3 results on the example map and Lean
-accepts its certificates.
+Done. Julia reproduces the phase 3 results on the example map, and Lean accepts
+its certificate (`DDD/docs/approach.md`, section 10).
 
-1. JSON with `Lean.Json`: `ToJson` and `FromJson` for `Schema`, `Translation`,
-   the data of a context map (contexts, arrows, translations, route equations,
-   kernel flags) and finite states; a format version; round-trip tests on the
-   examples. Generators are named `Entity.name`.
-2. Finite states as data: a list of entities per entity type, each generator a
-   finite function, attribute values in `K`; a check that the data satisfies
-   the equations of the schema, with soundness into `Schema.State K S`. The
-   value-object condition (two entities of a value object with equal
-   attributes are equal) is checked on this form.
-3. `Certificate.lean`: certificates and their checkers for a translation
-   (validity), a gluing (the schema Julia computed equals `Schema.glue` up to
-   the order of its lists: a check of equality up to permutation, and a lemma
-   that such schemas present isomorphic categories), a restriction `Δ_T X`, and
-   a morphism of states.
-4. `csd-check`: a `lake exe` that reads a JSON certificate and runs the
-   compiled checkers. It trusts the compiler, as `native_decide` does, and
-   states so in its output.
-5. `julia/`: Catlab and ACSets.jl. Schemas as acsets on a schema of schemas,
-   gluing as an acset pushout with the union of equations, restriction and
-   homomorphism search on states. Names that clash outside a kernel are
-   qualified with the context name before export.
-6. CI: the Julia side runs on the example map, and `csd-check` on its output.
+1. `Json.lean`: the exchange format `csd-ddd/1` for value types, schemas
+   (generators named `Entity.name`), translations, context maps (`MapDoc`:
+   contexts, arrows, translations, route equations, kernel flags), finite states
+   with literal values (`Lit`) and homomorphisms. `Examples/Exchange.lean` tests
+   the round trips through JSON text.
+2. `Data.lean`: finite states (`FinState`), with `check` and its soundness into
+   `Schema.State K S` (`toState`); the value-object condition
+   (`checkValueObjects`, `toState_valueObjects`); homomorphisms (`FinHom.check`,
+   `toHom`); and restriction on data (`FinState.restrict`), whose state is
+   isomorphic to `restrictState` (`restrictIso`).
+3. `Certificate.lean`: claims of well-formedness, acyclicity, validity of a
+   translation, a gluing up to the order of lists (`checkSameUpToOrder`,
+   `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`), a state, a restriction and a
+   homomorphism, each with a check and `checkClaim_sound`.
+4. `csd-check` (`cli/CsdCheck.lean`) checks a certificate and reports each
+   claim; `csd-export` (`cli/CsdExport.lean`) writes the example workspace. Both
+   run with `lake env lean --run`: a compiled executable would compile Mathlib
+   to native code. The evaluation trusts the compiler, and the output says so.
+5. `julia/`: Catlab 0.16.20 and JSON3. Schemas as acsets on a schema of
+   schemas, gluing as an acset pushout with the union of equations, names that
+   clash outside a kernel qualified with the context name, homomorphism search
+   on the acsets of states, and restriction along image paths. `run.jl` writes
+   a certificate of 32 claims; `test/` tests the round trips.
+6. CI: the exported workspace matches the committed one, the Julia side runs
+   and passes its tests, and `csd-check` accepts the certificate.
 
 ### 3. Strict integration along several inclusions
 
@@ -471,11 +486,9 @@ merged, and its merged map is checked.
   system supplied as a certificate, if a model needs it. It is not part of
   phase 4.
 
-Dependencies: item 3 uses the composite translations of item 1 (done); phase 5 uses
-the gluing of item 3 and the states of item 4; the state certificates of
-phase 4 use its finite states. Item 1 comes first because it is small and makes
-declared diamonds checkable; phase 4 comes next because its exit criterion
-concerns the phase 3 results.
+Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
+the gluing of item 3 and the states of item 4. Items 1 and 2 are done; item 3
+comes next.
 
 ## Decisions
 
@@ -487,8 +500,8 @@ Phases 0 to 3:
 - Attributes: in schemas from phase 1; attributed states in phase 3.
 - Interpretation of value types: a parameter `K` of the state layer, not part
   of the core. Representations matter only for checks on concrete values and
-  for the exchange format, so they live with the examples and, in phase 4,
-  with the checker.
+  for the exchange format, so they live with the examples and with the
+  exchange format (`Lit` in `Json.lean`).
 - Amounts: `Decimal`, not `ℚ`. Every value has a finite decimal notation, as
   amounts do; `ℚ` would admit `1/3`.
 - Entity-only and attributed states are separate types; data gluing for
@@ -525,12 +538,13 @@ Decision review after phase 3:
   certificates in phase 4.
 - Gluing: along a kernel that both schemas include with the same names, and
   that is all they share. Names that clash outside the kernel are an error
-  that the check reports; in phase 4, Julia qualifies them with the context
-  name before export. Inclusions that rename are not covered.
+  that the check reports; Julia qualifies them with the context name before
+  gluing (phase 4). Inclusions that rename are not covered.
 - Value types: `int`, `decimal`, `string`, `date`, `uuid`, `bool`, and
   project-defined `named n`, interpreted by `K`. No operations on values.
 - Value objects: an entity type can be marked as a value object, identified by
-  its attributes; the check on states comes with phase 4.
+  its attributes; the condition is checked on finite states
+  (`checkValueObjects`, phase 4).
 - Generators: identified by source entity type and name. In the phase 4 JSON a
   generator is named `Entity.name`; a qualified clash becomes, for
   example, `Customer.Orders.createdAt`.

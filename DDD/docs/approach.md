@@ -23,8 +23,9 @@ Contents:
 7. Published languages and the aggregate rule
 8. Strict integration
 9. States
-10. Modules and examples
-11. Limits of the current approach
+10. Data and certificates
+11. Modules and examples
+12. Limits of the current approach
 
 ## 1. Two kinds of guarantee, two embeddings
 
@@ -38,8 +39,8 @@ The two kinds meet through two embeddings of the same objects.
 
 - The deep embedding is finite data with decidable equality: a schema is lists
   of names (`Schema`), a translation is a list of images (`Translation`), a
-  gluing is three schemas. The checkers run on this data, and in phase 4 it is
-  the exchange format with Julia.
+  gluing is three schemas. The checkers run on this data, and it is the
+  exchange format with Julia (section 10).
 - The shallow embedding is the mathematics: `Schema.cat`, a category built with
   Mathlib's `Paths` and `Quotient`; `Translation.functor`; the diagram
   `D : J ⥤ Cat`; the Grothendieck construction; pushouts in `Cat`; functor
@@ -52,8 +53,8 @@ The two kinds meet through two embeddings of the same objects.
 
 *Figure 1. The path from data to semantics. A checker evaluated to `true` by
 the kernel (`decide`, `decide +kernel`) gives a kernel-checked proposition.
-`native_decide` and the planned `csd-check` executable evaluate compiled code
-and trust the compiler; each use is marked.*
+`native_decide` and `csd-check` (section 10) evaluate compiled code and trust
+the compiler; each use is marked.*
 
 The checks and their lemmas:
 
@@ -66,6 +67,12 @@ The checks and their lemmas:
 | `Schema.Gluable K B₁ B₂` | `checkGluable` | `checkGluable_sound` | not stated |
 | functor of `T` full and faithful | `checkFullyFaithful` | `checkFullyFaithful_sound` | not stated; needs `S`, `S'` acyclic |
 | `P.RootsOnly S` | `checkRootsOnly` | `checkRootsOnly_iff` | always |
+| two translations induce the same functor | `checkSameFunctor` | `checkSameFunctor_sound`, `checkSameFunctor_iff` | path equality in the target is decided |
+| declared route equations hold | `checkRouteEqn` | `coherent_of_check` | refuted by `routeDiagram_map_ne` when path equality in the target is decided |
+| a finite state is a state of `S` | `FinState.check` | `FinState.toState` | not stated |
+| value-object condition on a state | `checkValueObjects` | `toState_valueObjects` | not stated |
+| a morphism of finite states | `FinHom.check` | `FinHom.toHom` | not stated |
+| a claim of a certificate | `Certificate.checkClaim` | `checkClaim_sound` | not stated |
 
 `WellFormed`, `Acyclic`, `RootsOnly` and `Publishes` have `Decidable`
 instances, so `decide` proves them and their negations. Path equality and
@@ -491,12 +498,102 @@ value type that the source lacks would receive formal values instead of values
 in `K`. And data gluing is proved twice, once from the universal property in
 `Cat` and once for the bijections.
 
-## 10. Modules and examples
+## 10. Data and certificates
+
+Phase 4 connects the library to Catlab. Lean exports the example map, Julia
+computes with Catlab, and Lean checks what Julia claims.
+
+![Lean exports the example map, Julia computes with Catlab and writes a certificate, and Lean checks each claim of the certificate.](figures/pipeline.svg)
+
+*Figure 13. The phase 4 pipeline, run in CI. `cli/CsdExport.lean` writes the
+workspace; `julia/run.jl` writes the certificate; `cli/CsdCheck.lean` checks
+it. Julia output is untrusted: a claim counts only once its check passes.*
+
+### Finite states
+
+`DDD/Data.lean` gives states a finite form, in the shape of an acset: a number
+of entities for each entity type, a column per reference with the number of the
+target of each entity, and a column per attribute with the value of each
+entity. `FinState.check` asks for columns of the right length, references to
+existing entities, values of the declared types, and every equation at every
+entity. A finite state that passes is a state with values in `K`
+(`FinState.toState`): its set at an entity type is the entities numbered below
+its count, and following the names of a path through the columns is applying the
+state to the path (`eval_lift`). The value-object condition is checked on this
+form (`toState_valueObjects`). `FinHom.check` is sound for morphisms of states
+(`FinHom.toHom`).
+
+Restriction along a translation is computed on data: `FinState.restrict T S S' X`
+keeps the entities of `T e` for each entity type `e` of `S`, and computes the
+column of each generator by following its image path in `X`. It passes the
+check (`restrict_check`), and its state is isomorphic to
+`Translation.restrictState` applied to the state of `X` (`restrictIso`).
+
+### The exchange format
+
+`DDD/Json.lean` writes the deep data as JSON with the format identifier
+`csd-ddd/1`: schemas, with generators named `Entity.name`; translations;
+context maps (`MapDoc`), with contexts, named arrows, kernel flags and route
+equations; finite states, with literal values (`Lit`: integers, text and
+booleans); and homomorphisms. `Examples/Exchange.lean` tests the round trips
+through JSON text on the examples, and `julia/test` tests them on the Julia
+side.
+
+### Certificates
+
+`DDD/Certificate.lean` reads a certificate: named schemas, named finite states,
+and claims. Each kind of claim has a check and a meaning, and a claim that
+passes its check holds (`checkClaim_sound`):
+
+- a schema is well formed, or acyclic; a translation is valid;
+- a gluing: the schema Julia computed equals `Schema.glue` up to the order of its
+  lists (`checkSameUpToOrder`). Presentations that list the same things in
+  another order present isomorphic categories (`Schema.isoOfPerm`), so the
+  computed schema category is the pushout of the kernel span, with the
+  inclusions as legs (`Gluing.isPushout_of_perm`). Expected results of the
+  strict non-interference check are compared, and a result `true` proves that
+  the leg is full and faithful;
+- a finite state is a state of its schema, with literals of the declared types,
+  that satisfies the value-object condition;
+- a finite state is the restriction of another along a translation, so that its
+  state is isomorphic to `restrictState`;
+- a homomorphism of finite states that is a morphism of their states.
+
+`csd-check` (`cli/CsdCheck.lean`) runs these checks with the Lean interpreter,
+through `lake env lean --run`, and reports each claim. A compiled executable
+would compile Mathlib to native code; the interpreter loads the built modules.
+Either way the evaluation trusts the Lean compiler and runtime, as
+`native_decide` does.
+
+### The Julia side
+
+`julia/src/CsdDDD.jl` keeps a schema as an acset on a schema of schemas (entity
+types, references and attributes with their names) together with its
+equations, aggregates and value objects. Gluing along a kernel is Catlab's
+pushout of the two inclusions of the kernel, with the equations of both sides;
+names that two sides share outside a kernel are first qualified with the
+context name (`Customer.createdAt` in Orders becomes `Customer.Orders.createdAt`),
+with a translation to the renamed schema. States are the columns of
+`FinState`; homomorphisms are found by Catlab's search on their acsets, and
+restriction follows image paths, as `FinState.restrict` does.
+
+On the example map, `julia/run.jl` claims: the seven contexts are well formed
+and the six translations valid; Orders and Shipping glued along Customers, with
+both legs full and faithful; the failing delivery-address kernel, with the leg
+from Orders failing the check; the qualified `createdAt` scenario; sample states
+of Orders, Shipping, the glued schema, Payments and the kernel; the restrictions
+of data gluing (the glued state restricts to the states of Orders and Shipping,
+which restrict to the same kernel state) and of the anti-corruption layer from
+OrdersPL into Payments; and a homomorphism between two Shipping states. All 32
+claims pass `csd-check`.
+
+## 11. Modules and examples
 
 ![Imports between the modules of the DDD library: a chain from value types to context maps and states, and the examples on top.](figures/modules.svg)
 
 *Figure 12. The modules of the library and their imports. The core modules
-share the namespace `DDD`; each example module has its own.*
+share the namespace `DDD`; each example module has its own. `cli/` and `julia/`
+are outside the library.*
 
 | Module | Defines and proves |
 |---|---|
@@ -509,27 +606,32 @@ share the namespace `DDD`; each example module has its own.*
 | `Glue.lean` | `glue`, `Gluable`, `Gluing`, the bridge theorem, `checkFullyFaithful_sound` |
 | `ContextMap.lean` | `ContextMap`, `J`, `diagram`, `coherent_of_check`, `Lax`, `nonInterference`, `Publishes`, `kernelGluing`, `isPushout_kernel` |
 | `States.lean` | entity-only and attributed states, `Σ`, `Δ`, `Π`, data gluing |
+| `Data.lean` | `FinState`, `check`, `toState`, value objects, `FinHom`, `restrict`, `restrictIso` |
+| `Json.lean` | the exchange format `csd-ddd/1` |
+| `Certificate.lean` | `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`, claims, `checkClaim_sound` |
 | `Examples/Catalog.lean` | a free schema with a cycle; CatalogPL |
 | `Examples/Orders.lean` | an acyclic schema with two equations; OrdersPL and a failing one |
 | `Examples/Payments.lean`, `Shipping.lean` | the other two contexts |
 | `Examples/Integration.lean` | the seven-context map, its projection onto the Showcase map, non-interference, references |
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, the failing kernel |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
+| `Examples/Exchange.lean` | the example map as a workspace document, round trips, the `createdAt` clash |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
-## 11. Limits of the current approach
+## 12. Limits of the current approach
 
 - Path equality is decided for free and for acyclic schemas only.
 - Strict integration glues two contexts along one kernel; a kernel with more
   inclusions, or several kernels, is not covered.
 - Gluing needs the same names on both sides; names that clash outside the
-  kernel are reported and must be renamed, and inclusions that rename are not
-  covered.
-- Limits and colimits of attributed states, `Σ_T` on attributed states, and the
-  value-object condition on states are not yet defined.
+  kernel are reported, and the Julia side qualifies them; inclusions that rename
+  are not covered.
+- Limits and colimits of attributed states and `Σ_T` on attributed states are
+  not yet defined.
+- `csd-check` trusts the Lean compiler and runtime.
 - The checks compare names as strings in the kernel. The strict
   non-interference checks of the example take 14 to 22 seconds of kernel time
   each, which bounds the size of schemas checked with `decide`.
 
-The next steps in [`../README.md`](../README.md) address these and add the
-Julia side (phase 4) and open systems (phase 5).
+The next steps in [`../README.md`](../README.md) address these and add open
+systems (phase 5).

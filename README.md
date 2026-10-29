@@ -111,6 +111,8 @@ theorem run_serial (M : Machine ⟨I, X⟩) (N : Machine ⟨X, O⟩) (m n inputs
 
 Phases 1 to 3 are done, revised after a review of their decisions. A schema is a finite presentation (entity types, references, attributes into shared value types, equations, aggregates, value objects) with a well-formedness check that `decide` runs, and `Schema.cat` is the category it presents. Path equality is decided for schemas without equations and for acyclic schemas. A translation between schemas is checked valid the same way and induces a functor. A context map sends each context to its schema category and each arrow to such a functor, on the category of contexts presented by its arrows and declared equations between routes; its lax integration is a Grothendieck construction into which every context of a map without cycles embeds fully faithfully. Published languages are contexts that contain aggregate roots only. Two schemas glued along a shared kernel give a pushout in `Cat` (the bridge theorem), and the two arrows out of a kernel context glue their targets into the pushout of their images; states of the glued schema are pairs of states that agree on the kernel (data gluing), and a decidable check tells whether a merge leaves each context unchanged. The Catalog, Orders, Payments and Shipping schemas in [`Examples/`](DDD/Examples/), a context map with their published languages and a shared kernel that refines the map of `ContextMapNotifications.lean`, and the gluing of Orders and Shipping along that kernel are checked this way.
 
+Declared equations between routes are checked rather than proved: the two routes of each equation induce the same functor, which a decidable comparison of the composite translations shows. Phase 4 connects the library to Catlab. Lean exports the example map as JSON ([`cli/CsdExport.lean`](cli/CsdExport.lean)); [`julia/`](julia/) glues the schemas as acset pushouts, restricts finite states along translations and searches for homomorphisms between them, and writes a certificate of claims; `csd-check` ([`cli/CsdCheck.lean`](cli/CsdCheck.lean)) checks each claim with a checker proved sound. Finite states, in the shape of acsets, are states of the schema they pass the check for, and restriction on them agrees with restriction of states up to isomorphism. CI runs the three steps on each push. [`DDD/docs/approach.md`](DDD/docs/approach.md) describes the approach in depth, with diagrams.
+
 ```lean
 def Schema.cat (S : Schema) : Cat := Cat.of (CategoryTheory.Quotient S.rel)
 theorem pathEqAcyclic_iff (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj) (l l' : List String) :
@@ -124,6 +126,11 @@ theorem ContextMap.isPushout_kernel :
       (M.kernelGluing f₁ f₂ hk hc hwf).inl (M.kernelGluing f₁ f₂ hk hc hwf).inr
 def Gluing.stateEquiv : D.glued.State K ≃ { P : D.left.State K × D.right.State K //
     restrictState _ _ P.1 = restrictState _ _ P.2 }
+def FinState.toState (hX : X.check S = true) : S.State K
+def FinState.restrictIso (hS : S.WellFormed) (hS' : S'.WellFormed) (hX : X.check S' = true)
+    (hT : T.Valid S S') :
+    (X.restrict T S S').toState (restrict_check hS hX hT) ≅ restrictState hS' hT (X.toState hX)
+theorem Certificate.checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl
 ```
 
 ## Sketches
@@ -155,7 +162,7 @@ lake exe cache get   # download prebuilt Mathlib
 lake build           # Showcase, Sketches, Production, DDD
 ```
 
-CI builds these libraries on each push and generates the API documentation.
+CI builds these libraries on each push, runs the Julia side of `DDD` and checks its certificate, and generates the API documentation. The Julia side needs Julia 1.10; [`julia/README.md`](julia/README.md) gives the commands.
 
 ## License
 

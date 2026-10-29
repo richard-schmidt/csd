@@ -21,6 +21,9 @@ and `DDD`. CI runs the same build on every push.
   `sorry`.
 - `DDD/`: bounded contexts as finitely presented categories; `sorry` is
   allowed.
+- `cli/`: Lean programs of `DDD` (`csd-check`, `csd-export`), run with
+  `lake env lean --run`; not built by `lake build`.
+- `julia/`: the Julia side of `DDD` (Catlab), run in CI after the Lean build.
 - `wip/` and `deprecated/` are not built.
 
 Each module of `Showcase/` and `Sketches/` has its own namespace. `Production/`
