@@ -18,7 +18,9 @@ type, a function for each generator, and the equations satisfied.
   is `Δ_T` on them; translations send value types to themselves, so it needs no
   condition. `Σ_T` is not the left Kan extension here: a path from a translated
   entity type to a value type that `S` lacks would receive formal values
-  instead of values in `K`.
+  instead of values in `K`. `StateSigma.lean` gives `Σ_T` on attributed states
+  under the condition that excludes such paths; `StateLimits.lean` gives their
+  limits and colimits.
 
 Data gluing: the states of a glued schema correspond to pairs of states of the two
 schemas with equal restrictions to the kernel, for entity-only states
