@@ -182,6 +182,19 @@ its schema and the interfaces as its box, and the serial wiring of two such
 machines is a machine on the composite (`OpenMachine.lean`). Events carry routes
 of `J` and project to the `Svc` events of the Showcase map (`Events.lean`).
 
+### Aggregates
+
+The aggregate is the unit of consistency of a step (`Aggregates.lean`). The
+schema of an aggregate has its entity types with their generators, and the
+entity types its references reach outside it as identities with no generators.
+An equation is internal to an aggregate when its two sides are paths of the
+aggregate schema; the others are the rules across aggregates. A state of a
+context is a family of aggregate states that agree on the identities and the
+values and satisfy the rules across aggregates. A machine per aggregate checks
+a step against its own schema; the context runs them side by side and reports
+the rules across aggregates that the glued state breaks
+(`AggregateMachine.lean`).
+
 ## Two embeddings
 
 - Deep embedding: schemas, translations and gluing data as finite structures
@@ -241,6 +254,11 @@ DDD/
   Rename.lean        qualified names, isomorphisms of open schemas
   OpenMachine.lean   machines on open schemas, serial wiring
   Events.lean        services and events along the routes of J
+  Aggregates.lean    aggregate schemas, the rules across aggregates,
+                     consistency as gluing
+  AggregateMachine.lean
+                     violations, a machine per aggregate, the report of the
+                     context
   Data.lean          finite states, homomorphisms and restriction as data
   Json.lean          the exchange format csd-ddd/1
   Certificate.lean   certificates, their checks and soundness
@@ -265,7 +283,9 @@ this library.
   example context map refines.
 - `Production/Wiring.lean`: machines and their wiring. A machine on an open
   schema is one of its machines, and composing open schemas is its serial
-  wiring.
+  wiring. The aggregate machines of a context are its machines too, run one
+  command at a time (`dispatch`) and wired into the context by a box morphism
+  that shows the report.
 - `Showcase/ContextMapNotifications.lean`: also the services and events that
   `Events.lean` refines to contexts.
 
@@ -425,8 +445,13 @@ Revision after phase 5, in order:
    isomorphism to the original (`OpenSchema.qualify`, `qualifyIso`), given
    `checkQualify`. Two ordering contexts that share customers compose after the
    second is qualified (`Examples/Open.lean`). Done.
-3. Aggregates as the unit of behaviour: option B decided, planned as next
-   step 6.
+3. Aggregates as the unit of behaviour: option B, done as next step 6.
+
+Next step 6, aggregates as the unit of behaviour, is complete, with no `sorry`:
+a state of a context is a compatible family of aggregate states that satisfies
+the equations across aggregates; a machine per aggregate checks a step against
+its own schema, and the context reports the rules across aggregates that the
+glued state breaks (`Examples/Open.lean`).
 
 ## Next steps
 
@@ -594,27 +619,41 @@ Done. Open schemas, machines on them and events along `J`
 
 ### 6. Aggregates as the unit of behaviour
 
-Option B, decided after phase 5 (see Decisions): the aggregate is the unit of
-consistency of a step, and the rules across aggregates are found from the schema
-and kept between steps. Keeping the context as the transaction (A) and declaring
-the rules across aggregates in the schema (C) were set aside.
+Done. Option B, decided after phase 5 (see Decisions): the aggregate is the unit
+of consistency of a step, and the rules across aggregates are found from the
+schema and kept between steps (`DDD/docs/approach.md`, section 12).
 
-- Aggregate schemas: for an aggregate of a schema, the sub-schema of its root and
-  members with their generators, and the roots it refers to as entity types
-  without generators (identities); the equations of the schema within it. The
-  equations across aggregates, found from the schema (`crossAggregateEqns`). In
-  the examples all three equations cross aggregates.
-- Consistency: a family of states of the aggregate schemas that agree on the
-  identities and satisfy the equations across aggregates glues to a state of
-  the context schema, and every state of the context schema restricts to such a
-  family: the covering theorem of item 3 and data gluing, for states.
-- Behaviour: a machine per aggregate, whose step changes one aggregate and is
-  checked against its own schema; the context as the aggregate machines side by
-  side, with the rules across aggregates reported between steps instead of
-  refused.
-- Done when: in `Examples/Open.lean`, removing a customer who has an order is a
-  step of the Customer aggregate that passes, and the context reports the open
-  reference of the order.
+1. `Aggregates.lean`: `Schema.allAggregates`, the aggregates of a schema and
+   each entity type outside every aggregate as an aggregate of its own; every
+   entity type belongs to exactly one (`exists_aggregate`,
+   `eq_of_mem_entities`). The aggregate schema (`aggregateSchema`): the entity
+   types of the aggregate with their generators, the entity types its
+   references reach as identities, and the equations whose two sides are paths
+   of it; it is well-formed (`aggregateSchema_wellFormed`). The equations
+   across aggregates (`crossAggregateEqns`), and the internal schema, the
+   schema without them (`internalSchema`), which the aggregate schemas cover
+   (`aggregateCover`).
+2. Consistency for attributed states: a state of the internal schema is a
+   compatible family of aggregate states, by the covering theorem
+   (`familyEquiv`); a state of the schema is a state of the internal schema that
+   satisfies the equations across aggregates (`crossEquiv`); together,
+   `contextEquiv`.
+3. `AggregateMachine.lean`: the violations of a finite state, none exactly when
+   the check passes (`violations_eq_nil_iff`). The state glued from a finite
+   state of each aggregate (`glueFamily`): when each passes its own check,
+   every violation is a reference that leaves its aggregate and finds no
+   entity, or an equation across aggregates that fails (`violations_glue`).
+   The parts of a checked state glue back to its normal form (`glue_parts`).
+4. Machines: `aggregateMachine` takes a proposed state of its aggregate when it
+   passes the check of the aggregate schema; `dispatch` runs machines side by
+   side, one input at a time; `contextMachine` shows the violations of the
+   glued state, all of them across aggregates (`contextMachine_across`).
+5. `Examples/Open.lean`: Orders has four aggregates, and both of its equations
+   cross them; the equation of Payments is internal to the payment aggregate.
+   Removing Ada is a step of the customer aggregate that passes
+   (`remove_ada`); the context reports the open reference of her order and the
+   equation `billTo = customer.address` at it (`remove_ada_report`). A step
+   that breaks a rule of its own aggregate is refused (`bad_address_refused`).
 
 ### Conditional
 
@@ -628,8 +667,7 @@ the rules across aggregates in the schema (C) were set aside.
 
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
 the gluing along a kernel and the finite states of phase 4; item 6 uses the
-covering theorem of item 3 and the machines of phase 5. Items 1 to 5 are done;
-item 6 comes next.
+covering theorem of item 3 and the machines of phase 5. Items 1 to 6 are done.
 
 ## Decisions
 
@@ -757,6 +795,31 @@ Revision after phase 5:
   are found from the schema and reported between steps, for policies to
   restore. The context as the transaction (A) is stricter than DDD and makes
   every rule between aggregates transactional. Rules declared in the schema (C)
-  would change the schema, the exchange format and the Julia side, and move all
-  three equations of the examples, which all cross aggregates; it can follow if
-  declared policies prove useful.
+  would change the schema, the exchange format and the Julia side, and move the
+  equations across aggregates to policies; it can follow if declared policies
+  prove useful.
+
+Next step 6:
+
+- Entity types in no aggregate are aggregates of their own, so the aggregates
+  cover every entity type.
+- An aggregate schema holds the entity types its references reach as
+  identities, with no generators. An equation is internal when its two sides
+  are paths of an aggregate schema, so an equation whose sides end at an
+  identity is internal: `invoice = payment.invoice` of Payments compares two
+  invoice identities that the payment aggregate holds. The plan and the
+  decision counted it as an equation across aggregates; only the two
+  equations of Orders are.
+- Identities: in a finite aggregate state, the number of entities of an
+  identity bounds the references to it. The glued state takes the entities of
+  each entity type from the aggregate it belongs to, so a reference beyond
+  that number is dangling. For attributed states, `Compatible` asks the
+  stricter condition that the aggregate states agree on the identities.
+- Entities are numbered: removing an entity renumbers the later ones of its
+  aggregate, and the references of other aggregates are not renumbered.
+- The context machine takes one command at a time, addressed to one aggregate
+  (`dispatch`), not the product of inputs of the side by side wiring of
+  `Production`.
+- The equations across aggregates are not checked inside a step, and the
+  context does not refuse a step that breaks one; the policies that restore
+  them are not modelled.

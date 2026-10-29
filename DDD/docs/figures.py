@@ -746,7 +746,56 @@ def open_systems():
     return f
 
 
-# 16. Modules --------------------------------------------------------------------
+# 16. Aggregates -------------------------------------------------------------------
+
+def aggregates():
+    f = Fig("aggregates", 940, 540,
+            "The aggregate schemas of Orders hold the roots they refer to as identities; a "
+            "compatible family of their states that satisfies the equations across aggregates "
+            "is a state of Orders. A step of one aggregate passes its own check, and the "
+            "context reports the rules across aggregates that it breaks.")
+    f.region(20, 24, 900, 300, "AGGREGATE SCHEMAS OF ORDERS")
+    f.region(36, 50, 200, 176, "CUSTOMER", "kern")
+    f.region(252, 50, 316, 176, "ORDER", "kern")
+    f.region(584, 50, 150, 176, "ADDRESS", "kern")
+    f.region(750, 50, 154, 176, "PRODUCT", "kern")
+    f.node("c", 100, 104, "Customer", w=100)
+    f.node("ca", 170, 186, "Address", "muted", w=96, h=30)
+    f.arrow("c", "ca", "address", "acl", lside=-1, loff=8, lanchor="start")
+    f.node("o", 330, 104, "Order", w=100)
+    f.node("l", 330, 186, "OrderLine", w=100)
+    f.arrow("l", "o", "order", "acl", lside=1, loff=8, lanchor="end")
+    f.node("oc", 498, 84, "Customer", "muted", w=96, h=28)
+    f.node("oa", 498, 132, "Address", "muted", w=96, h=28)
+    f.node("op", 498, 186, "Product", "muted", w=96, h=28)
+    f.arrow("o", "oc", "", "acl")
+    f.arrow("o", "oa", "", "acl")
+    f.arrow("l", "op", "", "acl")
+    f.node("a", 659, 132, "Address", w=110, sub="value object")
+    f.node("p", 827, 132, "Product", w=110)
+    f.text(36, 250, "dashed: an identity, an entity type with no generators", "note")
+    f.text(36, 274, "equations across aggregates (orders_cross):", "mono")
+    f.text(36, 292, "billTo = customer.address", "mono warn")
+    f.text(250, 292, "sku = product.sku", "mono warn")
+    f.text(36, 312, "Payments: invoice = payment.invoice is internal to Payment", "mono m")
+    f.node("g", 760, 284, "a state of Orders", "glued", w=220, sub="contextEquiv")
+    f.text(760, 250, "compatible family + equations", "mono acc", "middle")
+    f.region(20, 344, 900, 180, "A MACHINE PER AGGREGATE")
+    f.node("s0", 130, 410, "Ada, order o₁", w=170, sub="report: none")
+    f.node("s1", 470, 410, "Customer: no one", "glued", w=200, sub="its own check passes")
+    f.node("s2", 790, 410, "reported", "warn", w=200, sub="not refused")
+    f.arrow("s0", "s1", "remove Ada", "acl", lside=-1, loff=10)
+    f.arrow("s1", "s2", "glue", "warn", lside=-1, loff=10)
+    f.text(36, 470, "dangling Order.customer: order 0 refers to customer 0", "mono warn")
+    f.text(36, 488, "eqn billTo = customer.address fails at order 0", "mono warn")
+    f.text(36, 510, "both rules across aggregates (contextMachine_across)", "mono m")
+    f.text(560, 470, "Ada's address set to one the customer", "mono")
+    f.text(560, 488, "aggregate does not hold: its own check", "mono")
+    f.text(560, 506, "fails, and the step is refused", "mono")
+    return f
+
+
+# 17. Modules --------------------------------------------------------------------
 
 def modules():
     f = Fig("modules", 1060, 546,
@@ -783,6 +832,10 @@ def modules():
     f.arrow("Union", "Open", "", "acl")
     f.arrow("Open", "OpenMachine", "", "acl")
     f.arrow("Open", "Rename", "", "acl")
+    f.node("Aggregates", 894, 192, "Aggregates", w=100, h=30)
+    f.node("AggregateMachine", 894, 250, "AggregateMachine", w=148, h=30)
+    f.arrow("Aggregates", "AggregateMachine", "", "acl")
+    f.arrow("OpenMachine", "AggregateMachine", "", "acl")
     dy = 50
     f.region(20, 235 + dy, 1020, 220, "EXAMPLES")
     f.raw(f'<rect class="rg plain" x="38" y="{266 + dy}" width="358" height="44" rx="6"/>', "back")
@@ -815,8 +868,8 @@ def modules():
     f.arrow("xMerge", "xOpen", "", "muted")
     f.text(1040, 518, "arrows point from a module to the modules that import it; Certificate "
            "and Union also import Compose, Open imports Compose and Glue,", "note", "end")
-    f.text(1040, 534, "OpenMachine imports Data and Production.Wiring, the example Open imports "
-           "Rename", "note", "end")
+    f.text(1040, 534, "OpenMachine imports Data and Production.Wiring, Aggregates imports Union "
+           "and States, the example Open imports Rename and AggregateMachine", "note", "end")
     return f
 
 
@@ -878,8 +931,8 @@ def pipeline():
 
 
 ALL = [embeddings, schema_orders, rewriting, translation, context_map, routes, lax,
-       published, pushout, failing, merge, data_gluing, states, open_systems, modules, next_steps,
-       pipeline]
+       published, pushout, failing, merge, data_gluing, states, open_systems, aggregates, modules,
+       next_steps, pipeline]
 
 
 def build():
