@@ -1,4 +1,5 @@
 import DDD.OpenMachine
+import DDD.Rename
 import DDD.Events
 import DDD.Examples.Merge
 import DDD.Examples.Values
@@ -22,11 +23,18 @@ checked with `decide`, and their schema categories are isomorphic by
 `assocIso`, compatibly with the legs. The identity on Customers composed with
 `orders` gives back the schema category of Orders (`idCompIso`).
 
+Qualified names: two ordering contexts that share customers, `orders` and a copy,
+clash on every other name (`orders_clash`) and do not compose
+(`not_orders_orders`). Qualifying the copy by `Store` keeps the names of
+Customers and prefixes the others (`storeOrders`); the copy is isomorphic to
+`orders` as an open schema (`storeOrdersIso`), and composes with it
+(`orders_storeOrders`).
+
 Machines: the conformist machines on `orders` and `shipping` take the customers
 they receive into their state. Wired in series, Shipping receives the
-customers of Orders one step late (`line_addresses`). An update that would leave
-an order without its customer fails the check and is refused
-(`refused`).
+customers of Orders one step late (`line_addresses`); the states stay in normal
+form (`line_normal`). An update that would leave an order without its customer
+fails the check and is refused (`refused`).
 
 Events: the projection `toDomains` of the example map sends the routes of `J` to
 arrivals of events (`projection`). Payments invoices an order published by
@@ -140,6 +148,48 @@ theorem idCustomers_orders : idCustomers.Composable orders :=
 noncomputable example : (idCustomers.comp orders idCustomers_orders).S.cat ≅ Orders.schema.cat :=
   orders.idCompIso _ _ idCustomers_orders
 
+/-! ## Qualified names -/
+
+/-- Two ordering contexts that share customers clash on every other name. -/
+theorem orders_clash : gluingClashes customers Orders.schema Orders.schema =
+    ["Order", "OrderLine", "Product", "Order.customer", "Order.billTo", "Order.shipTo",
+      "OrderLine.order", "OrderLine.product", "Order.id", "Order.placedOn", "Order.status",
+      "OrderLine.quantity", "OrderLine.unitPrice", "OrderLine.sku", "Product.sku",
+      "Product.name", "Product.listPrice"] := by
+  decide
+
+theorem not_orders_orders : ¬ orders.Composable orders := fun h =>
+  absurd (h.gluable.entities "Order" (by decide) (by decide)) (by decide)
+
+theorem storeOrders_check : orders.checkQualify "Store" = true := by decide
+
+/-- The second ordering context, its names outside Customers qualified by `Store`. -/
+def storeOrders : OpenSchema customers customers := orders.qualify storeOrders_check
+
+theorem storeOrders_entities : storeOrders.S.entities =
+    ["Customer", "Address", "Store.Order", "Store.OrderLine", "Store.Product"] := by
+  decide
+
+/-- The equations follow the names: `Store.billTo = Store.customer.address`. -/
+theorem storeOrders_eqns : storeOrders.S.eqns =
+    [⟨"Store.Order", ["Store.billTo"], ["Store.customer", "address"]⟩,
+      ⟨"Store.OrderLine", ["Store.sku"], ["Store.product", "Store.sku"]⟩] := by
+  decide
+
+/-- The copy is isomorphic to `orders`, compatibly with the interfaces. -/
+def storeOrdersIso : orders.Iso storeOrders := orders.qualifyIso storeOrders_check
+
+example : Orders.schema.cat ≅ storeOrders.S.cat := storeOrdersIso.catIso
+
+theorem orders_storeOrders : orders.Composable storeOrders :=
+  ⟨checkGluable_sound Orders.wellFormed storeOrders.wf (by decide), by decide, by decide,
+    by decide⟩
+
+theorem two_orders_entities : (orders.comp storeOrders orders_storeOrders).S.entities =
+    ["Customer", "Address", "Order", "OrderLine", "Product", "Store.Order", "Store.OrderLine",
+      "Store.Product"] := by
+  decide
+
 /-! ## Machines -/
 
 /-- The state of a schema with no entity. -/
@@ -171,6 +221,14 @@ step after Orders. -/
 theorem line_addresses :
     (line.run (ordersStart, shippingStart) [adaState, adaState]).map (·.1.size "Address") =
       [0, 0, 1] := by
+  decide
+
+/-- After three steps the state of Orders lists its five entity types and nothing
+else: the conformist machine keeps its state in normal form. -/
+theorem line_normal :
+    (show CheckedState K Orders.schema × CheckedState K Shipping.schema from
+      line.final (ordersStart, shippingStart) [adaState, adaState, adaState]).1.1.sizes.length =
+      5 := by
   decide
 
 /-- An order of customer 0, with no customer: the state fails the check. With Ada

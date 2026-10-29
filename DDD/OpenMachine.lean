@@ -28,6 +28,12 @@ which is why the state is a finite one.
 - Serial composition is associative up to relabelling the states
   (`serialAssoc`), as composition of open schemas is associative up to an
   isomorphism of schema categories.
+- A finite state has many representations: lists in any order, entries for names
+  outside the schema. Its normal form, the restriction along the identity
+  (`CheckedState.normalize`), lists exactly the names of the schema in its order
+  and has an isomorphic attributed state (`normalizeIso`). The conformist
+  machine (`conformist`) takes the data of its input interface, keeps its state
+  in normal form, and refuses updates that fail the check.
 -/
 
 namespace DDD
@@ -54,6 +60,15 @@ theorem restrictState_empty_comp {A B C : Schema} (hB : B.WellFormed) (hC : C.We
   change functor hB h₁ ⋙ functor hC h₂ ⋙ Y.F = functor hC h₃ ⋙ Y.F
   rw [← Functor.assoc, functor_empty_comp_empty hB hC h₁ h₂ h₃]
 
+omit [∀ v, DecidableEq (K v)] in
+/-- Restriction along the identity inclusion changes nothing. -/
+theorem restrictState_empty_self {S : Schema} (hS : S.WellFormed)
+    (h : ({} : Translation).Valid S S) (Y : S.State K) : restrictState hS h Y = Y := by
+  refine Schema.State.ext' ?_ fun _ _ => rfl
+  change functor hS h ⋙ Y.F = Y.F
+  rw [functor_empty_self hS h]
+  rfl
+
 end Translation
 
 namespace CheckedState
@@ -74,6 +89,23 @@ noncomputable def restrictIso (hA : A.WellFormed) (hB : B.WellFormed)
     (h : ({} : Translation).Valid A B) (x : CheckedState K B) :
     (x.restrict hA h).toState ≅ Translation.restrictState hB h x.toState :=
   FinState.restrictIso hA hB x.2 h
+
+/-- The normal form of a checked state: its restriction along the identity, which
+lists the entity types and generators of `S`, in the order of `S`, and nothing
+else. -/
+def normalize (hS : S.WellFormed) (x : CheckedState K S) : CheckedState K S :=
+  x.restrict hS (Translation.empty_valid_self hS)
+
+/-- The normal form has as many sizes as `S` has entity types, whatever `x` lists. -/
+theorem normalize_sizes_length (hS : S.WellFormed) (x : CheckedState K S) :
+    (x.normalize hS).1.sizes.length = S.entities.length := by
+  simp [normalize, restrict, FinState.restrict]
+
+/-- The normal form has the same attributed state, up to isomorphism. -/
+noncomputable def normalizeIso (hS : S.WellFormed) (x : CheckedState K S) :
+    (x.normalize hS).toState ≅ x.toState :=
+  (restrictIso hS hS _ x).trans
+    (eqToIso (Translation.restrictState_empty_self hS (Translation.empty_valid_self hS) _))
 
 /-- Restricting twice along inclusions is restricting along the composite
 inclusion, up to isomorphism of attributed states. -/
@@ -203,13 +235,17 @@ namespace OpenMachine
 variable {I O : Schema}
 
 /-- The conformist machine on `X`: it takes the data of its input interface into
-its state, and keeps its state when the result fails the check. -/
+its state, in normal form, and keeps its state when the result fails the
+check. -/
 def conformist (X : OpenSchema I O) : OpenMachine K X where
-  update s m := if h : (s.1.overwrite I m.1).check X.S = true then ⟨_, h⟩ else s
+  update s m :=
+    if h : (s.1.overwrite I m.1).check X.S = true then
+      CheckedState.normalize X.wf ⟨_, h⟩
+    else s
 
 theorem conformist_update_of_check (X : OpenSchema I O) (s : CheckedState K X.S)
     (m : CheckedState K I) (h : (s.1.overwrite I m.1).check X.S = true) :
-    (conformist X).update s m = ⟨_, h⟩ := dif_pos h
+    (conformist X).update s m = CheckedState.normalize X.wf ⟨_, h⟩ := dif_pos h
 
 /-- An update that would break the invariants of the schema is refused. -/
 theorem conformist_update_of_not_check (X : OpenSchema I O) (s : CheckedState K X.S)
