@@ -658,7 +658,48 @@ def merge():
     return f
 
 
-# 14. Modules --------------------------------------------------------------------
+# 13. Limits, colimits and Σ of attributed states -------------------------------
+
+def states():
+    f = Fig("states", 940, 390,
+            "A pushout of states merges entities along a shared sub-state and keeps the values; "
+            "Σ along a translation exists when the translation is bijective on paths into "
+            "value types.")
+    f.region(20, 24, 430, 310, "PUSHOUT OF STATES")
+    f.region(480, 24, 440, 310, "Σ ALONG A TRANSLATION")
+    f.node("z", 120, 92, "Z, shared", "kern", w=170, lines=["Customer: ada", "string ≃ K string"])
+    f.node("x", 345, 92, "X", w=170, lines=["Customer: ada, bo", "string ≃ K string"])
+    f.node("y", 120, 232, "Y", w=170, lines=["Customer: ada, cy", "string ≃ K string"])
+    f.node("p", 345, 232, "pushout", "glued", w=170,
+           lines=["Customer: ada, bo, cy", "string ≃ K string"])
+    f.arrow("z", "x", "", "kern")
+    f.arrow("z", "y", "", "kern")
+    f.arrow("x", "p", "", "glued")
+    f.arrow("y", "p", "", "glued")
+    f.raw('<path class="br" d="M274,190 L274,176 L288,176"/>')
+    f.text(36, 292, "entity types: the pushout of sets", "mono")
+    f.text(36, 308, "value types: K v again, not K v ⊔ K v", "mono")
+    f.text(36, 324, "limits: compatible families with one profile", "mono m")
+    f.node("kc", 570, 100, "Customer · Customers", "kern", w=160,
+           lines=["name", "address.street", "address.city"])
+    f.node("oc", 830, 100, "Customer · Orders", w=160,
+           lines=["name", "address.street", "address.city"])
+    f.arrow("kc", "oc", "inclusion", "kern", lside=-1, loff=9)
+    f.text(700, 158, "bijective into value types: Σ exists", "mono kern", "middle")
+    f.node("po", 570, 238, "Order · OrdersPL", "pl", w=160,
+           lines=["id, placedOn", "customer.name, …", "billTo…, shipTo…"])
+    f.node("oo", 830, 238, "Order · Orders", w=160,
+           lines=["id, placedOn", "customer.name, …", "billTo…, shipTo…", "status"])
+    f.arrow("po", "oo", "inclusion", "incl", lside=-1, loff=9)
+    f.text(700, 306, "status has no source path: no Σ", "mono warn", "middle")
+    f.text(24, 356, "isRightAdjoint_restrictStateFunctor_iff: Δ_T on attributed states has a left "
+           "adjoint exactly when T is bijective", "note")
+    f.text(24, 372, "on paths into value types, when each K v has two values; "
+           "checkFullyFaithful passing implies the condition", "note")
+    return f
+
+
+# 15. Modules --------------------------------------------------------------------
 
 def modules():
     f = Fig("modules", 1060, 400,
@@ -676,6 +717,10 @@ def modules():
     f.node("ContextMap", 530, 125, "ContextMap", w=100, h=30)
     f.node("Union", 640, 125, "Union", w=80, h=30)
     f.node("Merge", 750, 125, "Merge", w=80, h=30)
+    f.node("StateLimits", 868, 125, "StateLimits", w=92, h=30)
+    f.node("StateSigma", 978, 125, "StateSigma", w=92, h=30)
+    f.poly([(685, 96), (868, 96), (868, 106)], "acl")
+    f.arrow("StateLimits", "StateSigma", "", "acl")
     f.arrow("Translation", "Compose", "", "acl")
     f.arrow("Compose", "ContextMap", "", "acl")
     f.arrow("Glue", "ContextMap", "", "acl")
@@ -702,7 +747,10 @@ def modules():
     f.poly([(685, 72), (685, 297), (523, 297)], "muted")
     f.poly([(82, 321), (82, 338), (470, 338), (470, 322)], "muted")
     f.poly([(521, 313), (833, 313)], "muted")
-    f.poly([(885, 72), (885, 288)], "muted")
+    f.poly([(885, 72), (885, 84), (1045, 84), (1045, 305), (939, 305)], "muted")
+    f.node("xSigma", 978, 228, "Sigma", "pl", w=80, h=30)
+    f.arrow("StateSigma", "xSigma", "", "muted")
+    f.poly([(600, 260), (978, 260), (978, 247)], "muted")
     f.poly([(470, 244), (470, 260), (600, 260), (600, 336)], "muted")
     f.poly([(790, 125), (810, 125), (810, 355), (654, 355)], "muted")
     f.text(1040, 396, "arrows point from a module to the modules that import it; "
@@ -710,7 +758,7 @@ def modules():
     return f
 
 
-# 13. Next steps ------------------------------------------------------------------
+# Next steps, in DDD/README.md ---------------------------------------------------
 
 def next_steps():
     f = Fig("next-steps", 940, 300,
@@ -734,7 +782,7 @@ def next_steps():
     return f
 
 
-# 13. The phase 4 pipeline -------------------------------------------------------
+# 14. The phase 4 pipeline -------------------------------------------------------
 
 def pipeline():
     f = Fig("pipeline", 920, 260,
@@ -765,7 +813,7 @@ def pipeline():
 
 
 ALL = [embeddings, schema_orders, rewriting, translation, context_map, routes, lax,
-       published, pushout, failing, merge, data_gluing, modules, next_steps, pipeline]
+       published, pushout, failing, merge, data_gluing, states, modules, next_steps, pipeline]
 
 
 def build():

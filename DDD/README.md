@@ -155,12 +155,15 @@ which has three consequences:
 
 - Mathlib's pointwise limits and colimits in `C ⥤ Type` do not apply directly.
   The pointwise coproduct of two states has `K v ⊔ K v` at a value type `v`, so
-  it is not a state. Limits and colimits are constructed with entities computed
-  pointwise and values fixed, and their universal properties are proved.
+  it is not a state. Limits and colimits are constructed with values fixed, and
+  their universal properties are proved (`StateLimits.lean`): colimits are
+  pointwise at entity types, limits are compatible families with one profile,
+  and connected limits and colimits are pointwise.
 - `Σ_T` is not a plain left Kan extension. If the target schema has an
   attribute path from a translated entity type that the source schema lacks,
   the Kan extension adds formal values instead of taking them from `K`. `Δ_T`
-  is unaffected.
+  is unaffected. On attributed states, `Σ_T` exists exactly when `T` neither
+  adds nor identifies such paths (`StateSigma.lean`).
 - The data gluing theorem is proved for entity-only states from the universal
   property in `Cat`, and again for attributed states.
 
@@ -231,11 +234,13 @@ DDD/
   Union.lean         unions of schemas, the covering theorem
   Merge.lean         components, their colimit, the merged map
   States.lean        states, migrations, gluing
+  StateLimits.lean   limits and colimits of attributed states
+  StateSigma.lean    Σ on attributed states, the condition for it
   Data.lean          finite states, homomorphisms and restriction as data
   Json.lean          the exchange format csd-ddd/1
   Certificate.lean   certificates, their checks and soundness
   Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
-                     Gluing, Routes, Exchange, Merge
+                     Gluing, Routes, Exchange, Merge, Sigma
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check and csd-export, run with lake env lean --run
 julia/               Catlab side: src/CsdDDD.jl, run.jl, test/, data/, out/
@@ -390,6 +395,11 @@ Next step 3, strict integration along several inclusions, is complete, with no
 `sorry`: the example map with a second kernel, shared by Orders, Shipping and
 Payments, is merged, and its merged map is checked (`Examples/Merge.lean`).
 
+Next step 4, attributed states, is complete, with no `sorry`: attributed states
+have all small limits and colimits, and `Δ_T` on them has a left adjoint exactly
+when `T` is bijective on paths into value types; along the arrows of the example
+map, `Σ_T` exists or is refuted (`Examples/Sigma.lean`).
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -483,12 +493,38 @@ context (`DDD/docs/approach.md`, section 8).
 
 ### 4. Attributed states
 
-- Limits and colimits with values fixed: which shapes exist, their
-  construction on entity types, and their universal properties. Colimits merge
-  data along a shared sub-state.
-- `Σ_T` on attributed states: the condition on `T` under which
-  `restrictStateFunctor` has a left adjoint, and the adjoint under that
-  condition.
+Done. Attributed states have all small limits and colimits with the values
+fixed, and `Σ_T` on them exists under a condition on `T` that is also necessary
+(`DDD/docs/approach.md`, section 9).
+
+1. `StateLimits.lean`: morphisms out of a value type are identities
+   (`Schema.eq_value_of_hom`); profiles, the values of an element along the
+   morphisms to value types, preserved by morphisms of states
+   (`State.Hom.profile_app`). The terminal state (all profiles) and the initial
+   state (no entity, the values).
+2. Limits of every small shape (`limitCone`, `limitConeIsLimit`): at an object,
+   a profile and a compatible family of elements with that profile. Colimits of
+   every small shape (`colimitCocone`, `colimitCoconeIsColimit`): the quotient of
+   the elements of the members and the values, by the arrows of the diagram and
+   the values of the members. `HasLimits` and `HasColimits`.
+3. Shapes computed pointwise: the functor to entity-only states
+   (`State.toEntity`) preserves connected limits and colimits, so pullbacks,
+   pushouts, equalizers and coequalizers are pointwise; at an entity type,
+   colimits of every shape are pointwise (`preservesColimitsOfShape_entity`). A
+   pushout along a shared sub-state merges two states.
+4. `StateSigma.lean`: the condition `Translation.AttrBijective` (for each object
+   `a` and value type `v`, the functor of `T` is a bijection from `a ⟶ v` onto
+   `T a ⟶ v`). Under it, `sigmaState` and `sigmaStateAdjunction`. Conversely,
+   when every `K v` has two elements, a left adjoint gives the condition
+   (`attrBijective_of_isRightAdjoint`): `Δ_T` then preserves the terminal state,
+   and restriction of profiles along `T` is a bijection. The equivalence is
+   `isRightAdjoint_restrictStateFunctor_iff`. A fully faithful translation
+   satisfies the condition (`attrBijective_of_fullyFaithful`); a path to a value
+   type that the source lacks refutes it (`not_attrBijective`).
+5. `Examples/Sigma.lean`: `Σ_T` along Customers → Orders, Customers → Shipping
+   and OrdersPL → Payments, from `checkFullyFaithful` by `decide +kernel`; none
+   along OrdersPL → Orders (an order's status) or CatalogPL → Orders (a
+   product's list price).
 
 ### 5. Phase 5: open systems
 
@@ -514,8 +550,8 @@ context (`DDD/docs/approach.md`, section 8).
   phase 4.
 
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
-the gluing of item 3 and the states of item 4. Items 1 to 3 are done; item 4
-comes next.
+the gluing of item 3 and the states of item 4. Items 1 to 4 are done; item 5,
+phase 5, comes next.
 
 ## Decisions
 
@@ -593,3 +629,16 @@ Next step 3:
   rests; the covering theorem of `Union.lean` covers any number of parts.
 - Julia: the Julia side glues the two targets of each kernel of the exchanged
   map; `Examples/Merge.lean` extends that map in Lean only.
+
+Next step 4:
+
+- Limits and colimits are constructed, not taken from an equivalence with a
+  slice or coslice of `S.cat ⥤ Type`; the constructions give the entities at
+  each object directly.
+- The value-object condition stays a separate predicate on states
+  (`State.ValueObjects`); limits and colimits are of states without it.
+- The condition for `Σ_T` quantifies over all objects of `S`, value types
+  included, where it always holds. It is necessary when every `K v` has two
+  elements, which holds for the `K` of the examples (`Examples/Sigma.lean`).
+- No check decides the condition. It is proved from `checkFullyFaithful`, which
+  is stronger, and refuted from a path to a value type that the source lacks.

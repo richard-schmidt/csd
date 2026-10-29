@@ -115,6 +115,8 @@ Declared equations between routes are checked rather than proved: the two routes
 
 A kernel shared by more than two contexts, or contexts that share several kernels, merge as a component. The union of the member schemas is the colimit of `D` restricted to the component, when the members share names only through kernels, a condition checked along the list of members; it rests on a covering theorem that glues functors out of any number of agreeing parts. The merged map has the component as one context, with each arrow into a member composed with the leg of the member. [`Examples/Merge.lean`](DDD/Examples/Merge.lean) merges Orders, Shipping and Payments along the Customers kernel and a second kernel, Addresses, and checks the merged map.
 
+States with attribute values fixed by an interpretation of the value types have all limits and colimits; connected ones, among them the pushout that merges two states along a shared sub-state, are computed pointwise, and colimits are pointwise at entity types. Pushing states downstream along a translation, the left adjoint of restriction, exists, for an interpretation with two values in each value type, exactly when the translation neither adds nor identifies paths into value types out of the entity types it translates. [`Examples/Sigma.lean`](DDD/Examples/Sigma.lean) finds it along the kernel inclusions and from the published language of Orders to Payments, and refutes it into Orders, where an order has a status that the published language does not give.
+
 ```lean
 def Schema.cat (S : Schema) : Cat := Cat.of (CategoryTheory.Quotient S.rel)
 theorem pathEqAcyclic_iff (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj) (l l' : List String) :
@@ -134,6 +136,10 @@ def FinState.restrictIso (hS : S.WellFormed) (hS' : S'.WellFormed) (hX : X.check
     (X.restrict T S S').toState (restrict_check hS hX hT) ≅ restrictState hS' hT (X.toState hX)
 theorem Certificate.checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl
 noncomputable def ContextMap.Component.isColimit : IsColimit P.cocone  -- apex (glueAll members).cat
+instance : HasLimits (S.State K)
+instance : HasColimits (S.State K)
+theorem Translation.isRightAdjoint_restrictStateFunctor_iff [∀ v, Nontrivial (K v)] :
+    (restrictStateFunctor hS' hT).IsRightAdjoint ↔ AttrBijective hS' hT
 ```
 
 ## Sketches

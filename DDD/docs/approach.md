@@ -67,6 +67,7 @@ The checks and their lemmas:
 | `Schema.Gluable K B₁ B₂` | `checkGluable` | `checkGluable_sound` | not stated |
 | members of a context map share names only through kernels | `checkComponent` | `Component.agree`, `Component.isColimit` | not stated; depends on the order of the members |
 | functor of `T` full and faithful | `checkFullyFaithful` | `checkFullyFaithful_sound` | not stated; needs `S`, `S'` acyclic |
+| `Δ_T` on attributed states has a left adjoint (`AttrBijective`) | `checkFullyFaithful` | `attrBijective_of_fullyFaithful`, `isRightAdjoint_restrictStateFunctor_iff` | no; `not_attrBijective` refutes it from a missing path |
 | `P.RootsOnly S` | `checkRootsOnly` | `checkRootsOnly_iff` | always |
 | two translations induce the same functor | `checkSameFunctor` | `checkSameFunctor_sound`, `checkSameFunctor_iff` | path equality in the target is decided |
 | declared route equations hold | `checkRouteEqn` | `coherent_of_check` | refuted by `routeDiagram_map_ne` when path equality in the target is decided |
@@ -553,13 +554,80 @@ of states. `stateEquiv` restricts a state of the glued schema to both sides;
 its inverse glues a compatible pair with `desc` and takes the bijections of the
 first state.*
 
-Attributed states do not form a plain functor category, with three
-consequences. Mathlib's pointwise limits and colimits do not apply: the
-pointwise coproduct of two states has `K v ⊔ K v` at a value type. `Σ_T` is not
-the left Kan extension: a path in the target from a translated entity type to a
-value type that the source lacks would receive formal values instead of values
-in `K`. And data gluing is proved twice, once from the universal property in
-`Cat` and once for the bijections.
+Data gluing is proved twice: for entity-only states from the universal property
+in `Cat`, and for attributed states with their bijections.
+
+### Limits and colimits
+
+Attributed states have all small limits and colimits (`DDD/StateLimits.lean`),
+with the values fixed: at a value type `v`, a limit or a colimit has `K v`
+again. They are not the limits and colimits of `S.cat ⥤ Type`, in which the
+product of two states has `K v × K v` at `v` and the coproduct `K v ⊕ K v`.
+
+No generator leaves a value type, so the only morphisms out of a value type are
+identities, and a state is determined at value types by its bijections. The
+profile of an element `x` at an object `a` is the family of values of `x` along
+the morphisms from `a` to value types (`State.profile`); morphisms of states
+preserve profiles.
+
+- The terminal state has, at each object, all profiles; the morphism into it
+  sends an element to its profile. The initial state has no entity, and the
+  values at value types.
+- A limit has, at `a`, a profile and a compatible family of elements of the
+  members with that profile (`limitCone`). The product of two states pairs
+  entities with equal profiles. For a connected shape the profile is that of any
+  member of the family, and the limit is the limit of the underlying functors:
+  pullbacks and equalizers of states are computed pointwise
+  (`preservesLimitsOfShape_connected`).
+- A colimit has, at `a`, the quotient of the elements of the members and the
+  values at `a`, by the arrows of the diagram and by the values of the members
+  (`colimitCocone`). No value lies at an entity type, so at entity types
+  colimits of every shape are computed pointwise
+  (`preservesColimitsOfShape_entity`); for a connected shape they are computed
+  pointwise everywhere (`preservesColimitsOfShape_connected`).
+
+A pushout along a shared sub-state merges two states: its entities are those of
+the two states, identified along the sub-state, and its values are `K v`
+(Figure 13, left).
+
+### Σ along a translation
+
+`Σ_T` on attributed states is not the left Kan extension: a path of `S'` from a
+translated entity type to a value type that `S` lacks would receive formal
+values instead of values in `K`. `DDD/StateSigma.lean` states when `Δ_T` on
+attributed states has a left adjoint, and gives the adjoint.
+
+- `AttrBijective`: for each object `a` of `S` and value type `v`, the functor of
+  `T` is a bijection from the morphisms `a ⟶ v` of `S` onto the morphisms
+  `T a ⟶ v` of `S'`. `T` neither adds nor identifies paths into value types out
+  of the images of its source.
+- Under the condition, `Σ_T X` at an object `b` of `S'` is the quotient of the
+  triples `(a, f : T a ⟶ b, x ∈ X a)` that identifies `(a, T h ≫ f, x)` with
+  `(a', f, X h x)`. At a value type, a triple has the value of `x` along the
+  morphism of `S` that `T` sends to `f` (`sigmaState`, `sigmaStateAdjunction`).
+- Conversely, when each `K v` has two elements, a left adjoint makes `Δ_T`
+  preserve the terminal state. The morphism from the restricted terminal state
+  of `S'` to the terminal state of `S` is then an isomorphism; at `a` it
+  restricts profiles along `T`, and that restriction is a bijection only when
+  `T` is bijective on the morphisms from `a` into each value type
+  (`attrBijective_of_isRightAdjoint`).
+
+`isRightAdjoint_restrictStateFunctor_iff` states the equivalence. A fully
+faithful translation satisfies the condition, so a passing `checkFullyFaithful`
+proves it; a path of `S'` from the image of an entity type to a value type that
+no path of `S` from that entity type reaches refutes it (`not_attrBijective`).
+In `Examples/Sigma.lean`, `Σ_T` exists along Customers → Orders, Customers →
+Shipping and OrdersPL → Payments. It does not exist along OrdersPL → Orders, as
+an order of Orders has a status that the published language does not give, nor
+along CatalogPL → Orders, as a product of Orders has a list price.
+
+![A pushout of states merges entities along a shared sub-state and keeps the values; Σ along a translation exists when the translation is bijective on paths into value types.](figures/states.svg)
+
+*Figure 13. Left: a pushout of states along a shared customer. The customers of
+the two states are merged; the values stay `K v`. Right: along Customers →
+Orders each path from a customer into a value type is the image of one path of
+the kernel, and `Σ_T` exists. Along OrdersPL → Orders the status of an order has
+no source path, and `Σ_T` does not exist.*
 
 ## 10. Data and certificates
 
@@ -568,7 +636,7 @@ computes with Catlab, and Lean checks what Julia claims.
 
 ![Lean exports the example map, Julia computes with Catlab and writes a certificate, and Lean checks each claim of the certificate.](figures/pipeline.svg)
 
-*Figure 13. The phase 4 pipeline, run in CI. `cli/CsdExport.lean` writes the
+*Figure 14. The phase 4 pipeline, run in CI. `cli/CsdExport.lean` writes the
 workspace; `julia/run.jl` writes the certificate; `cli/CsdCheck.lean` checks
 it. Julia output is untrusted: a claim counts only once its check passes.*
 
@@ -654,7 +722,7 @@ claims pass `csd-check`.
 
 ![Imports between the modules of the DDD library: a chain from value types to context maps and states, and the examples on top.](figures/modules.svg)
 
-*Figure 14. The modules of the library and their imports. The core modules
+*Figure 15. The modules of the library and their imports. The core modules
 share the namespace `DDD`; each example module has its own. `cli/` and `julia/`
 are outside the library.*
 
@@ -671,6 +739,8 @@ are outside the library.*
 | `Union.lean` | `Schema.Cover`, `Agree`, `Cover.desc` with `leg_desc` and `desc_unique`, `glueAll`, `pairwise_of_checkSpanning` |
 | `Merge.lean` | `Component`, `checkComponent`, `Component.isColimit`, the merged map, `diagram_into`, `Component.nonInterference` |
 | `States.lean` | entity-only and attributed states, `Σ`, `Δ`, `Π`, data gluing |
+| `StateLimits.lean` | profiles, the terminal and initial states, `limitCone`, `colimitCocone`, connected limits and colimits pointwise, colimits pointwise at entity types |
+| `StateSigma.lean` | `AttrBijective`, `sigmaState`, `sigmaStateAdjunction`, `isRightAdjoint_restrictStateFunctor_iff`, `not_attrBijective` |
 | `Data.lean` | `FinState`, `check`, `toState`, value objects, `FinHom`, `restrict`, `restrictIso` |
 | `Json.lean` | the exchange format `csd-ddd/1` |
 | `Certificate.lean` | `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`, claims, `checkClaim_sound` |
@@ -681,6 +751,7 @@ are outside the library.*
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, the failing kernel |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
 | `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
+| `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along OrdersPL → Orders or CatalogPL → Orders |
 | `Examples/Exchange.lean` | the example map as a workspace document, round trips, the `createdAt` clash |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
@@ -699,8 +770,11 @@ are outside the library.*
 - Gluing needs the same names on both sides; names that clash outside the
   kernel are reported, and the Julia side qualifies them; inclusions that rename
   are not covered.
-- Limits and colimits of attributed states and `Σ_T` on attributed states are
-  not yet defined.
+- Limits and colimits of attributed states do not consider the value-object
+  condition, which stays a separate predicate (`State.ValueObjects`).
+- The condition for `Σ_T` on attributed states is proved through
+  `checkFullyFaithful`, which needs acyclic schemas and is sufficient only, or
+  refuted from a missing path; no check decides it.
 - `csd-check` trusts the Lean compiler and runtime.
 - The checks compare names as strings in the kernel. The strict
   non-interference checks of the example take 14 to 22 seconds of kernel time
