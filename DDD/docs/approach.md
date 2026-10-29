@@ -24,8 +24,9 @@ Contents:
 8. Strict integration
 9. States
 10. Data and certificates
-11. Modules and examples
-12. Limits of the current approach
+11. Open systems
+12. Modules and examples
+13. Limits of the current approach
 
 ## 1. Two kinds of guarantee, two embeddings
 
@@ -69,6 +70,7 @@ The checks and their lemmas:
 | functor of `T` full and faithful | `checkFullyFaithful` | `checkFullyFaithful_sound` | not stated; needs `S`, `S'` acyclic |
 | `Δ_T` on attributed states has a left adjoint (`AttrBijective`) | `checkFullyFaithful` | `attrBijective_of_fullyFaithful`, `isRightAdjoint_restrictStateFunctor_iff` | no; `not_attrBijective` refutes it from a missing path |
 | `P.RootsOnly S` | `checkRootsOnly` | `checkRootsOnly_iff` | always |
+| two open schemas compose (`Composable`) | `checkGluable`, `checkWellFormed`, `checkRootsOnly` | `checkGluable_sound` and the iff lemmas | not stated |
 | two translations induce the same functor | `checkSameFunctor` | `checkSameFunctor_sound`, `checkSameFunctor_iff` | path equality in the target is decided |
 | declared route equations hold | `checkRouteEqn` | `coherent_of_check` | refuted by `routeDiagram_map_ne` when path equality in the target is decided |
 | a finite state is a state of `S` | `FinState.check` | `FinState.toState` | not stated |
@@ -718,11 +720,110 @@ which restrict to the same kernel state) and of the anti-corruption layer from
 OrdersPL into Payments; and a homomorphism between two Shipping states. All 32
 claims pass `csd-check`.
 
-## 11. Modules and examples
+## 11. Open systems
+
+A bounded context with a published input and a published output is an open
+system: it composes with the context that publishes its input and with the
+context that consumes its output. `DDD/Open.lean` gives the schemas,
+`DDD/OpenMachine.lean` the behaviour, `DDD/Events.lean` the events.
+
+### Open schemas
+
+An open schema `X : I → O` is a structured cospan `I ⟶ S ⟵ O` of schemas
+(`OpenSchema`): a schema `S` with an input interface `I` and an output interface
+`O`, each included in `S` by the empty translation and containing roots only, as
+published languages do. Its legs are the functors of the two inclusions.
+
+- Composition: `X : I → M` and `Y : M → O` compose when they share only the
+  names of `M`, their glued schema is well-formed, and `I` and `O` contain roots
+  only in it (`Composable`, checked with `decide`). The composite `X ∘ Y : I → O`
+  has the schema of `X` and the schema of `Y` glued along `M`, the binary gluing
+  of section 8 with `M` as kernel. Its legs are those of `X` and `Y` followed by
+  the legs of the gluing (`comp_legI`, `comp_legO`), and its schema category is
+  the pushout in `Cat` of the two schema categories over `M`
+  (`isPushout_comp`).
+- Identities: an interface that contains roots only in itself, with both legs
+  the identity (`OpenSchema.id`).
+- Associativity: the schema categories of `(X ∘ Y) ∘ Z` and `X ∘ (Y ∘ Z)` are
+  isomorphic by an isomorphism that commutes with both legs (`assocIso`,
+  `assocIso_legI`, `assocIso_legO`). The glued presentations list their names in
+  different orders, so the isomorphism comes from the pushouts: `X ∘ (Y ∘ Z)` is
+  shown to be a pushout of `X ∘ Y` and `Z` over `N` by pasting the pushout
+  squares in `Cat` (`isPushout_assoc`), and two pushouts of one span are
+  isomorphic. The identity laws are the same argument with a square whose two
+  sides are identities (`compIdIso`, `idCompIso`).
+
+### Machines
+
+A machine on an open schema `X : I → O` (`OpenMachine`) is a machine of
+`Production/Wiring.lean`. Its state is a finite state of the schema of `X` that
+passes the check (`CheckedState`), which `FinState.toState` sends to an
+attributed state; Production's machines have states in `Type`, attributed states
+live in `Type 1`. It reads checked states of `I` and shows the restriction of
+its state to `O`.
+
+- The interface of a machine on `X` is the box of checked states of `I` in and
+  of `O` out (`OpenSchema.box`). The box of `X ∘ Y` is the target of the serial
+  wiring of the boxes of `X` and `Y`, so the serial composite of machines on `X`
+  and on `Y` is a machine on `X ∘ Y` (`OpenMachine.comp`). Serial composition is
+  associative up to relabelling the states (`serialAssoc`), as composition of
+  open schemas is associative up to isomorphism.
+- One step: the machine on `X` takes the input, the machine on `Y` takes what
+  the machine on `X` showed before the step (`comp_update`). What `X` publishes
+  on `M` reaches `Y` one step late; over a run, the machine on `Y` sees every
+  output of the machine on `X` but the last (`comp_run`, from `run_serial`).
+- A checked state of the glued schema splits into a state of `X` and one of `Y`
+  (`split`). The two agree on `M` up to isomorphism of attributed states
+  (`split_agree`), and the composite started from the split shows on `O` what
+  the glued state shows (`comp_view_split`). Both rest on restriction along two
+  inclusions being restriction along the composite inclusion, up to isomorphism
+  (`restrictRestrictIso`).
+- The conformist machine takes the data of its input interface into its state,
+  and refuses an update whose result fails the check (`conformist`). The check
+  holds the equations and the references of the schema, so a refused update is
+  one that would break an invariant.
+
+In `Examples/Open.lean`, Orders (`orders : Customers → Customers`) and Shipping
+(`shipping : Customers → Addresses`) compose into the gluing of section 8, and
+with Payments (`payments : Addresses → Addresses`) the two composites of the
+three have isomorphic schema categories. The conformist machines on Orders and
+Shipping, in series, receive the customer Ada; Shipping shows no address, no
+address, then Ada's (`line_addresses`). Orders refuses to take an empty set of
+customers while it holds an order of Ada (`refused`).
+
+### Events
+
+`Showcase/ContextMapNotifications.lean` types a service by its domain: each
+event it returns comes from its domain or from one upstream of it (`Svc`).
+`DDD/Events.lean` states the same for contexts, with routes of `J` in place of
+arrows between domains.
+
+- `CSvc M c α`: a computation in the context `c`; each event it returns carries
+  its context and has a route of `J` from that context to `c`. `emit` tags an
+  event with `c`; `callAlong` calls an endpoint of a context upstream along a
+  morphism of `J`, `call` along an arrow.
+- A `Projection` sends contexts to domains and routes of `J` to arrivals of
+  events, as `toDomains` does for the example map. `toSvc` turns a computation
+  in a context into a computation in its domain, and commutes with `pure`,
+  `bind` and `emit`.
+- Without an arrival between two domains there is no route between their
+  contexts (`Projection.isEmpty_hom`). The context level separates more: OrdersPL
+  and Customers lie in one domain, and no route of `J` leads from OrdersPL to
+  Customers (`no_route_ordersPL_customers`).
+
+![Open schemas compose by gluing along the shared interface; machines on them compose by serial wiring; events follow the routes of the category of contexts.](figures/open.svg)
+
+*Figure 15. Top: Orders and Shipping as open schemas along Customers, and their
+composite, the pushout over Customers. Bottom left: their conformist machines in
+series; Shipping receives the customers of Orders one step late. Bottom right:
+an invoice in Payments for an order of OrdersPL, through `toDomains`, and two
+routes that do not exist.*
+
+## 12. Modules and examples
 
 ![Imports between the modules of the DDD library: a chain from value types to context maps and states, and the examples on top.](figures/modules.svg)
 
-*Figure 15. The modules of the library and their imports. The core modules
+*Figure 16. The modules of the library and their imports. The core modules
 share the namespace `DDD`; each example module has its own. `cli/` and `julia/`
 are outside the library.*
 
@@ -735,6 +836,9 @@ are outside the library.*
 | `Translation.lean` | `Translation`, `Valid`, `checkValid_iff`, `functor`, `restrict` |
 | `Compose.lean` | `Translation.comp`, `functor_comp`, `checkSameFunctor_iff` |
 | `Glue.lean` | `glue`, `Gluable`, `Gluing`, the bridge theorem, `checkFullyFaithful_sound` |
+| `Open.lean` | `OpenSchema`, `Composable`, `comp`, `isPushout_comp`, `assocIso`, `compIdIso`, `idCompIso` |
+| `OpenMachine.lean` | `CheckedState`, `OpenMachine`, `OpenMachine.comp`, `split_agree`, `comp_view_split`, `conformist`, `serialAssoc` |
+| `Events.lean` | `CSvc`, `emit`, `callAlong`, `Projection`, `toSvc` |
 | `ContextMap.lean` | `ContextMap`, `J`, `diagram`, `coherent_of_check`, `Lax`, `nonInterference`, `Publishes`, `kernelGluing`, `isPushout_kernel` |
 | `Union.lean` | `Schema.Cover`, `Agree`, `Cover.desc` with `leg_desc` and `desc_unique`, `glueAll`, `pairwise_of_checkSpanning` |
 | `Merge.lean` | `Component`, `checkComponent`, `Component.isColimit`, the merged map, `diagram_into`, `Component.nonInterference` |
@@ -751,11 +855,12 @@ are outside the library.*
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, the failing kernel |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
 | `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
+| `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, machines in series, events of the example map |
 | `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along OrdersPL → Orders or CatalogPL → Orders |
 | `Examples/Exchange.lean` | the example map as a workspace document, round trips, the `createdAt` clash |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
-## 12. Limits of the current approach
+## 13. Limits of the current approach
 
 - Path equality is decided for free and for acyclic schemas only.
 - A merged component has no arrow out of it: a translation out of a member is
@@ -775,10 +880,19 @@ are outside the library.*
 - The condition for `Σ_T` on attributed states is proved through
   `checkFullyFaithful`, which needs acyclic schemas and is sufficient only, or
   refuted from a missing path; no check decides it.
+- Open schemas compose only when they share the names of the interface and no
+  other; there is no renaming before composition.
+- A machine on an open schema has a finite state. Serial composition delays the
+  downstream machine by one step, so machines have no identity for it and are
+  associative up to relabelling only. The composite's state is a pair of
+  states, related to the states of the glued schema through `split`, up to
+  isomorphism; no machine has the glued schema as its state.
+- Events are typed at the level of contexts in Lean only; `Svc` of the Showcase
+  map is unchanged, and the Julia side has no events.
 - `csd-check` trusts the Lean compiler and runtime.
 - The checks compare names as strings in the kernel. The strict
   non-interference checks of the example take 14 to 22 seconds of kernel time
   each, which bounds the size of schemas checked with `decide`.
 
-The next steps in [`../README.md`](../README.md) address these and add open
-systems (phase 5).
+The conditional items of the next steps in [`../README.md`](../README.md) address
+the last of these.

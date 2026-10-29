@@ -117,6 +117,8 @@ A kernel shared by more than two contexts, or contexts that share several kernel
 
 States with attribute values fixed by an interpretation of the value types have all limits and colimits; connected ones, among them the pushout that merges two states along a shared sub-state, are computed pointwise, and colimits are pointwise at entity types. Pushing states downstream along a translation, the left adjoint of restriction, exists, for an interpretation with two values in each value type, exactly when the translation neither adds nor identifies paths into value types out of the entity types it translates. [`Examples/Sigma.lean`](DDD/Examples/Sigma.lean) finds it along the kernel inclusions and from the published language of Orders to Payments, and refutes it into Orders, where an order has a status that the published language does not give.
 
+Phase 5 makes contexts open systems. An open schema is a schema with an input and an output interface, both published languages included in it; two open schemas compose by gluing along the interface they share, and the composite schema category is a pushout in `Cat`, so composition is associative and has identities up to isomorphism. A machine on an open schema is a machine of [`Production/Wiring.lean`](Production/Wiring.lean) whose state is a finite state of the schema and whose output is that state restricted to the output interface; two such machines in series are a machine on the composite, in which the downstream context sees what the upstream one publishes one step late. Events are typed by context: each event a service returns has a route in the category of contexts to the service, and the projection onto the domains of `ContextMapNotifications.lean` turns these services into its `Svc` services. [`Examples/Open.lean`](DDD/Examples/Open.lean) composes Orders, Shipping and Payments, runs Orders and Shipping in series, and routes the events of the example map.
+
 ```lean
 def Schema.cat (S : Schema) : Cat := Cat.of (CategoryTheory.Quotient S.rel)
 theorem pathEqAcyclic_iff (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj) (l l' : List String) :
@@ -140,6 +142,11 @@ instance : HasLimits (S.State K)
 instance : HasColimits (S.State K)
 theorem Translation.isRightAdjoint_restrictStateFunctor_iff [∀ v, Nontrivial (K v)] :
     (restrictStateFunctor hS' hT).IsRightAdjoint ↔ AttrBijective hS' hT
+noncomputable def OpenSchema.assocIso :
+    ((X.comp Y hXY).comp Z hXY_Z).S.cat ≅ (X.comp (Y.comp Z hYZ) hX_YZ).S.cat
+def OpenMachine.comp (A : OpenMachine K X) (B : OpenMachine K Y) (h : X.Composable Y) :
+    Production.Machine ((X.comp Y h).box K)
+def CSvc.toSvc (P : Projection M) (s : CSvc M c α) : Svc (P.domain c) α
 ```
 
 ## Sketches

@@ -176,10 +176,11 @@ that may repeat a value.
 ### Open systems
 
 Structured cospans `I ⟶ S ⟵ O` of schemas, with interface schemas as published
-languages and composition by pushout. `Production/Wiring.lean` composes
-machines by wiring; this layer composes schemas. Planned connection: machines
-whose state types are the states of an aggregate schema, and `Svc` events
-routed along `J`.
+languages and composition by pushout (`Open.lean`). `Production/Wiring.lean`
+composes machines by wiring; a machine on an open schema has a finite state of
+its schema and the interfaces as its box, and the serial wiring of two such
+machines is a machine on the composite (`OpenMachine.lean`). Events carry routes
+of `J` and project to the `Svc` events of the Showcase map (`Events.lean`).
 
 ## Two embeddings
 
@@ -236,11 +237,14 @@ DDD/
   States.lean        states, migrations, gluing
   StateLimits.lean   limits and colimits of attributed states
   StateSigma.lean    Σ on attributed states, the condition for it
+  Open.lean          open schemas, their composition and its laws
+  OpenMachine.lean   machines on open schemas, serial wiring
+  Events.lean        services and events along the routes of J
   Data.lean          finite states, homomorphisms and restriction as data
   Json.lean          the exchange format csd-ddd/1
   Certificate.lean   certificates, their checks and soundness
   Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
-                     Gluing, Routes, Exchange, Merge, Sigma
+                     Gluing, Routes, Exchange, Merge, Sigma, Open
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check and csd-export, run with lake env lean --run
 julia/               Catlab side: src/CsdDDD.jl, run.jl, test/, data/, out/
@@ -258,7 +262,11 @@ this library.
   integration onto `J`, with fields as unnamed references.
 - `Showcase/ContextMapNotifications.lean`: the domains and routes that the
   example context map refines.
-- `Production/Wiring.lean`: composition of behaviour, connected in phase 5.
+- `Production/Wiring.lean`: machines and their wiring. A machine on an open
+  schema is one of its machines, and composing open schemas is its serial
+  wiring.
+- `Showcase/ContextMapNotifications.lean`: also the services and events that
+  `Events.lean` refines to contexts.
 
 ## Roadmap
 
@@ -400,6 +408,12 @@ have all small limits and colimits, and `Δ_T` on them has a left adjoint exactl
 when `T` is bijective on paths into value types; along the arrows of the example
 map, `Σ_T` exists or is refuted (`Examples/Sigma.lean`).
 
+Next step 5, phase 5, is complete, with no `sorry`: open schemas compose by
+gluing along their interfaces, associatively and with identities up to
+isomorphism of schema categories; machines of `Production` on them compose by
+serial wiring; events follow the routes of `J` and project to the `Svc` events
+of the Showcase map (`Examples/Open.lean`).
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -528,16 +542,41 @@ fixed, and `Σ_T` on them exists under a condition on `T` that is also necessary
 
 ### 5. Phase 5: open systems
 
-- Structured cospans `I ⟶ S ⟵ O` of schemas, with interfaces that are published
-  languages included by the empty translation; composition by gluing along the
-  shared interface (item 3, with the interface as kernel); identities, and
-  associativity up to isomorphism of schema categories.
-- Behaviour: machines of `Production/Wiring.lean` whose state type is the
-  attributed states of an aggregate schema, with wiring compatible with the
-  composition of cospans.
-- Events: the `Svc` events of `Showcase/ContextMapNotifications.lean` routed
-  along `J` through `toDomains`, so that an event of a context reaches only its
-  downstream contexts.
+Done. Open schemas, machines on them and events along `J`
+(`DDD/docs/approach.md`, section 11).
+
+1. `Open.lean`: `OpenSchema I O`, a schema with interfaces `I` and `O` included
+   by the empty translation and containing roots only. `X : I → M` and
+   `Y : M → O` compose when they share only the names of `M` and the glued
+   schema is well-formed (`Composable`); the composite glues their schemas along
+   `M`, its legs are those of `X` and `Y` followed by the legs of the gluing, and
+   its schema category is the pushout in `Cat` over `M` (`isPushout_comp`).
+   Identities on interfaces (`OpenSchema.id`). Associativity (`assocIso`) and
+   the identity laws (`compIdIso`, `idCompIso`) up to isomorphism of schema
+   categories commuting with the legs, by pasting pushout squares in `Cat`.
+2. `OpenMachine.lean`: a machine on `X : I → O` is a `Production.Machine` on the
+   box of checked states of `I` and `O`, whose state is a checked finite state
+   of the schema of `X` and whose view is its restriction to `O`. The serial
+   wiring of machines on `X` and `Y` is a machine on the box of `X ∘ Y`
+   (`OpenMachine.comp`); the machine on `Y` receives what the machine on `X`
+   showed one step before (`comp_update`, `comp_run`). A state of the glued
+   schema splits into parts that agree on `M` up to isomorphism (`split_agree`),
+   and the composite shows what the glued state shows on `O`
+   (`comp_view_split`). The conformist machine (`conformist`) refuses updates
+   that fail the check. Serial composition is associative up to relabelling
+   (`serialAssoc`).
+3. `Events.lean`: `CSvc M c`, computations in the context `c` whose events each
+   have a route of `J` to `c`; `emit`, `callAlong`, `call`. A `Projection` to
+   the Showcase map turns them into `Svc` computations (`toSvc`, commuting with
+   `pure`, `bind`, `emit`), and refutes routes between contexts whose domains
+   no event reaches (`Projection.isEmpty_hom`).
+4. `Examples/Open.lean`: Orders, Shipping and Payments as open schemas along
+   Customers and Addresses; both composites of the three, checked with `decide`,
+   and their isomorphism; the identity on Customers. The conformist machines on
+   Orders and Shipping in series, with Shipping one step behind
+   (`line_addresses`) and an update refused (`refused`). Events of the example
+   map through `toDomains` (`invoice_domains`); no route from OrdersPL to
+   Customers, and none from Payments to Catalog.
 
 ### Conditional
 
@@ -550,8 +589,8 @@ fixed, and `Σ_T` on them exists under a condition on `T` that is also necessary
   phase 4.
 
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
-the gluing of item 3 and the states of item 4. Items 1 to 4 are done; item 5,
-phase 5, comes next.
+the gluing along a kernel and the finite states of phase 4. Items 1 to 5 are
+done; the conditional items remain.
 
 ## Decisions
 
@@ -642,3 +681,23 @@ Next step 4:
   elements, which holds for the `K` of the examples (`Examples/Sigma.lean`).
 - No check decides the condition. It is proved from `checkFullyFaithful`, which
   is stronger, and refuted from a path to a value type that the source lacks.
+
+Phase 5:
+
+- Composition of open schemas uses the binary gluing of `Glue.lean` with the
+  shared interface as kernel; components and the covering theorem of item 3 are
+  not needed for it.
+- Associativity and identities are isomorphisms of schema categories, derived
+  from the pushouts, not equalities of presentations: the glued presentations
+  list names in different orders.
+- Machines: the state of a machine is a checked finite state of the schema of
+  a context, not an attributed state of an aggregate schema as planned.
+  Production's machines have states in `Type`, attributed states live in
+  `Type 1`; `FinState.toState` connects the two. Statements about the glued
+  schema are up to isomorphism of attributed states.
+- Machines compose by the serial wiring of `Production`, in which the downstream
+  machine sees the upstream one step late. Machines on open schemas therefore
+  have no identity for this composition; associativity holds up to relabelling
+  the states.
+- Events: a context-level service type in `DDD`, with a projection to the
+  domain-level `Svc` of the Showcase module, which stays unchanged.

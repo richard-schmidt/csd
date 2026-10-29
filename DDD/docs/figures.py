@@ -699,12 +699,60 @@ def states():
     return f
 
 
-# 15. Modules --------------------------------------------------------------------
+# 15. Open systems ----------------------------------------------------------------
+
+def open_systems():
+    f = Fig("open", 940, 440,
+            "Open schemas compose by gluing along the shared interface; machines on them "
+            "compose by serial wiring; events follow the routes of the category of contexts.")
+    f.region(20, 24, 900, 200, "OPEN SCHEMAS")
+    f.node("i", 95, 80, "Customers", "kern", w=110, badge="I", badge_kind="kern")
+    f.node("x", 255, 80, "Orders", w=110)
+    f.node("m", 415, 80, "Customers", "kern", w=110, badge="M", badge_kind="kern")
+    f.node("y", 575, 80, "Shipping", w=110)
+    f.node("o", 735, 80, "Addresses", "kern", w=110, badge="O", badge_kind="kern")
+    f.arrow("i", "x", "", "kern")
+    f.arrow("m", "x", "", "kern")
+    f.arrow("m", "y", "", "kern")
+    f.arrow("o", "y", "", "kern")
+    f.node("g", 415, 180, "Orders ⊔ Shipping", "glued", w=170)
+    f.arrow("x", "g", "", "glued")
+    f.arrow("y", "g", "", "glued")
+    f.text(36, 160, "X : I → M", "mono")
+    f.text(36, 176, "Y : M → O", "mono")
+    f.text(36, 192, "X ∘ Y : I → O", "mono acc")
+    f.text(620, 160, "the pushout in Cat over M", "mono")
+    f.text(620, 176, "(X ∘ Y) ∘ Z ≅ X ∘ (Y ∘ Z),", "mono")
+    f.text(620, 192, "commuting with the legs", "mono")
+    f.region(20, 244, 540, 170, "MACHINES")
+    f.node("ma", 180, 310, "Orders", w=130, sub="state: Orders")
+    f.node("mb", 420, 310, "Shipping", w=130, sub="state: Shipping")
+    f.arrow((36, 310), "ma", "", "acl")
+    f.text(36, 296, "Customers", "lb c-acl")
+    f.arrow("ma", "mb", "Customers", "acl", lside=-1, loff=10)
+    f.text(300, 330, "a step late", "lb c-acl", "middle")
+    f.arrow("mb", (545, 310), "", "acl")
+    f.text(545, 298, "Addresses", "lb c-acl", "end")
+    f.text(36, 370, "serial wiring, on the box of X ∘ Y", "mono")
+    f.text(36, 388, "Shipping shows no address, none, then Bern", "mono acc")
+    f.text(36, 404, "a split glued state shows the same on O, up to ≅", "mono m")
+    f.region(580, 244, 340, 170, "EVENTS")
+    f.text(596, 290, "Payments calls OrdersPL", "mono")
+    f.text(596, 306, "events of OrdersPL, Payments", "mono")
+    f.text(596, 322, "through toDomains: Orders, Payments", "mono acc")
+    f.text(596, 354, "no route OrdersPL → Customers,", "mono warn")
+    f.text(596, 370, "both in the Orders domain", "mono warn")
+    f.text(596, 386, "no route Payments → Catalog", "mono warn")
+    return f
+
+
+# 16. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1060, 400,
+    f = Fig("modules", 1060, 490,
             "Imports between the modules of the DDD library: a chain from value types to "
-            "certificates, context maps beside it, and the examples on top.")
+            "certificates, context maps, states and open systems beside it, and the examples on "
+            "top.")
     f.text(20, 18, "on Mathlib: Paths, Quotient, Grothendieck, IsPushout, Kan extensions", "note")
     core = [("Values", 55), ("Schema", 158), ("Semantics", 263), ("PathEq", 368),
             ("Translation", 475), ("Glue", 582), ("States", 685), ("Data", 785),
@@ -727,34 +775,44 @@ def modules():
     f.arrow("Glue", "Union", "", "acl")
     f.arrow("Union", "Merge", "", "acl")
     f.poly([(530, 141), (530, 158), (750, 158), (750, 145)], "acl")
-    f.region(20, 175, 1020, 205, "EXAMPLES")
-    f.raw('<rect class="rg plain" x="38" y="206" width="358" height="44" rx="6"/>', "back")
+    f.node("Events", 425, 192, "Events", w=92, h=30)
+    f.node("Open", 640, 192, "Open", w=80, h=30)
+    f.node("OpenMachine", 752, 192, "OpenMachine", w=104, h=30)
+    f.poly([(530, 158), (425, 158), (425, 173)], "acl")
+    f.arrow("Union", "Open", "", "acl")
+    f.arrow("Open", "OpenMachine", "", "acl")
+    f.region(20, 235, 1020, 220, "EXAMPLES")
+    f.raw('<rect class="rg plain" x="38" y="266" width="358" height="44" rx="6"/>', "back")
     for name, x in [("Catalog", 82), ("Orders", 172), ("Payments", 262), ("Shipping", 352)]:
-        f.node("x" + name, x, 228, name, w=82, h=30)
-    f.poly([(368, 72), (368, 204)], "muted")
-    f.node("xIntegration", 470, 228, "Integration", "pl", w=110, h=30)
-    f.node("xRoutes", 600, 228, "Routes", w=90, h=30)
-    f.node("xGluing", 470, 305, "Gluing", "kern", w=100, h=30)
-    f.node("xExchange", 885, 305, "Exchange", w=100, h=30)
-    f.node("xMerge", 600, 355, "Merge", "kern", w=100, h=30)
-    f.node("xShowcase", 270, 305, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
-    f.node("xValues", 82, 305, "Values", w=82, h=30)
-    f.poly([(397, 228), (413, 228)], "muted")
+        f.node("x" + name, x, 288, name, w=82, h=30)
+    f.poly([(368, 72), (368, 264)], "muted")
+    f.node("xIntegration", 470, 288, "Integration", "pl", w=110, h=30)
+    f.node("xRoutes", 600, 288, "Routes", w=90, h=30)
+    f.node("xGluing", 470, 365, "Gluing", "kern", w=100, h=30)
+    f.node("xExchange", 885, 365, "Exchange", w=100, h=30)
+    f.node("xMerge", 600, 415, "Merge", "kern", w=100, h=30)
+    f.node("xOpen", 752, 415, "Open", "kern", w=90, h=30)
+    f.node("xShowcase", 270, 365, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
+    f.node("xValues", 82, 365, "Values", w=82, h=30)
+    f.poly([(397, 288), (413, 288)], "muted")
     f.arrow("ContextMap", "xIntegration", "", "muted")
     f.arrow("ContextMap", "xRoutes", "", "muted")
     f.arrow("xIntegration", "xGluing", "", "muted")
     f.arrow("xShowcase", "xIntegration", "", "muted")
-    f.poly([(685, 72), (685, 297), (523, 297)], "muted")
-    f.poly([(82, 321), (82, 338), (470, 338), (470, 322)], "muted")
-    f.poly([(521, 313), (833, 313)], "muted")
-    f.poly([(885, 72), (885, 84), (1045, 84), (1045, 305), (939, 305)], "muted")
-    f.node("xSigma", 978, 228, "Sigma", "pl", w=80, h=30)
-    f.arrow("StateSigma", "xSigma", "", "muted")
-    f.poly([(600, 260), (978, 260), (978, 247)], "muted")
-    f.poly([(470, 244), (470, 260), (600, 260), (600, 336)], "muted")
-    f.poly([(790, 125), (810, 125), (810, 355), (654, 355)], "muted")
-    f.text(1040, 396, "arrows point from a module to the modules that import it; "
-           "Certificate and Union also import Compose", "note", "end")
+    f.poly([(685, 72), (685, 357), (523, 357)], "muted")
+    f.poly([(82, 381), (82, 398), (470, 398), (470, 382)], "muted")
+    f.poly([(521, 373), (833, 373)], "muted")
+    f.poly([(885, 72), (885, 84), (1045, 84), (1045, 365), (939, 365)], "muted")
+    f.node("xSigma", 978, 288, "Sigma", "pl", w=80, h=30)
+    f.poly([(978, 141), (978, 271)], "muted")
+    f.poly([(600, 304), (600, 320), (978, 320), (978, 307)], "muted")
+    f.poly([(470, 304), (470, 320), (600, 320), (600, 398)], "muted")
+    f.poly([(790, 125), (810, 125), (810, 442), (600, 442), (600, 433)], "muted")
+    f.poly([(752, 208), (752, 398)], "muted")
+    f.arrow("xMerge", "xOpen", "", "muted")
+    f.text(1040, 482, "arrows point from a module to the modules that import it; Certificate and "
+           "Union also import Compose, Open imports Compose and Glue, OpenMachine imports Data "
+           "and Production.Wiring", "note", "end")
     return f
 
 
@@ -813,7 +871,8 @@ def pipeline():
 
 
 ALL = [embeddings, schema_orders, rewriting, translation, context_map, routes, lax,
-       published, pushout, failing, merge, data_gluing, states, modules, next_steps, pipeline]
+       published, pushout, failing, merge, data_gluing, states, open_systems, modules, next_steps,
+       pipeline]
 
 
 def build():

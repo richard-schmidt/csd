@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 440" width="940" height="440" role="img" aria-label="Open schemas compose by gluing along the shared interface; machines on them compose by serial wiring; events follow the routes of the category of contexts."><style>svg { --surface: #ffffff; --region: #f3f5f8; --fg: #1b232c; --muted: #5a6675; --line: #c9d1da; --accent: #17708f; --accentfill: rgba(23,112,143,0.10); --kern: #2f7a4b; --kernfill: rgba(47,122,75,0.10); --warn: #b4421b; --warnfill: rgba(180,66,27,0.08); } @media (prefers-color-scheme: dark) { svg { --surface: #19212a; --region: #202a35; --fg: #e3e9ef; --muted: #9aa7b5; --line: #34414f; --accent: #5db4d3; --accentfill: rgba(93,180,211,0.14); --kern: #6cc28d; --kernfill: rgba(108,194,141,0.13); --warn: #f08c5e; --warnfill: rgba(240,140,94,0.11); } }
+.bgr { fill: var(--surface); }
+.n rect { fill: var(--surface); stroke: var(--fg); stroke-width: 1.2; }
+.n.pl rect { fill: var(--accentfill); stroke: var(--accent); stroke-width: 1.5; }
+.n.kern rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.glued rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.muted rect { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 3; }
+.n.warn rect { fill: var(--warnfill); stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.n.val rect { fill: var(--region); stroke: var(--muted); }
+.n.chip rect { fill: var(--surface); stroke: var(--muted); }
+.n.chip.s rect { fill: var(--accentfill); stroke: var(--accent); }
+.n.dot rect { fill: var(--region); stroke: var(--muted); }
+.n .t { fill: var(--fg); font: 500 12.5px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+.n .s { fill: var(--muted); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .a { fill: var(--fg); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n.chip .t, .n.val .t, .n.dot .t { font: 400 11.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .hr { stroke: var(--line); stroke-width: 1; }
+.badge { font: 500 10px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.b-pl { fill: var(--accent); } .b-kern { fill: var(--kern); } .b-warn { fill: var(--warn); }
+.b-muted { fill: var(--muted); }
+.e { fill: none; stroke-width: 1.4; }
+.e.acl { stroke: var(--fg); }
+.e.muted { stroke: var(--muted); }
+.e.incl { stroke: var(--accent); stroke-dasharray: 6 4; }
+.e.kern { stroke: var(--kern); stroke-dasharray: 6 4; stroke-width: 1.6; }
+.e.eq { stroke: var(--accent); stroke-width: 2.2; }
+.e.warn { stroke: var(--warn); stroke-width: 1.8; }
+.e.ghost { stroke: var(--warn); stroke-dasharray: 3 3; }
+.e.uniq { stroke: var(--fg); stroke-dasharray: 3 3; }
+.e.map { stroke: var(--accent); stroke-dasharray: 2 3; stroke-width: 1.3; }
+.e.glued { stroke: var(--kern); stroke-width: 1.6; }
+.mk-acl, .mk-uniq { fill: var(--fg); } .mk-muted { fill: var(--muted); }
+.mk-incl, .mk-eq, .mk-map { fill: var(--accent); } .mk-kern, .mk-glued { fill: var(--kern); }
+.mk-warn, .mk-ghost { fill: var(--warn); }
+.lbg { fill: var(--surface); }
+.lb { font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.c-acl, .c-muted, .c-uniq { fill: var(--muted); } .c-fg { fill: var(--fg); }
+.c-incl, .c-eq, .c-map, .c-pl { fill: var(--accent); }
+.c-kern, .c-glued { fill: var(--kern); } .c-warn, .c-ghost { fill: var(--warn); }
+.rg { fill: var(--region); stroke: var(--line); }
+.rg.pl { fill: var(--accentfill); stroke: var(--accent); stroke-dasharray: 3 3; }
+.rg.kern { fill: var(--kernfill); stroke: var(--kern); stroke-dasharray: 3 3; }
+.rg.warn { fill: var(--warnfill); stroke: var(--warn); stroke-dasharray: 3 3; }
+.rg.plain { fill: none; stroke: var(--line); }
+.rgl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--muted); letter-spacing: 0.04em; }
+.rgl.pl { fill: var(--accent); } .rgl.kern { fill: var(--kern); } .rgl.warn { fill: var(--warn); }
+.hull { fill: none; stroke: var(--fg); stroke-dasharray: 2 3; stroke-width: 1; }
+.hl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.note { font: 400 11px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; fill: var(--muted); }
+.note.fg { fill: var(--fg); }
+.mono { font: 400 11px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.mono.m { fill: var(--muted); } .mono.acc { fill: var(--accent); } .mono.warn { fill: var(--warn); }
+.mono.kern { fill: var(--kern); }
+.br { fill: none; stroke: var(--muted); stroke-width: 1; }
+.br.acc { stroke: var(--accent); }
+</style><defs><marker id="open-acl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-incl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-incl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-kern" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-kern" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-eq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-eq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-warn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-warn" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-ghost" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ghost" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-uniq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-uniq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-map" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-map" d="M0,0 L10,5 L0,10 z"/></marker><marker id="open-glued" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-glued" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="bgr" width="940" height="440"/><rect class="rg " x="20" y="24" width="900" height="200" rx="8"/><text class="rgl " x="30" y="41">OPEN SCHEMAS</text><rect class="rg " x="20" y="244" width="540" height="170" rx="8"/><text class="rgl " x="30" y="261">MACHINES</text><rect class="rg " x="580" y="244" width="340" height="170" rx="8"/><text class="rgl " x="590" y="261">EVENTS</text><g class="n kern"><rect x="40.0" y="63.0" width="110" height="34" rx="5"/><text class="t" x="95.0" y="84.5" text-anchor="middle">Customers</text><text class="badge b-kern" x="42.0" y="58.0">I</text></g><g class="n "><rect x="200.0" y="63.0" width="110" height="34" rx="5"/><text class="t" x="255.0" y="84.5" text-anchor="middle">Orders</text></g><g class="n kern"><rect x="360.0" y="63.0" width="110" height="34" rx="5"/><text class="t" x="415.0" y="84.5" text-anchor="middle">Customers</text><text class="badge b-kern" x="362.0" y="58.0">M</text></g><g class="n "><rect x="520.0" y="63.0" width="110" height="34" rx="5"/><text class="t" x="575.0" y="84.5" text-anchor="middle">Shipping</text></g><g class="n kern"><rect x="680.0" y="63.0" width="110" height="34" rx="5"/><text class="t" x="735.0" y="84.5" text-anchor="middle">Addresses</text><text class="badge b-kern" x="682.0" y="58.0">O</text></g><line class="e kern" x1="152.5" y1="80.0" x2="196.0" y2="80.0" marker-end="url(#open-kern)"/><line class="e kern" x1="357.5" y1="80.0" x2="314.0" y2="80.0" marker-end="url(#open-kern)"/><line class="e kern" x1="472.5" y1="80.0" x2="516.0" y2="80.0" marker-end="url(#open-kern)"/><line class="e kern" x1="677.5" y1="80.0" x2="634.0" y2="80.0" marker-end="url(#open-kern)"/><g class="n glued"><rect x="330.0" y="163.0" width="170" height="34" rx="5"/><text class="t" x="415.0" y="184.5" text-anchor="middle">Orders ⊔ Shipping</text></g><line class="e glued" x1="286.2" y1="99.5" x2="381.4" y2="159.0" marker-end="url(#open-glued)"/><line class="e glued" x1="543.8" y1="99.5" x2="448.6" y2="159.0" marker-end="url(#open-glued)"/><g class="n "><rect x="115.0" y="290.0" width="130" height="40" rx="5"/><text class="t" x="180.0" y="307.0" text-anchor="middle">Orders</text><text class="s" x="180.0" y="322.0" text-anchor="middle">state: Orders</text></g><g class="n "><rect x="355.0" y="290.0" width="130" height="40" rx="5"/><text class="t" x="420.0" y="307.0" text-anchor="middle">Shipping</text><text class="s" x="420.0" y="322.0" text-anchor="middle">state: Shipping</text></g><line class="e acl" x1="36.0" y1="310.0" x2="111.0" y2="310.0" marker-end="url(#open-acl)"/><line class="e acl" x1="247.5" y1="310.0" x2="351.0" y2="310.0" marker-end="url(#open-acl)"/><line class="e acl" x1="487.5" y1="310.0" x2="545.0" y2="310.0" marker-end="url(#open-acl)"/><text class="mono" x="36.0" y="160.0" text-anchor="start">X : I → M</text><text class="mono" x="36.0" y="176.0" text-anchor="start">Y : M → O</text><text class="mono acc" x="36.0" y="192.0" text-anchor="start">X ∘ Y : I → O</text><text class="mono" x="620.0" y="160.0" text-anchor="start">the pushout in Cat over M</text><text class="mono" x="620.0" y="176.0" text-anchor="start">(X ∘ Y) ∘ Z ≅ X ∘ (Y ∘ Z),</text><text class="mono" x="620.0" y="192.0" text-anchor="start">commuting with the legs</text><text class="lb c-acl" x="36.0" y="296.0" text-anchor="start">Customers</text><rect class="lbg" x="266.9" y="291.0" width="64.7" height="13" rx="2"/><text class="lb c-acl" x="299.2" y="301.5" text-anchor="middle">Customers</text><text class="lb c-acl" x="300.0" y="330.0" text-anchor="middle">a step late</text><text class="lb c-acl" x="545.0" y="298.0" text-anchor="end">Addresses</text><text class="mono" x="36.0" y="370.0" text-anchor="start">serial wiring, on the box of X ∘ Y</text><text class="mono acc" x="36.0" y="388.0" text-anchor="start">Shipping shows no address, none, then Bern</text><text class="mono m" x="36.0" y="404.0" text-anchor="start">a split glued state shows the same on O, up to ≅</text><text class="mono" x="596.0" y="290.0" text-anchor="start">Payments calls OrdersPL</text><text class="mono" x="596.0" y="306.0" text-anchor="start">events of OrdersPL, Payments</text><text class="mono acc" x="596.0" y="322.0" text-anchor="start">through toDomains: Orders, Payments</text><text class="mono warn" x="596.0" y="354.0" text-anchor="start">no route OrdersPL → Customers,</text><text class="mono warn" x="596.0" y="370.0" text-anchor="start">both in the Orders domain</text><text class="mono warn" x="596.0" y="386.0" text-anchor="start">no route Payments → Catalog</text></svg>
