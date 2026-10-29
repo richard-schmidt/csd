@@ -753,6 +753,27 @@ published languages do. Its legs are the functors of the two inclusions.
   isomorphic. The identity laws are the same argument with a square whose two
   sides are identities (`compIdIso`, `idCompIso`).
 
+### Qualified names
+
+Two open schemas compose only when they share no name outside the shared
+interface. Two ordering contexts that share customers clash on every other
+name. `DDD/Rename.lean` qualifies the names of a schema that its interfaces do
+not have: `Schema.qualify` prefixes them, so that `Order` becomes `Store.Order`
+and `customer` becomes `Store.customer`, and the equations follow
+(`Store.billTo = Store.customer.address`).
+
+- Translations both ways whose functors compose to the identity both ways give
+  an isomorphism of schema categories (`Translation.catIso`); the composites
+  are checked with `checkSameFunctor`.
+- `OpenSchema.Iso`: such translations between the schemas of two open schemas
+  with the same interfaces, commuting with the legs. `OpenSchema.qualify` and
+  `qualifyIso` give the qualified open schema and its isomorphism with the
+  original, when `checkQualify` passes: well-formedness, the inclusions and
+  roots of the interfaces, validity both ways, the composites and the legs.
+- In `Examples/Open.lean`, the second ordering context qualified by `Store` is
+  isomorphic to the first and composes with it; the composite has `Order` and
+  `Store.Order`.
+
 ### Machines
 
 A machine on an open schema `X : I → O` (`OpenMachine`) is a machine of
@@ -778,10 +799,15 @@ its state to `O`.
   the glued state shows (`comp_view_split`). Both rest on restriction along two
   inclusions being restriction along the composite inclusion, up to isomorphism
   (`restrictRestrictIso`).
+- A finite state has many representations: lists in any order, entries for
+  names outside the schema. Its normal form is its restriction along the
+  identity (`CheckedState.normalize`), with an isomorphic attributed state
+  (`normalizeIso`).
 - The conformist machine takes the data of its input interface into its state,
-  and refuses an update whose result fails the check (`conformist`). The check
-  holds the equations and the references of the schema, so a refused update is
-  one that would break an invariant.
+  keeps it in normal form, and refuses an update whose result fails the check
+  (`conformist`). The check holds the equations and the references of the
+  schema, so a refused update is one that would break an invariant of the
+  context.
 
 In `Examples/Open.lean`, Orders (`orders : Customers → Customers`) and Shipping
 (`shipping : Customers → Addresses`) compose into the gluing of section 8, and
@@ -838,6 +864,7 @@ are outside the library.*
 | `Glue.lean` | `glue`, `Gluable`, `Gluing`, the bridge theorem, `checkFullyFaithful_sound` |
 | `Open.lean` | `OpenSchema`, `Composable`, `comp`, `isPushout_comp`, `assocIso`, `compIdIso`, `idCompIso` |
 | `OpenMachine.lean` | `CheckedState`, `OpenMachine`, `OpenMachine.comp`, `split_agree`, `comp_view_split`, `conformist`, `serialAssoc` |
+| `Rename.lean` | `Schema.qualify`, `Translation.catIso`, `OpenSchema.Iso`, `checkQualify`, `qualifyIso` |
 | `Events.lean` | `CSvc`, `emit`, `callAlong`, `Projection`, `toSvc` |
 | `ContextMap.lean` | `ContextMap`, `J`, `diagram`, `coherent_of_check`, `Lax`, `nonInterference`, `Publishes`, `kernelGluing`, `isPushout_kernel` |
 | `Union.lean` | `Schema.Cover`, `Agree`, `Cover.desc` with `leg_desc` and `desc_unique`, `glueAll`, `pairwise_of_checkSpanning` |
@@ -855,7 +882,7 @@ are outside the library.*
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, the failing kernel |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
 | `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
-| `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, machines in series, events of the example map |
+| `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, a qualified second ordering context, machines in series, events of the example map |
 | `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along OrdersPL → Orders or CatalogPL → Orders |
 | `Examples/Exchange.lean` | the example map as a workspace document, round trips, the `createdAt` clash |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
@@ -881,7 +908,13 @@ are outside the library.*
   `checkFullyFaithful`, which needs acyclic schemas and is sufficient only, or
   refuted from a missing path; no check decides it.
 - Open schemas compose only when they share the names of the interface and no
-  other; there is no renaming before composition.
+  other. Qualification renames the others; its checks run per use
+  (`checkQualify`), and the Julia side qualifies clashing generators but not
+  entity types.
+- A machine step changes a whole context, and the check of the context schema
+  must pass after it: rules across aggregates are transactional, which is
+  stricter than DDD. Aggregates as the unit of behaviour, with the rules across
+  them kept between steps, are next step 6.
 - A machine on an open schema has a finite state. Serial composition delays the
   downstream machine by one step, so machines have no identity for it and are
   associative up to relabelling only. The composite's state is a pair of

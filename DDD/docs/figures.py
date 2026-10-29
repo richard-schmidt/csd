@@ -749,7 +749,7 @@ def open_systems():
 # 16. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1060, 490,
+    f = Fig("modules", 1060, 546,
             "Imports between the modules of the DDD library: a chain from value types to "
             "certificates, context maps, states and open systems beside it, and the examples on "
             "top.")
@@ -778,60 +778,67 @@ def modules():
     f.node("Events", 425, 192, "Events", w=92, h=30)
     f.node("Open", 640, 192, "Open", w=80, h=30)
     f.node("OpenMachine", 752, 192, "OpenMachine", w=104, h=30)
+    f.node("Rename", 640, 250, "Rename", w=84, h=30)
     f.poly([(530, 158), (425, 158), (425, 173)], "acl")
     f.arrow("Union", "Open", "", "acl")
     f.arrow("Open", "OpenMachine", "", "acl")
-    f.region(20, 235, 1020, 220, "EXAMPLES")
-    f.raw('<rect class="rg plain" x="38" y="266" width="358" height="44" rx="6"/>', "back")
+    f.arrow("Open", "Rename", "", "acl")
+    dy = 50
+    f.region(20, 235 + dy, 1020, 220, "EXAMPLES")
+    f.raw(f'<rect class="rg plain" x="38" y="{266 + dy}" width="358" height="44" rx="6"/>', "back")
     for name, x in [("Catalog", 82), ("Orders", 172), ("Payments", 262), ("Shipping", 352)]:
-        f.node("x" + name, x, 288, name, w=82, h=30)
-    f.poly([(368, 72), (368, 264)], "muted")
-    f.node("xIntegration", 470, 288, "Integration", "pl", w=110, h=30)
-    f.node("xRoutes", 600, 288, "Routes", w=90, h=30)
-    f.node("xGluing", 470, 365, "Gluing", "kern", w=100, h=30)
-    f.node("xExchange", 885, 365, "Exchange", w=100, h=30)
-    f.node("xMerge", 600, 415, "Merge", "kern", w=100, h=30)
-    f.node("xOpen", 752, 415, "Open", "kern", w=90, h=30)
-    f.node("xShowcase", 270, 365, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
-    f.node("xValues", 82, 365, "Values", w=82, h=30)
-    f.poly([(397, 288), (413, 288)], "muted")
+        f.node("x" + name, x, 288 + dy, name, w=82, h=30)
+    f.poly([(368, 72), (368, 264 + dy)], "muted")
+    f.node("xIntegration", 470, 288 + dy, "Integration", "pl", w=110, h=30)
+    f.node("xRoutes", 600, 288 + dy, "Routes", w=90, h=30)
+    f.node("xGluing", 470, 365 + dy, "Gluing", "kern", w=100, h=30)
+    f.node("xExchange", 885, 365 + dy, "Exchange", w=100, h=30)
+    f.node("xMerge", 600, 415 + dy, "Merge", "kern", w=100, h=30)
+    f.node("xOpen", 752, 415 + dy, "Open", "kern", w=90, h=30)
+    f.node("xShowcase", 270, 365 + dy, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
+    f.node("xValues", 82, 365 + dy, "Values", w=82, h=30)
+    f.poly([(397, 288 + dy), (413, 288 + dy)], "muted")
     f.arrow("ContextMap", "xIntegration", "", "muted")
     f.arrow("ContextMap", "xRoutes", "", "muted")
     f.arrow("xIntegration", "xGluing", "", "muted")
     f.arrow("xShowcase", "xIntegration", "", "muted")
-    f.poly([(685, 72), (685, 357), (523, 357)], "muted")
-    f.poly([(82, 381), (82, 398), (470, 398), (470, 382)], "muted")
-    f.poly([(521, 373), (833, 373)], "muted")
-    f.poly([(885, 72), (885, 84), (1045, 84), (1045, 365), (939, 365)], "muted")
-    f.node("xSigma", 978, 288, "Sigma", "pl", w=80, h=30)
-    f.poly([(978, 141), (978, 271)], "muted")
-    f.poly([(600, 304), (600, 320), (978, 320), (978, 307)], "muted")
-    f.poly([(470, 304), (470, 320), (600, 320), (600, 398)], "muted")
-    f.poly([(790, 125), (810, 125), (810, 442), (600, 442), (600, 433)], "muted")
-    f.poly([(752, 208), (752, 398)], "muted")
+    f.poly([(685, 72), (685, 357 + dy), (523, 357 + dy)], "muted")
+    f.poly([(82, 381 + dy), (82, 398 + dy), (470, 398 + dy), (470, 382 + dy)], "muted")
+    f.poly([(521, 373 + dy), (833, 373 + dy)], "muted")
+    f.poly([(885, 72), (885, 84), (1045, 84), (1045, 365 + dy), (939, 365 + dy)], "muted")
+    f.node("xSigma", 978, 288 + dy, "Sigma", "pl", w=80, h=30)
+    f.poly([(978, 141), (978, 271 + dy)], "muted")
+    f.poly([(600, 304 + dy), (600, 320 + dy), (978, 320 + dy), (978, 307 + dy)], "muted")
+    f.poly([(470, 304 + dy), (470, 320 + dy), (600, 320 + dy), (600, 398 + dy)], "muted")
+    f.poly([(790, 125), (810, 125), (810, 442 + dy), (600, 442 + dy), (600, 433 + dy)], "muted")
+    f.poly([(752, 208), (752, 398 + dy)], "muted")
     f.arrow("xMerge", "xOpen", "", "muted")
-    f.text(1040, 482, "arrows point from a module to the modules that import it; Certificate and "
-           "Union also import Compose, Open imports Compose and Glue, OpenMachine imports Data "
-           "and Production.Wiring", "note", "end")
+    f.text(1040, 518, "arrows point from a module to the modules that import it; Certificate "
+           "and Union also import Compose, Open imports Compose and Glue,", "note", "end")
+    f.text(1040, 534, "OpenMachine imports Data and Production.Wiring, the example Open imports "
+           "Rename", "note", "end")
     return f
 
 
 # Next steps, in DDD/README.md ---------------------------------------------------
 
 def next_steps():
-    f = Fig("next-steps", 940, 300,
+    f = Fig("next-steps", 1040, 300,
             "The next steps in order, left to right, with the dependencies between them.")
     f.text(24, 28, "order of work", "rgl")
-    f.poly([(120, 23), (910, 23)], "muted")
+    f.poly([(120, 23), (1010, 23)], "muted")
     f.node("s1", 85, 120, "1. Coherence by check", w=152, sub="Translation.comp", h=44)
-    f.node("s2", 275, 120, "2. Phase 4", "pl", w=150, sub="JSON, certificates", h=44)
-    f.node("s3", 465, 120, "3. Several inclusions", w=150, sub="n-ary gluing", h=44)
-    f.node("s4", 655, 120, "4. Attributed states", w=150, sub="limits, colimits, Σ", h=44)
-    f.node("s5", 845, 120, "5. Phase 5", "kern", w=150, sub="open systems", h=44)
+    f.node("s2", 255, 120, "2. Phase 4", "pl", w=150, sub="JSON, certificates", h=44)
+    f.node("s3", 425, 120, "3. Several inclusions", w=150, sub="n-ary gluing", h=44)
+    f.node("s4", 595, 120, "4. Attributed states", w=150, sub="limits, colimits, Σ", h=44)
+    f.node("s5", 765, 120, "5. Phase 5", "kern", w=150, sub="open systems", h=44)
+    f.node("s6", 945, 120, "6. Aggregates", w=150, sub="aggregate machines", h=44)
     f.arrow("s1", "s3", "composite translations", "acl", bend=-26, lpos=0.5, lside=-1,
             loff=10)
-    f.arrow("s3", "s5", "gluing along interfaces", "acl", bend=26, lpos=0.5, lside=1, loff=10)
-    f.arrow("s4", "s5", "states", "acl", lside=-1, loff=12)
+    f.arrow("s2", "s5", "finite states", "acl", bend=34, lpos=0.5, lside=1, loff=10)
+    f.arrow("s4", "s5", "states", "acl", lside=1, loff=34)
+    f.arrow("s5", "s6", "machines", "acl", lside=1, loff=34)
+    f.arrow("s3", "s6", "covering theorem", "acl", bend=-34, lpos=0.5, lside=-1, loff=10)
     f.node("c1", 300, 250, "names as indices", "muted", w=190,
            sub="if checks exceed CI time", h=40)
     f.node("c2", 580, 250, "rewriting certificates", "muted", w=260,

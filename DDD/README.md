@@ -238,6 +238,7 @@ DDD/
   StateLimits.lean   limits and colimits of attributed states
   StateSigma.lean    Σ on attributed states, the condition for it
   Open.lean          open schemas, their composition and its laws
+  Rename.lean        qualified names, isomorphisms of open schemas
   OpenMachine.lean   machines on open schemas, serial wiring
   Events.lean        services and events along the routes of J
   Data.lean          finite states, homomorphisms and restriction as data
@@ -414,6 +415,19 @@ isomorphism of schema categories; machines of `Production` on them compose by
 serial wiring; events follow the routes of `J` and project to the `Svc` events
 of the Showcase map (`Examples/Open.lean`).
 
+Revision after phase 5, in order:
+
+1. `OpenMachine.lean`: the normal form of a checked state, its restriction along
+   the identity (`CheckedState.normalize`, `normalizeIso`); the conformist
+   machine keeps its state in normal form. Done.
+2. `Rename.lean`: qualified names (`Schema.qualify`), isomorphisms of open
+   schemas (`OpenSchema.Iso`), and the qualification of an open schema with its
+   isomorphism to the original (`OpenSchema.qualify`, `qualifyIso`), given
+   `checkQualify`. Two ordering contexts that share customers compose after the
+   second is qualified (`Examples/Open.lean`). Done.
+3. Aggregates as the unit of behaviour: option B decided, planned as next
+   step 6.
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -578,6 +592,30 @@ Done. Open schemas, machines on them and events along `J`
    map through `toDomains` (`invoice_domains`); no route from OrdersPL to
    Customers, and none from Payments to Catalog.
 
+### 6. Aggregates as the unit of behaviour
+
+Option B, decided after phase 5 (see Decisions): the aggregate is the unit of
+consistency of a step, and the rules across aggregates are found from the schema
+and kept between steps. Keeping the context as the transaction (A) and declaring
+the rules across aggregates in the schema (C) were set aside.
+
+- Aggregate schemas: for an aggregate of a schema, the sub-schema of its root and
+  members with their generators, and the roots it refers to as entity types
+  without generators (identities); the equations of the schema within it. The
+  equations across aggregates, found from the schema (`crossAggregateEqns`). In
+  the examples all three equations cross aggregates.
+- Consistency: a family of states of the aggregate schemas that agree on the
+  identities and satisfy the equations across aggregates glues to a state of
+  the context schema, and every state of the context schema restricts to such a
+  family: the covering theorem of item 3 and data gluing, for states.
+- Behaviour: a machine per aggregate, whose step changes one aggregate and is
+  checked against its own schema; the context as the aggregate machines side by
+  side, with the rules across aggregates reported between steps instead of
+  refused.
+- Done when: in `Examples/Open.lean`, removing a customer who has an order is a
+  step of the Customer aggregate that passes, and the context reports the open
+  reference of the order.
+
 ### Conditional
 
 - Names as indices instead of strings in the checkers, with a lemma relating
@@ -589,8 +627,9 @@ Done. Open schemas, machines on them and events along `J`
   phase 4.
 
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
-the gluing along a kernel and the finite states of phase 4. Items 1 to 5 are
-done; the conditional items remain.
+the gluing along a kernel and the finite states of phase 4; item 6 uses the
+covering theorem of item 3 and the machines of phase 5. Items 1 to 5 are done;
+item 6 comes next.
 
 ## Decisions
 
@@ -701,3 +740,23 @@ Phase 5:
   the states.
 - Events: a context-level service type in `DDD`, with a projection to the
   domain-level `Svc` of the Showcase module, which stays unchanged.
+
+Revision after phase 5:
+
+- Normal form: a finite state is normalized by restriction along the identity,
+  which lists the names of the schema in its order; machines that keep their
+  state in normal form compare states as data.
+- Qualified names: entity types and generators outside the interfaces get the
+  prefix `p.`, as the Julia side does for clashing generators; the Julia side
+  still reports clashing entity types instead of qualifying them. The checks
+  of a qualification (well-formedness, validity both ways, composites, legs)
+  run per use with `decide` (`checkQualify`); no general lemma shows that
+  qualification is always an isomorphism.
+- Aggregates (option B of three): a step of a machine changes one aggregate and
+  is checked against the schema of that aggregate; the rules across aggregates
+  are found from the schema and reported between steps, for policies to
+  restore. The context as the transaction (A) is stricter than DDD and makes
+  every rule between aggregates transactional. Rules declared in the schema (C)
+  would change the schema, the exchange format and the Julia side, and move all
+  three equations of the examples, which all cross aggregates; it can follow if
+  declared policies prove useful.
