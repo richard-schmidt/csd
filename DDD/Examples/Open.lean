@@ -1,4 +1,5 @@
 import DDD.OpenMachine
+import DDD.AggregateMachine
 import DDD.Rename
 import DDD.Events
 import DDD.Examples.Merge
@@ -35,6 +36,16 @@ they receive into their state. Wired in series, Shipping receives the
 customers of Orders one step late (`line_addresses`); the states stay in normal
 form (`line_normal`). An update that would leave an order without its customer
 fails the check and is refused (`refused`).
+
+Aggregates: Orders has four aggregates (`orders_aggregates`), and both of its
+equations cross them (`orders_cross`); the equation of Payments is internal to
+the payment aggregate (`payments_internal`). A state of Orders is a compatible
+family of aggregate states that satisfies the two equations (`contextEquiv`).
+With a machine per aggregate, removing Ada is a step of the customer aggregate
+that passes its check (`remove_ada`); the context then reports the open
+reference of her order and the equation `billTo = customer.address` at that
+order (`remove_ada_report`). A step that breaks a rule of its own aggregate is
+refused (`bad_address_refused`).
 
 Events: the projection `toDomains` of the example map sends the routes of `J` to
 arrivals of events (`projection`). Payments invoices an order published by
@@ -253,6 +264,98 @@ refused, and the state stays. -/
 theorem refused : (OpenMachine.conformist orders).update orderOfAdaState noCustomers =
     orderOfAdaState :=
   OpenMachine.conformist_update_of_not_check _ _ _ (by decide)
+
+/-! ## Aggregates -/
+
+/-- The aggregates of Orders: customers, addresses, orders with their lines, and
+products. -/
+theorem orders_aggregates : Orders.schema.allAggregates =
+    [⟨"Customer", []⟩, ⟨"Address", []⟩, ⟨"Order", [⟨"OrderLine", "order"⟩]⟩,
+      ⟨"Product", []⟩] := by
+  decide
+
+/-- The aggregate schema of an order: the order and its lines, and the customers,
+addresses and products it refers to, as identities. -/
+theorem order_aggregate_entities :
+    (Orders.schema.aggregateSchema ⟨"Order", [⟨"OrderLine", "order"⟩]⟩).entities =
+      ["Order", "OrderLine", "Customer", "Address", "Product"] := by
+  decide
+
+/-- Both equations of Orders cross aggregates: `customer.address` and `product.sku`
+leave the order aggregate through an identity. -/
+theorem orders_cross : Orders.schema.crossAggregateEqns = Orders.schema.eqns := by decide
+
+/-- The equation of Payments is internal to the payment aggregate: a refund and its
+payment both belong to it, and both sides end at the identity of the invoice. -/
+theorem payments_internal : Payments.schema.crossAggregateEqns = [] := by decide
+
+theorem payment_aggregate_eqns :
+    (Payments.schema.aggregateSchema ⟨"Payment", [⟨"Refund", "payment"⟩]⟩).eqns =
+      Payments.schema.eqns := by
+  decide
+
+/-- A state of Orders is a compatible family of states of its four aggregate
+schemas whose glued state satisfies the two equations across aggregates. -/
+noncomputable example :
+    Orders.schema.State K ≃ { X : { X : ∀ A : Orders.schema.Aggs,
+        (Orders.schema.aggregateSchema A.1).State K // Compatible X } //
+      ∀ q ∈ Orders.schema.crossAggregateEqns,
+        Satisfies ((familyEquiv Orders.wellFormed (by decide)).symm X).F q } :=
+  contextEquiv Orders.wellFormed (by decide)
+
+/-- The customer aggregate. -/
+def customerAgg : Orders.schema.Aggs := ⟨⟨"Customer", []⟩, by decide⟩
+
+/-- A machine per aggregate of Orders: a command proposes a new state of the
+aggregate. -/
+def ordersAggregates (A : Orders.schema.Aggs) :
+    Production.Machine ⟨FinState K, CheckedState K (Orders.schema.aggregateSchema A.1)⟩ :=
+  aggregateMachine K Orders.wellFormed A fun _ m => m
+
+/-- Orders as its aggregate machines side by side. -/
+def ordersContext :
+    Production.Machine ⟨Σ _ : Orders.schema.Aggs, FinState K, List Violation⟩ :=
+  contextMachine ordersAggregates
+
+/-- Ada with her order, as a state of each aggregate. -/
+def adaParts : ∀ A : Orders.schema.Aggs, CheckedState K (Orders.schema.aggregateSchema A.1) :=
+  orderOfAdaState.parts Orders.wellFormed
+
+/-- The customer aggregate with Ada removed. -/
+def noAda : FinState K where
+  sizes := [("Customer", 0), ("Address", 1)]
+  refs := [(("Customer", "address"), [])]
+  attrs := [(("Customer", "name"), [])]
+
+theorem noAda_check : noAda.check (Orders.schema.aggregateSchema customerAgg.1) = true := by
+  decide
+
+/-- Removing Ada is a step of the customer aggregate that passes its check. -/
+theorem remove_ada : (ordersAggregates customerAgg).lens.update (adaParts customerAgg) noAda =
+    CheckedState.normalize (aggregateSchema_wellFormed Orders.wellFormed customerAgg.2)
+      ⟨noAda, noAda_check⟩ :=
+  aggregateMachine_update_of_check _ _ _ _ _ noAda_check
+
+/-- The context reports nothing before the step. After it, the context reports the
+open reference of Ada's order, and the equation `billTo = customer.address`, which
+no longer holds at that order. The same removal through the interface of Orders
+is refused (`refused`). -/
+theorem remove_ada_report : ordersContext.run adaParts [⟨customerAgg, noAda⟩] =
+    [[], [.dangling "Order" "customer" 0 0,
+      .eqn ⟨"Order", ["billTo"], ["customer", "address"]⟩ 0]] := by
+  decide
+
+/-- Ada's address set to an address the customer aggregate does not hold. -/
+def badAddress : FinState K where
+  sizes := [("Customer", 1), ("Address", 1)]
+  refs := [(("Customer", "address"), [3])]
+  attrs := [(("Customer", "name"), [⟨.string, "Ada"⟩])]
+
+/-- A step that breaks a rule of its own aggregate is refused. -/
+theorem bad_address_refused :
+    (ordersAggregates customerAgg).lens.update (adaParts customerAgg) badAddress =
+      adaParts customerAgg :=
+  aggregateMachine_update_of_not_check _ _ _ _ _ (by decide)
 
 /-! ## Events -/
 
