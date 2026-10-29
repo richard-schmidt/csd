@@ -62,16 +62,37 @@ for c in map["contexts"]
   end
 end
 
-# Scenarios outside the map.
+# Scenarios outside the map. Names that the two sides share outside the kernel are
+# qualified with the context names before gluing.
 for s in get(ws, "scenarios", [])
   name = String(s["name"])
   K, L, R = read_schema(s["kernel"]), read_schema(s["left"]), read_schema(s["right"])
-  G = glue(K, L, R)
-  for (suffix, S) in (("kernel", K), ("left", L), ("right", R), ("glued", G))
-    add_schema!(cert, "$name/$suffix", S)
+  add_schema!(cert, "$name/kernel", K)
+  add_schema!(cert, "$name/left", L)
+  add_schema!(cert, "$name/right", R)
+  left, right = "$name/left", "$name/right"
+  if haskey(s, "qualify")
+    (lc, rc) = String.(s["qualify"])
+    cl = clashes(K, L, R)
+    L, TL = qualify(L, lc, cl)
+    R, TR = qualify(R, rc, cl)
+    add_schema!(cert, "$left.qualified", L)
+    add_schema!(cert, "$right.qualified", R)
+    add_claim!(cert, "translation"; source=left, target="$left.qualified",
+      translation=write_translation(TL))
+    add_claim!(cert, "translation"; source=right, target="$right.qualified",
+      translation=write_translation(TR))
+    left, right = "$left.qualified", "$right.qualified"
   end
-  add_claim!(cert, "gluing"; kernel="$name/kernel", left="$name/left", right="$name/right",
-    glued="$name/glued", fullyFaithful=Bool.(s["fullyFaithful"]))
+  G = glue(K, L, R)
+  add_schema!(cert, "$name/glued", G)
+  if haskey(s, "fullyFaithful")
+    add_claim!(cert, "gluing"; kernel="$name/kernel", left=left, right=right,
+      glued="$name/glued", fullyFaithful=Bool.(s["fullyFaithful"]))
+  else
+    add_claim!(cert, "gluing"; kernel="$name/kernel", left=left, right=right,
+      glued="$name/glued")
+  end
 end
 
 # ---------------------------------------------------------------------------

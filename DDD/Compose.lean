@@ -25,28 +25,6 @@ namespace Schema
 
 variable {S : Schema}
 
-/-- A generator out of `o` is a reference or an attribute of `S` out of an entity
-type. -/
-theorem exists_gen_of_step? {o o' : Ob} {n : String} (h : S.step? o n = some o') :
-    ∃ e, o = .entity e ∧
-      ((∃ r ∈ S.refs, r.src = e ∧ r.name = n) ∨ (∃ a ∈ S.attrs, a.src = e ∧ a.name = n)) := by
-  cases o with
-  | value => simp [step?] at h
-  | entity e =>
-    refine ⟨e, rfl, ?_⟩
-    simp only [step?] at h
-    split at h
-    · rename_i r hr
-      unfold ref? at hr
-      have hp := List.find?_some hr
-      simp only [Bool.and_eq_true, beq_iff_eq] at hp
-      exact Or.inl ⟨r, List.mem_of_find?_eq_some hr, hp⟩
-    · obtain ⟨a, ha, -⟩ := Option.map_eq_some_iff.mp h
-      unfold attr? at ha
-      have hp := List.find?_some ha
-      simp only [Bool.and_eq_true, beq_iff_eq] at hp
-      exact Or.inr ⟨a, List.mem_of_find?_eq_some ha, hp⟩
-
 /-- The object map of `Schema.obj` is injective. -/
 theorem obj_injective {a b : S.Obj} (h : S.obj a = S.obj b) : a = b := by
   have h' : (CategoryTheory.Quotient.functor S.rel).obj a =

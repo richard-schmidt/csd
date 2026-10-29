@@ -1,4 +1,3 @@
-import DDD.Compose
 import DDD.States
 
 /-!

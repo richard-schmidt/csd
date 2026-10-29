@@ -10,7 +10,9 @@ import DDD.Examples.Gluing
 non-interference check for the Customers kernel (both legs full and faithful,
 `Gluing.orders_fullyFaithful` and `Gluing.shipping_fullyFaithful`), and the
 failing kernel of `Gluing.lean` as a scenario (the leg from Orders fails the
-check, `Gluing.delivery_check`). `cli/CsdExport.lean` writes it to
+check, `Gluing.delivery_check`), and a scenario whose two sides share a name
+outside the kernel (`created_clash`), which the Julia side qualifies with the
+context names before gluing. `cli/CsdExport.lean` writes it to
 `julia/data/workspace.json`.
 
 The round trips through JSON text are tested with `#guard`: schemas,
@@ -51,6 +53,20 @@ def map : MapDoc where
   contexts := contexts.map fun c => (contextName c, schema c, kernel c)
   arrows := arrows
 
+/-- Orders, with the date each customer was created. -/
+def ordersCreated : Schema :=
+  { Orders.schema with attrs := Orders.schema.attrs ++ [⟨"createdAt", "Customer", .date⟩] }
+
+/-- Shipping, with the date each customer was created. -/
+def shippingCreated : Schema :=
+  { Shipping.schema with attrs := Shipping.schema.attrs ++ [⟨"createdAt", "Customer", .date⟩] }
+
+/-- The two share `Customer.createdAt` outside the kernel, so they cannot be glued
+as they are. -/
+theorem created_clash : Schema.gluingClashes customers ordersCreated shippingCreated =
+    ["Customer.createdAt"] := by
+  decide
+
 /-- The document for the Julia side. -/
 def workspace : Json := Json.mkObj [
   ("format", .str formatVersion), ("kind", .str "workspace"),
@@ -59,7 +75,10 @@ def workspace : Json := Json.mkObj [
     ("fullyFaithful", toJson [true, true])]]),
   ("scenarios", Json.arr #[Json.mkObj [("name", .str "deliveryAddress"),
     ("kernel", Gluing.kernel₂.toJson), ("left", Gluing.orders₂.toJson),
-    ("right", Gluing.shipping₂.toJson), ("fullyFaithful", toJson [false, true])]])]
+    ("right", Gluing.shipping₂.toJson), ("fullyFaithful", toJson [false, true])],
+    Json.mkObj [("name", .str "createdAt"), ("kernel", customers.toJson),
+    ("left", ordersCreated.toJson), ("right", shippingCreated.toJson),
+    ("qualify", toJson ["Orders", "Shipping"])]])]
 
 /-! ## Round trips -/
 

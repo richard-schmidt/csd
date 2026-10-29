@@ -2418,6 +2418,798 @@
                     "Carrier"
                 ]
             }
+        },
+        {
+            "name": "createdAt/kernel",
+            "schema": {
+                "aggregates": [
+                    {
+                        "root": "Customer",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Address",
+                        "members": [
+                        ]
+                    }
+                ],
+                "valueObjects": [
+                    "Address"
+                ],
+                "references": [
+                    {
+                        "name": "Customer.address",
+                        "target": "Address"
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "Customer.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.street",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.city",
+                        "type": "string"
+                    }
+                ],
+                "equations": [
+                ],
+                "entities": [
+                    "Customer",
+                    "Address"
+                ]
+            }
+        },
+        {
+            "name": "createdAt/left",
+            "schema": {
+                "aggregates": [
+                    {
+                        "root": "Customer",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Address",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Order",
+                        "members": [
+                            {
+                                "owner": "order",
+                                "entity": "OrderLine"
+                            }
+                        ]
+                    },
+                    {
+                        "root": "Product",
+                        "members": [
+                        ]
+                    }
+                ],
+                "valueObjects": [
+                    "Address"
+                ],
+                "references": [
+                    {
+                        "name": "Customer.address",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Order.customer",
+                        "target": "Customer"
+                    },
+                    {
+                        "name": "Order.billTo",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Order.shipTo",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "OrderLine.order",
+                        "target": "Order"
+                    },
+                    {
+                        "name": "OrderLine.product",
+                        "target": "Product"
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "Customer.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.street",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.city",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Order.id",
+                        "type": "uuid"
+                    },
+                    {
+                        "name": "Order.placedOn",
+                        "type": "date"
+                    },
+                    {
+                        "name": "Order.status",
+                        "type": {
+                            "named": "OrderStatus"
+                        }
+                    },
+                    {
+                        "name": "OrderLine.quantity",
+                        "type": "int"
+                    },
+                    {
+                        "name": "OrderLine.unitPrice",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "OrderLine.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.listPrice",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "Customer.createdAt",
+                        "type": "date"
+                    }
+                ],
+                "equations": [
+                    {
+                        "source": "Order",
+                        "rhs": [
+                            "customer",
+                            "address"
+                        ],
+                        "lhs": [
+                            "billTo"
+                        ]
+                    },
+                    {
+                        "source": "OrderLine",
+                        "rhs": [
+                            "product",
+                            "sku"
+                        ],
+                        "lhs": [
+                            "sku"
+                        ]
+                    }
+                ],
+                "entities": [
+                    "Customer",
+                    "Address",
+                    "Order",
+                    "OrderLine",
+                    "Product"
+                ]
+            }
+        },
+        {
+            "name": "createdAt/right",
+            "schema": {
+                "aggregates": [
+                    {
+                        "root": "Customer",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Address",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Shipment",
+                        "members": [
+                            {
+                                "owner": "shipment",
+                                "entity": "Item"
+                            }
+                        ]
+                    },
+                    {
+                        "root": "Carrier",
+                        "members": [
+                        ]
+                    }
+                ],
+                "valueObjects": [
+                    "Address"
+                ],
+                "references": [
+                    {
+                        "name": "Customer.address",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Shipment.customer",
+                        "target": "Customer"
+                    },
+                    {
+                        "name": "Shipment.destination",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Shipment.carrier",
+                        "target": "Carrier"
+                    },
+                    {
+                        "name": "Item.shipment",
+                        "target": "Shipment"
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "Customer.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.street",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.city",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Shipment.orderId",
+                        "type": "uuid"
+                    },
+                    {
+                        "name": "Shipment.shippedOn",
+                        "type": "date"
+                    },
+                    {
+                        "name": "Shipment.trackingCode",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Shipment.signatureRequired",
+                        "type": "bool"
+                    },
+                    {
+                        "name": "Item.quantity",
+                        "type": "int"
+                    },
+                    {
+                        "name": "Item.declaredValue",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "Item.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Item.description",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Carrier.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Customer.createdAt",
+                        "type": "date"
+                    }
+                ],
+                "equations": [
+                ],
+                "entities": [
+                    "Customer",
+                    "Address",
+                    "Shipment",
+                    "Item",
+                    "Carrier"
+                ]
+            }
+        },
+        {
+            "name": "createdAt/left.qualified",
+            "schema": {
+                "aggregates": [
+                    {
+                        "root": "Customer",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Address",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Order",
+                        "members": [
+                            {
+                                "owner": "order",
+                                "entity": "OrderLine"
+                            }
+                        ]
+                    },
+                    {
+                        "root": "Product",
+                        "members": [
+                        ]
+                    }
+                ],
+                "valueObjects": [
+                    "Address"
+                ],
+                "references": [
+                    {
+                        "name": "Customer.address",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Order.customer",
+                        "target": "Customer"
+                    },
+                    {
+                        "name": "Order.billTo",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Order.shipTo",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "OrderLine.order",
+                        "target": "Order"
+                    },
+                    {
+                        "name": "OrderLine.product",
+                        "target": "Product"
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "Customer.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.street",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.city",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Order.id",
+                        "type": "uuid"
+                    },
+                    {
+                        "name": "Order.placedOn",
+                        "type": "date"
+                    },
+                    {
+                        "name": "Order.status",
+                        "type": {
+                            "named": "OrderStatus"
+                        }
+                    },
+                    {
+                        "name": "OrderLine.quantity",
+                        "type": "int"
+                    },
+                    {
+                        "name": "OrderLine.unitPrice",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "OrderLine.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.listPrice",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "Customer.Orders.createdAt",
+                        "type": "date"
+                    }
+                ],
+                "equations": [
+                    {
+                        "source": "Order",
+                        "rhs": [
+                            "customer",
+                            "address"
+                        ],
+                        "lhs": [
+                            "billTo"
+                        ]
+                    },
+                    {
+                        "source": "OrderLine",
+                        "rhs": [
+                            "product",
+                            "sku"
+                        ],
+                        "lhs": [
+                            "sku"
+                        ]
+                    }
+                ],
+                "entities": [
+                    "Customer",
+                    "Address",
+                    "Order",
+                    "OrderLine",
+                    "Product"
+                ]
+            }
+        },
+        {
+            "name": "createdAt/right.qualified",
+            "schema": {
+                "aggregates": [
+                    {
+                        "root": "Customer",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Address",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Shipment",
+                        "members": [
+                            {
+                                "owner": "shipment",
+                                "entity": "Item"
+                            }
+                        ]
+                    },
+                    {
+                        "root": "Carrier",
+                        "members": [
+                        ]
+                    }
+                ],
+                "valueObjects": [
+                    "Address"
+                ],
+                "references": [
+                    {
+                        "name": "Customer.address",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Shipment.customer",
+                        "target": "Customer"
+                    },
+                    {
+                        "name": "Shipment.destination",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Shipment.carrier",
+                        "target": "Carrier"
+                    },
+                    {
+                        "name": "Item.shipment",
+                        "target": "Shipment"
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "Customer.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.street",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.city",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Shipment.orderId",
+                        "type": "uuid"
+                    },
+                    {
+                        "name": "Shipment.shippedOn",
+                        "type": "date"
+                    },
+                    {
+                        "name": "Shipment.trackingCode",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Shipment.signatureRequired",
+                        "type": "bool"
+                    },
+                    {
+                        "name": "Item.quantity",
+                        "type": "int"
+                    },
+                    {
+                        "name": "Item.declaredValue",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "Item.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Item.description",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Carrier.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Customer.Shipping.createdAt",
+                        "type": "date"
+                    }
+                ],
+                "equations": [
+                ],
+                "entities": [
+                    "Customer",
+                    "Address",
+                    "Shipment",
+                    "Item",
+                    "Carrier"
+                ]
+            }
+        },
+        {
+            "name": "createdAt/glued",
+            "schema": {
+                "aggregates": [
+                    {
+                        "root": "Customer",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Address",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Order",
+                        "members": [
+                            {
+                                "owner": "order",
+                                "entity": "OrderLine"
+                            }
+                        ]
+                    },
+                    {
+                        "root": "Product",
+                        "members": [
+                        ]
+                    },
+                    {
+                        "root": "Shipment",
+                        "members": [
+                            {
+                                "owner": "shipment",
+                                "entity": "Item"
+                            }
+                        ]
+                    },
+                    {
+                        "root": "Carrier",
+                        "members": [
+                        ]
+                    }
+                ],
+                "valueObjects": [
+                    "Address"
+                ],
+                "references": [
+                    {
+                        "name": "Customer.address",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Order.customer",
+                        "target": "Customer"
+                    },
+                    {
+                        "name": "Order.billTo",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Order.shipTo",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "OrderLine.order",
+                        "target": "Order"
+                    },
+                    {
+                        "name": "OrderLine.product",
+                        "target": "Product"
+                    },
+                    {
+                        "name": "Shipment.customer",
+                        "target": "Customer"
+                    },
+                    {
+                        "name": "Shipment.destination",
+                        "target": "Address"
+                    },
+                    {
+                        "name": "Shipment.carrier",
+                        "target": "Carrier"
+                    },
+                    {
+                        "name": "Item.shipment",
+                        "target": "Shipment"
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "Customer.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.street",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Address.city",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Order.id",
+                        "type": "uuid"
+                    },
+                    {
+                        "name": "Order.placedOn",
+                        "type": "date"
+                    },
+                    {
+                        "name": "Order.status",
+                        "type": {
+                            "named": "OrderStatus"
+                        }
+                    },
+                    {
+                        "name": "OrderLine.quantity",
+                        "type": "int"
+                    },
+                    {
+                        "name": "OrderLine.unitPrice",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "OrderLine.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Product.listPrice",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "Customer.Orders.createdAt",
+                        "type": "date"
+                    },
+                    {
+                        "name": "Shipment.orderId",
+                        "type": "uuid"
+                    },
+                    {
+                        "name": "Shipment.shippedOn",
+                        "type": "date"
+                    },
+                    {
+                        "name": "Shipment.trackingCode",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Shipment.signatureRequired",
+                        "type": "bool"
+                    },
+                    {
+                        "name": "Item.quantity",
+                        "type": "int"
+                    },
+                    {
+                        "name": "Item.declaredValue",
+                        "type": "decimal"
+                    },
+                    {
+                        "name": "Item.sku",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Item.description",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Carrier.name",
+                        "type": "string"
+                    },
+                    {
+                        "name": "Customer.Shipping.createdAt",
+                        "type": "date"
+                    }
+                ],
+                "equations": [
+                    {
+                        "source": "Order",
+                        "rhs": [
+                            "customer",
+                            "address"
+                        ],
+                        "lhs": [
+                            "billTo"
+                        ]
+                    },
+                    {
+                        "source": "OrderLine",
+                        "rhs": [
+                            "product",
+                            "sku"
+                        ],
+                        "lhs": [
+                            "sku"
+                        ]
+                    }
+                ],
+                "entities": [
+                    "Customer",
+                    "Address",
+                    "Order",
+                    "OrderLine",
+                    "Product",
+                    "Shipment",
+                    "Item",
+                    "Carrier"
+                ]
+            }
         }
     ],
     "claims": [
@@ -2588,6 +3380,47 @@
             ],
             "claim": "gluing",
             "glued": "deliveryAddress/glued"
+        },
+        {
+            "translation": {
+                "generators": [
+                    {
+                        "name": "Customer.createdAt",
+                        "path": [
+                            "Orders.createdAt"
+                        ]
+                    }
+                ],
+                "entities": [
+                ]
+            },
+            "source": "createdAt/left",
+            "target": "createdAt/left.qualified",
+            "claim": "translation"
+        },
+        {
+            "translation": {
+                "generators": [
+                    {
+                        "name": "Customer.createdAt",
+                        "path": [
+                            "Shipping.createdAt"
+                        ]
+                    }
+                ],
+                "entities": [
+                ]
+            },
+            "source": "createdAt/right",
+            "target": "createdAt/right.qualified",
+            "claim": "translation"
+        },
+        {
+            "left": "createdAt/left.qualified",
+            "right": "createdAt/right.qualified",
+            "kernel": "createdAt/kernel",
+            "claim": "gluing",
+            "glued": "createdAt/glued"
         },
         {
             "claim": "state",

@@ -618,43 +618,44 @@ def data_gluing():
 # 12. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 880, 350,
+    f = Fig("modules", 1060, 370,
             "Imports between the modules of the DDD library: a chain from value types to "
-            "context maps and states, and the examples on top.")
+            "certificates, context maps beside it, and the examples on top.")
     f.text(20, 18, "on Mathlib: Paths, Quotient, Grothendieck, IsPushout, Kan extensions", "note")
-    core = [("Values", 60), ("Schema", 170), ("Semantics", 285), ("PathEq", 400),
-            ("Translation", 520)]
+    core = [("Values", 55), ("Schema", 158), ("Semantics", 263), ("PathEq", 368),
+            ("Translation", 475), ("Glue", 582), ("States", 685), ("Data", 785),
+            ("Json", 885), ("Certificate", 995)]
     for name, x in core:
-        f.node(name, x, 75, name, w=100, h=30)
+        f.node(name, x, 55, name, w=92 if name != "Certificate" else 100, h=30)
     for (a, _), (b, _) in zip(core, core[1:]):
         f.arrow(a, b, "", "acl")
-    f.node("Glue", 650, 45, "Glue", w=100, h=30)
-    f.node("Compose", 650, 105, "Compose", w=100, h=30)
-    f.node("States", 790, 45, "States", w=100, h=30)
-    f.node("ContextMap", 790, 105, "ContextMap", w=110, h=30)
+    f.node("Compose", 475, 125, "Compose", w=92, h=30)
+    f.node("ContextMap", 582, 125, "ContextMap", w=100, h=30)
     f.arrow("Translation", "Compose", "", "acl")
-    f.arrow("Translation", "Glue", "", "acl")
     f.arrow("Compose", "ContextMap", "", "acl")
     f.arrow("Glue", "ContextMap", "", "acl")
-    f.arrow("Glue", "States", "", "acl")
-    f.region(20, 160, 830, 175, "EXAMPLES")
-    f.raw('<rect class="rg plain" x="44" y="194" width="424" height="44" rx="6"/>', "back")
-    for name, x in [("Catalog", 98), ("Orders", 202), ("Payments", 310), ("Shipping", 414)]:
-        f.node("x" + name, x, 216, name, w=96, h=30)
-    f.poly([(400, 92), (400, 192)], "muted")
-    f.node("xIntegration", 580, 216, "Integration", "pl", w=110, h=30)
-    f.node("xRoutes", 790, 216, "Routes", w=100, h=30)
-    f.node("xGluing", 580, 284, "Gluing", "kern", w=100, h=30)
-    f.node("xShowcase", 330, 284, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
-    f.node("xValues", 98, 284, "Values", w=96, h=30)
-    f.poly([(469, 216), (523, 216)], "muted")
+    f.region(20, 175, 1020, 175, "EXAMPLES")
+    f.raw('<rect class="rg plain" x="38" y="206" width="358" height="44" rx="6"/>', "back")
+    for name, x in [("Catalog", 82), ("Orders", 172), ("Payments", 262), ("Shipping", 352)]:
+        f.node("x" + name, x, 228, name, w=82, h=30)
+    f.poly([(368, 72), (368, 204)], "muted")
+    f.node("xIntegration", 470, 228, "Integration", "pl", w=110, h=30)
+    f.node("xRoutes", 600, 228, "Routes", w=90, h=30)
+    f.node("xGluing", 470, 305, "Gluing", "kern", w=100, h=30)
+    f.node("xExchange", 885, 305, "Exchange", w=100, h=30)
+    f.node("xShowcase", 270, 305, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
+    f.node("xValues", 82, 305, "Values", w=82, h=30)
+    f.poly([(397, 228), (413, 228)], "muted")
     f.arrow("ContextMap", "xIntegration", "", "muted")
     f.arrow("ContextMap", "xRoutes", "", "muted")
     f.arrow("xIntegration", "xGluing", "", "muted")
     f.arrow("xShowcase", "xIntegration", "", "muted")
-    f.poly([(840, 45), (866, 45), (866, 318), (600, 318), (600, 301)], "muted")
-    f.poly([(98, 300), (98, 318), (560, 318), (560, 301)], "muted")
-    f.text(860, 346, "arrows point from a module to the modules that import it", "note", "end")
+    f.poly([(685, 72), (685, 297), (523, 297)], "muted")
+    f.poly([(82, 321), (82, 338), (470, 338), (470, 322)], "muted")
+    f.poly([(521, 313), (833, 313)], "muted")
+    f.poly([(885, 72), (885, 288)], "muted")
+    f.text(1040, 366, "arrows point from a module to the modules that import it; "
+           "Certificate also imports Compose", "note", "end")
     return f
 
 
@@ -682,8 +683,38 @@ def next_steps():
     return f
 
 
+# 14. The phase 4 pipeline -------------------------------------------------------
+
+def pipeline():
+    f = Fig("pipeline", 920, 260,
+            "Lean exports the example map, Julia computes with Catlab and writes a "
+            "certificate, and Lean checks each claim of the certificate.")
+    f.region(20, 24, 200, 210, "LEAN")
+    f.region(330, 24, 250, 210, "JULIA, CATLAB")
+    f.region(690, 24, 210, 210, "LEAN")
+    f.node("ex", 120, 80, "Examples/Exchange", "pl", w=150)
+    f.node("ws", 275, 80, "workspace.json", "muted", w=104, h=30)
+    f.node("run", 455, 80, "julia/run.jl", w=150)
+    f.node("cert", 635, 80, "certificate.json", "muted", w=104, h=30)
+    f.node("chk", 795, 80, "csd-check", "pl", w=150)
+    f.arrow("ex", "ws", "", "acl")
+    f.arrow("ws", "run", "", "acl")
+    f.arrow("run", "cert", "", "acl")
+    f.arrow("cert", "chk", "", "acl")
+    for i, line in enumerate(["gluing: acset pushout", "sample states",
+                              "restriction along images", "homomorphism search"]):
+        f.text(345, 140 + 20 * i, line, "mono")
+    for i, line in enumerate(["checkClaim per claim", "checkClaim_sound:",
+                              "a passing claim holds", "29 claims, all hold"]):
+        f.text(705, 140 + 20 * i, line, "mono acc" if i == 3 else "mono")
+    for i, line in enumerate(["csd-export writes", "the map, the kernel", "expectations, the",
+                              "failing scenario"]):
+        f.text(35, 140 + 20 * i, line, "mono")
+    return f
+
+
 ALL = [embeddings, schema_orders, rewriting, translation, context_map, routes, lax,
-       published, pushout, failing, data_gluing, modules, next_steps]
+       published, pushout, failing, data_gluing, modules, next_steps, pipeline]
 
 
 def build():

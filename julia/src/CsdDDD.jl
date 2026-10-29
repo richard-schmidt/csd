@@ -19,7 +19,8 @@ using Catlab
 using JSON3
 
 export FORMAT, DDDSchema, read_schema, write_schema, Translation, read_translation,
-  write_translation, State, write_state, read_state, glue, restrict, check_state,
+  write_translation, State, write_state, read_state, glue, clashes, qualify, restrict,
+  check_state,
   homomorphism_search, Certificate, add_schema!, add_state!, add_claim!, write_certificate
 
 const FORMAT = "csd-ddd/1"
@@ -160,6 +161,50 @@ function glue(K::DDDSchema, L::DDDSchema, R::DDDSchema)
   G = ob(P)
   vos = vcat(L.valueObjects, [v for v in R.valueObjects if !(v in L.valueObjects)])
   DDDSchema(G, vcat(L.eqns, R.eqns), merge_aggregates(L.aggregates, R.aggregates), vos)
+end
+
+"""
+    clashes(K, L, R)
+
+The generators that `L` and `R` share outside the kernel `K`, as (entity type,
+name). Entity types shared outside `K` are an error.
+"""
+function clashes(K::DDDSchema, L::DDDSchema, R::DDDSchema)
+  ents = [e for e in entities(L) if e in entities(R) && !(e in entities(K))]
+  isempty(ents) || error("entity types shared outside the kernel: $ents")
+  gens(S) = vcat([(s, n) for (s, n, _) in refs(S)], [(s, n) for (s, n, _) in attrs(S)])
+  [g for g in gens(L) if g in gens(R) && !(g in gens(K))]
+end
+
+"""
+    qualify(S, ctx, names)
+
+`S` with each generator in `names` renamed to `ctx.name`, so that the generator
+`createdAt` of `Customer` in the context `Orders` becomes `Customer.Orders.createdAt`
+in the exchange format; and the translation from `S` to the result.
+"""
+function qualify(S::DDDSchema, ctx, names)
+  newname(e, n) = (e, n) in names ? "$ctx.$n" : n
+  G = copy(S.graph)
+  for r in parts(G, :Ref)
+    set_subpart!(G, r, :ref_name, newname(G[r, (:ref_src, :entity_name)], G[r, :ref_name]))
+  end
+  for a in parts(G, :Attr)
+    set_subpart!(G, a, :attr_name, newname(G[a, (:attr_src, :entity_name)], G[a, :attr_name]))
+  end
+  function rename_path(src, path)
+    e, out = src, String[]
+    for n in path
+      push!(out, newname(e, n))
+      i = findfirst(x -> x[1] == e && x[2] == n, refs(S))
+      e = i === nothing ? "" : refs(S)[i][3]
+    end
+    out
+  end
+  eqns = [Equation(q.src, rename_path(q.src, q.lhs), rename_path(q.src, q.rhs)) for q in S.eqns]
+  aggs = [Aggregate(A.root, [(m, newname(m, o)) for (m, o) in A.members]) for A in S.aggregates]
+  T = Translation(Tuple{String,String}[], [(e, n, [newname(e, n)]) for (e, n) in names])
+  (DDDSchema(G, eqns, aggs, S.valueObjects), T)
 end
 
 # ---------------------------------------------------------------------------
