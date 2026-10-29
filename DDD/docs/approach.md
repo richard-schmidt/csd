@@ -65,6 +65,7 @@ The checks and their lemmas:
 | `S.PathEq a l l'` | `pathEqFree`, `pathEqAcyclic`, `pathEq` | `pathEq_sound` | `S` free or acyclic (`pathEq_iff_of_free`, `pathEq_iff_of_acyclic`) |
 | `T.Valid S S'` | `checkValid` with a path-equality checker for `S'` | `checkValid_sound`, `checkValid_iff` | the path-equality checker is complete |
 | `Schema.Gluable K B₁ B₂` | `checkGluable` | `checkGluable_sound` | not stated |
+| members of a context map share names only through kernels | `checkComponent` | `Component.agree`, `Component.isColimit` | not stated; depends on the order of the members |
 | functor of `T` full and faithful | `checkFullyFaithful` | `checkFullyFaithful_sound` | not stated; needs `S`, `S'` acyclic |
 | `P.RootsOnly S` | `checkRootsOnly` | `checkRootsOnly_iff` | always |
 | two translations induce the same functor | `checkSameFunctor` | `checkSameFunctor_sound`, `checkSameFunctor_iff` | path equality in the target is decided |
@@ -461,6 +462,68 @@ is in the kernel, but the glued schema makes the two morphisms of Orders equal:
 For the example gluing both legs pass (`orders_fullyFaithful`,
 `shipping_fullyFaithful`), checked with `decide +kernel`.
 
+### Several kernels
+
+A kernel can be shared by more than two contexts, and a context can share
+several kernels. The contexts to merge then form a component
+(`ContextMap.Component`, `DDD/Merge.lean`): a list of contexts, its members,
+closed under the arrows out of them. Every arrow out of a member is an arrow out
+of a kernel into a member, so the arrows between members are inclusions, and
+every kernel with an arrow into a member is a member.
+
+The glued schema is the union of the schemas of the members, `Schema.glueAll`
+(`DDD/Union.lean`), in the order of the list: each schema glued onto the union of
+the ones after it, so a generator of the union is the generator of the first
+member that has it. The covering theorem generalises the bridge theorem from two
+parts to any number. A schema `G` is covered by parts `B i` (`Schema.Cover`)
+when each part is included in `G` by the empty translation and every object,
+generator and equation of `G` belongs to some part. Functors `F i` out of the
+parts that agree where the parts overlap (`Schema.Agree`: on shared objects, and
+on shared generators as arrows of the target) glue to a functor out of `G`
+(`Cover.desc`), which restricts to each `F i` (`leg_desc`) and is the only such
+functor (`desc_unique`).
+
+Agreement comes from the kernels. `checkComponent` asks, along the list of
+members, that each member sharing an entity type or a generator with earlier
+members share it with one of them through a kernel that has it and includes into
+both, and that each member after the first share the value types with an earlier
+one through a kernel. A kernel includes into a member along a listed arrow out of
+it, or is the member. Agreement between neighbours then extends to all pairs
+(`pairwise_of_checkSpanning`), since agreement is an equivalence. The members
+also give each shared generator the same target (`step_agree`), so they cover
+the glued schema (`Component.cover`).
+
+`Component.isColimit` states the result: the glued schema category, with the
+legs of the members, is the colimit of `D` restricted to the members and the
+arrows between them. For one kernel and its two targets the restricted diagram is
+a span and the colimit is the pushout of `isPushout_kernel`.
+
+The merged map (`Component.map`) has the contexts `Merged`: one glued context and
+the contexts outside the component. An arrow between outside contexts is kept;
+an arrow `f : u ⟶ d` into a member becomes an arrow into the glued context whose
+translation is `T f` composed with the inclusion of `d` (`Translation.comp`), so
+its functor is the functor of `f` followed by the leg of `d` (`diagram_into`).
+No arrow leaves the component, so no arrow leaves the glued context. A rank on
+the map gives a rank on the merged map, the glued context taking the largest
+rank of the members, and lax non-interference follows
+(`Component.nonInterference`). Strict non-interference is checked leg by leg
+(`leg_fullyFaithful`).
+
+![Two kernels shared by Orders, Shipping and Payments form a component; merging it gives one glued context, and the arrows into its members become arrows into the glued context.](figures/merge.svg)
+
+*Figure 11. The merge of `Examples/Merge.lean`. The map of
+`Examples/Integration.lean` gains the kernel Addresses, included into Orders,
+Shipping and Payments. With the members in the order Orders, Shipping, Payments,
+Customers, Addresses, Shipping shares customers and addresses with Orders
+through Customers, and Payments shares addresses with Orders through Addresses.
+The merged map has four contexts; OrdersPL has two arrows into the glued
+context, through Orders and through Payments.*
+
+In the example the component check, the well-formedness and the acyclicity of
+the glued schema are checked with `decide`, and the five legs are fully faithful,
+checked with `decide +kernel` (`orders_fullyFaithful` to
+`addresses_fullyFaithful`).
+
 ## 9. States
 
 A state of a schema is the data of one context (`DDD/States.lean`).
@@ -484,7 +547,7 @@ states (`stateEquiv`).
 
 ![Restriction is contravariant: the pushout of schema categories becomes a correspondence between states of the glued schema and pairs of states that agree on the kernel.](figures/data-gluing.svg)
 
-*Figure 11. A state is a functor out of the schema category, and restriction is
+*Figure 12. A state is a functor out of the schema category, and restriction is
 precomposition, so the pushout square of categories becomes a pullback of sets
 of states. `stateEquiv` restricts a state of the glued schema to both sides;
 its inverse glues a compatible pair with `desc` and takes the bijections of the
@@ -591,7 +654,7 @@ claims pass `csd-check`.
 
 ![Imports between the modules of the DDD library: a chain from value types to context maps and states, and the examples on top.](figures/modules.svg)
 
-*Figure 12. The modules of the library and their imports. The core modules
+*Figure 14. The modules of the library and their imports. The core modules
 share the namespace `DDD`; each example module has its own. `cli/` and `julia/`
 are outside the library.*
 
@@ -605,6 +668,8 @@ are outside the library.*
 | `Compose.lean` | `Translation.comp`, `functor_comp`, `checkSameFunctor_iff` |
 | `Glue.lean` | `glue`, `Gluable`, `Gluing`, the bridge theorem, `checkFullyFaithful_sound` |
 | `ContextMap.lean` | `ContextMap`, `J`, `diagram`, `coherent_of_check`, `Lax`, `nonInterference`, `Publishes`, `kernelGluing`, `isPushout_kernel` |
+| `Union.lean` | `Schema.Cover`, `Agree`, `Cover.desc` with `leg_desc` and `desc_unique`, `glueAll`, `pairwise_of_checkSpanning` |
+| `Merge.lean` | `Component`, `checkComponent`, `Component.isColimit`, the merged map, `diagram_into`, `Component.nonInterference` |
 | `States.lean` | entity-only and attributed states, `Σ`, `Δ`, `Π`, data gluing |
 | `Data.lean` | `FinState`, `check`, `toState`, value objects, `FinHom`, `restrict`, `restrictIso` |
 | `Json.lean` | the exchange format `csd-ddd/1` |
@@ -615,14 +680,22 @@ are outside the library.*
 | `Examples/Integration.lean` | the seven-context map, its projection onto the Showcase map, non-interference, references |
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, the failing kernel |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
+| `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
 | `Examples/Exchange.lean` | the example map as a workspace document, round trips, the `createdAt` clash |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
 ## 12. Limits of the current approach
 
 - Path equality is decided for free and for acyclic schemas only.
-- Strict integration glues two contexts along one kernel; a kernel with more
-  inclusions, or several kernels, is not covered.
+- A merged component has no arrow out of it: a translation out of a member is
+  not a translation out of the glued schema. Contexts serve others through their
+  published languages, which stay outside the component.
+- The merged map declares no equation between routes.
+- The component check is sufficient, not necessary: it depends on the order of
+  the members, and a name shared along a chain of kernels needs each member to
+  share it with an earlier one directly.
+- The Julia side glues the two targets of a kernel; it does not merge
+  components.
 - Gluing needs the same names on both sides; names that clash outside the
   kernel are reported, and the Julia side qualifies them; inclusions that rename
   are not covered.

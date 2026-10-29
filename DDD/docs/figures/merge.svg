@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 430" width="940" height="430" role="img" aria-label="Two kernels shared by Orders, Shipping and Payments form a component; merging it gives one glued context, and the arrows into its members become arrows into the glued context."><style>svg { --surface: #ffffff; --region: #f3f5f8; --fg: #1b232c; --muted: #5a6675; --line: #c9d1da; --accent: #17708f; --accentfill: rgba(23,112,143,0.10); --kern: #2f7a4b; --kernfill: rgba(47,122,75,0.10); --warn: #b4421b; --warnfill: rgba(180,66,27,0.08); } @media (prefers-color-scheme: dark) { svg { --surface: #19212a; --region: #202a35; --fg: #e3e9ef; --muted: #9aa7b5; --line: #34414f; --accent: #5db4d3; --accentfill: rgba(93,180,211,0.14); --kern: #6cc28d; --kernfill: rgba(108,194,141,0.13); --warn: #f08c5e; --warnfill: rgba(240,140,94,0.11); } }
+.bgr { fill: var(--surface); }
+.n rect { fill: var(--surface); stroke: var(--fg); stroke-width: 1.2; }
+.n.pl rect { fill: var(--accentfill); stroke: var(--accent); stroke-width: 1.5; }
+.n.kern rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.glued rect { fill: var(--kernfill); stroke: var(--kern); stroke-width: 1.5; }
+.n.muted rect { fill: var(--surface); stroke: var(--muted); stroke-dasharray: 4 3; }
+.n.warn rect { fill: var(--warnfill); stroke: var(--warn); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.n.val rect { fill: var(--region); stroke: var(--muted); }
+.n.chip rect { fill: var(--surface); stroke: var(--muted); }
+.n.chip.s rect { fill: var(--accentfill); stroke: var(--accent); }
+.n.dot rect { fill: var(--region); stroke: var(--muted); }
+.n .t { fill: var(--fg); font: 500 12.5px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; }
+.n .s { fill: var(--muted); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .a { fill: var(--fg); font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n.chip .t, .n.val .t, .n.dot .t { font: 400 11.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.n .hr { stroke: var(--line); stroke-width: 1; }
+.badge { font: 500 10px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.b-pl { fill: var(--accent); } .b-kern { fill: var(--kern); } .b-warn { fill: var(--warn); }
+.b-muted { fill: var(--muted); }
+.e { fill: none; stroke-width: 1.4; }
+.e.acl { stroke: var(--fg); }
+.e.muted { stroke: var(--muted); }
+.e.incl { stroke: var(--accent); stroke-dasharray: 6 4; }
+.e.kern { stroke: var(--kern); stroke-dasharray: 6 4; stroke-width: 1.6; }
+.e.eq { stroke: var(--accent); stroke-width: 2.2; }
+.e.warn { stroke: var(--warn); stroke-width: 1.8; }
+.e.ghost { stroke: var(--warn); stroke-dasharray: 3 3; }
+.e.uniq { stroke: var(--fg); stroke-dasharray: 3 3; }
+.e.map { stroke: var(--accent); stroke-dasharray: 2 3; stroke-width: 1.3; }
+.e.glued { stroke: var(--kern); stroke-width: 1.6; }
+.mk-acl, .mk-uniq { fill: var(--fg); } .mk-muted { fill: var(--muted); }
+.mk-incl, .mk-eq, .mk-map { fill: var(--accent); } .mk-kern, .mk-glued { fill: var(--kern); }
+.mk-warn, .mk-ghost { fill: var(--warn); }
+.lbg { fill: var(--surface); }
+.lb { font: 400 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+.c-acl, .c-muted, .c-uniq { fill: var(--muted); } .c-fg { fill: var(--fg); }
+.c-incl, .c-eq, .c-map, .c-pl { fill: var(--accent); }
+.c-kern, .c-glued { fill: var(--kern); } .c-warn, .c-ghost { fill: var(--warn); }
+.rg { fill: var(--region); stroke: var(--line); }
+.rg.pl { fill: var(--accentfill); stroke: var(--accent); stroke-dasharray: 3 3; }
+.rg.kern { fill: var(--kernfill); stroke: var(--kern); stroke-dasharray: 3 3; }
+.rg.warn { fill: var(--warnfill); stroke: var(--warn); stroke-dasharray: 3 3; }
+.rg.plain { fill: none; stroke: var(--line); }
+.rgl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--muted); letter-spacing: 0.04em; }
+.rgl.pl { fill: var(--accent); } .rgl.kern { fill: var(--kern); } .rgl.warn { fill: var(--warn); }
+.hull { fill: none; stroke: var(--fg); stroke-dasharray: 2 3; stroke-width: 1; }
+.hl { font: 500 10.5px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.note { font: 400 11px 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif; fill: var(--muted); }
+.note.fg { fill: var(--fg); }
+.mono { font: 400 11px 'IBM Plex Mono', ui-monospace, Menlo, monospace; fill: var(--fg); }
+.mono.m { fill: var(--muted); } .mono.acc { fill: var(--accent); } .mono.warn { fill: var(--warn); }
+.mono.kern { fill: var(--kern); }
+.br { fill: none; stroke: var(--muted); stroke-width: 1; }
+.br.acc { stroke: var(--accent); }
+</style><defs><marker id="merge-acl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-acl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-muted" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-incl" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-incl" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-kern" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-kern" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-eq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-eq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-warn" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-warn" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-ghost" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-ghost" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-uniq" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-uniq" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-map" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-map" d="M0,0 L10,5 L0,10 z"/></marker><marker id="merge-glued" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path class="mk-glued" d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="bgr" width="940" height="430"/><rect class="rg " x="20" y="24" width="450" height="300" rx="8"/><text class="rgl " x="30" y="41">COMPONENT</text><rect class="rg " x="500" y="24" width="420" height="300" rx="8"/><text class="rgl " x="510" y="41">MERGED MAP</text><g class="n kern"><rect x="60.0" y="60.0" width="150" height="40" rx="5"/><text class="t" x="135.0" y="77.0" text-anchor="middle">Customers</text><text class="s" x="135.0" y="92.0" text-anchor="middle">Customer, Address</text><text class="badge b-kern" x="62.0" y="55.0">kernel</text></g><g class="n kern"><rect x="280.0" y="60.0" width="150" height="40" rx="5"/><text class="t" x="355.0" y="77.0" text-anchor="middle">Addresses</text><text class="s" x="355.0" y="92.0" text-anchor="middle">Address</text><text class="badge b-kern" x="282.0" y="55.0">kernel</text></g><g class="n "><rect x="25.0" y="210.0" width="120" height="40" rx="5"/><text class="t" x="85.0" y="227.0" text-anchor="middle">Orders</text><text class="s" x="85.0" y="242.0" text-anchor="middle">5 entity types</text></g><g class="n "><rect x="185.0" y="210.0" width="120" height="40" rx="5"/><text class="t" x="245.0" y="227.0" text-anchor="middle">Shipping</text><text class="s" x="245.0" y="242.0" text-anchor="middle">5 entity types</text></g><g class="n "><rect x="345.0" y="210.0" width="120" height="40" rx="5"/><text class="t" x="405.0" y="227.0" text-anchor="middle">Payments</text><text class="s" x="405.0" y="242.0" text-anchor="middle">6 entity types</text></g><line class="e kern" x1="127.5" y1="102.5" x2="93.0" y2="206.0" marker-end="url(#merge-kern)"/><line class="e kern" x1="151.5" y1="102.5" x2="227.4" y2="206.0" marker-end="url(#merge-kern)"/><line class="e kern" x1="314.5" y1="102.5" x2="128.2" y2="206.0" marker-end="url(#merge-kern)"/><line class="e kern" x1="338.5" y1="102.5" x2="262.6" y2="206.0" marker-end="url(#merge-kern)"/><line class="e kern" x1="362.5" y1="102.5" x2="397.0" y2="206.0" marker-end="url(#merge-kern)"/><g class="n pl"><rect x="520.0" y="63.0" width="120" height="34" rx="5"/><text class="t" x="580.0" y="84.5" text-anchor="middle">CatalogPL</text></g><g class="n pl"><rect x="780.0" y="63.0" width="120" height="34" rx="5"/><text class="t" x="840.0" y="84.5" text-anchor="middle">OrdersPL</text></g><g class="n "><rect x="520.0" y="233.0" width="120" height="34" rx="5"/><text class="t" x="580.0" y="254.5" text-anchor="middle">Catalog</text></g><g class="n glued"><rect x="690.0" y="230.0" width="150" height="40" rx="5"/><text class="t" x="765.0" y="247.0" text-anchor="middle">glued</text><text class="s" x="765.0" y="262.0" text-anchor="middle">13 entity types</text></g><line class="e incl" x1="580.0" y1="99.5" x2="580.0" y2="229.0" marker-end="url(#merge-incl)"/><line class="e acl" x1="601.2" y1="99.5" x2="738.9" y2="226.0" marker-end="url(#merge-acl)"/><path class="e incl" d="M817.5,99.5 Q762.2,147.2 764.4,226.0" marker-end="url(#merge-incl)"/><path class="e acl" d="M840.5,99.5 Q842.8,182.8 792.8,226.0" marker-end="url(#merge-acl)"/><text class="mono" x="36.0" y="300.0" text-anchor="start">Shipping shares Customer, Address with Orders through Customers</text><text class="mono" x="36.0" y="314.0" text-anchor="start">Payments shares Address with Orders through Addresses</text><rect class="lbg" x="527.3" y="148.8" width="64.7" height="13" rx="2"/><text class="lb c-incl" x="588.0" y="159.3" text-anchor="end">inclusion</text><rect class="lbg" x="634.9" y="176.3" width="89.9" height="13" rx="2"/><text class="lb c-acl" x="679.8" y="186.8" text-anchor="middle">catalogOrders</text><rect class="lbg" x="705.1" y="136.5" width="71.0" height="13" rx="2"/><text class="lb c-incl" x="772.1" y="147.0" text-anchor="end">via Orders</text><rect class="lbg" x="835.3" y="160.6" width="83.6" height="13" rx="2"/><text class="lb c-acl" x="839.3" y="171.1" text-anchor="start">via Payments</text><text class="mono" x="24.0" y="350.0" text-anchor="start">glued = glueAll [Orders, Shipping, Payments, Customers, Addresses]</text><text class="mono m" x="24.0" y="368.0" text-anchor="start">isColimit: the glued schema category is the colimit of D restricted to the component</text><text class="note" x="24.0" y="386.0" text-anchor="start">an arrow into a member goes to glued, its translation composed with the leg of the member (diagram_into)</text><text class="note" x="24.0" y="404.0" text-anchor="start">every leg fully faithful; the merged map has no cycle, so lax non-interference holds for its four contexts</text></svg>

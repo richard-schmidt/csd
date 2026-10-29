@@ -581,7 +581,7 @@ def failing():
     return f
 
 
-# 11. Data gluing ----------------------------------------------------------------
+# 12. Data gluing ----------------------------------------------------------------
 
 def data_gluing():
     f = Fig("data-gluing", 860, 300,
@@ -615,10 +615,53 @@ def data_gluing():
     return f
 
 
-# 12. Modules --------------------------------------------------------------------
+# 11. Merging a component ---------------------------------------------------------
+
+def merge():
+    f = Fig("merge", 940, 430,
+            "Two kernels shared by Orders, Shipping and Payments form a component; merging it "
+            "gives one glued context, and the arrows into its members become arrows into the "
+            "glued context.")
+    f.region(20, 24, 450, 300, "COMPONENT")
+    f.region(500, 24, 420, 300, "MERGED MAP")
+    f.node("kc", 135, 80, "Customers", "kern", w=150, sub="Customer, Address",
+           badge="kernel", badge_kind="kern")
+    f.node("ka", 355, 80, "Addresses", "kern", w=150, sub="Address",
+           badge="kernel", badge_kind="kern")
+    f.node("o", 85, 230, "Orders", w=120, sub="5 entity types")
+    f.node("s", 245, 230, "Shipping", w=120, sub="5 entity types")
+    f.node("p", 405, 230, "Payments", w=120, sub="6 entity types")
+    f.arrow("kc", "o", "", "kern")
+    f.arrow("kc", "s", "", "kern")
+    f.arrow("ka", "o", "", "kern")
+    f.arrow("ka", "s", "", "kern")
+    f.arrow("ka", "p", "", "kern")
+    f.text(36, 300, "Shipping shares Customer, Address with Orders through Customers", "mono")
+    f.text(36, 314, "Payments shares Address with Orders through Addresses", "mono")
+    f.node("cpl", 580, 80, "CatalogPL", "pl", w=120)
+    f.node("opl", 840, 80, "OrdersPL", "pl", w=120)
+    f.node("cat", 580, 250, "Catalog", w=120)
+    f.node("g", 765, 250, "glued", "glued", w=150, sub="13 entity types")
+    f.arrow("cpl", "cat", "inclusion", "incl", lside=-1, loff=8, lanchor="end", lpos=0.45)
+    f.arrow("cpl", "g", "catalogOrders", "acl", lside=1, lpos=0.62, loff=10)
+    f.arrow("opl", "g", "via Orders", "incl", bend=22, lpos=0.45, lside=1, loff=8,
+            lanchor="end")
+    f.arrow("opl", "g", "via Payments", "acl", bend=-22, lpos=0.45, lside=-1, loff=8,
+            lanchor="start")
+    f.text(24, 350, "glued = glueAll [Orders, Shipping, Payments, Customers, Addresses]", "mono")
+    f.text(24, 368, "isColimit: the glued schema category is the colimit of D restricted to "
+           "the component", "mono m")
+    f.text(24, 386, "an arrow into a member goes to glued, its translation composed with the "
+           "leg of the member (diagram_into)", "note")
+    f.text(24, 404, "every leg fully faithful; the merged map has no cycle, so lax "
+           "non-interference holds for its four contexts", "note")
+    return f
+
+
+# 14. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1060, 370,
+    f = Fig("modules", 1060, 400,
             "Imports between the modules of the DDD library: a chain from value types to "
             "certificates, context maps beside it, and the examples on top.")
     f.text(20, 18, "on Mathlib: Paths, Quotient, Grothendieck, IsPushout, Kan extensions", "note")
@@ -629,12 +672,17 @@ def modules():
         f.node(name, x, 55, name, w=92 if name != "Certificate" else 100, h=30)
     for (a, _), (b, _) in zip(core, core[1:]):
         f.arrow(a, b, "", "acl")
-    f.node("Compose", 475, 125, "Compose", w=92, h=30)
-    f.node("ContextMap", 582, 125, "ContextMap", w=100, h=30)
+    f.node("Compose", 420, 125, "Compose", w=92, h=30)
+    f.node("ContextMap", 530, 125, "ContextMap", w=100, h=30)
+    f.node("Union", 640, 125, "Union", w=80, h=30)
+    f.node("Merge", 750, 125, "Merge", w=80, h=30)
     f.arrow("Translation", "Compose", "", "acl")
     f.arrow("Compose", "ContextMap", "", "acl")
     f.arrow("Glue", "ContextMap", "", "acl")
-    f.region(20, 175, 1020, 175, "EXAMPLES")
+    f.arrow("Glue", "Union", "", "acl")
+    f.arrow("Union", "Merge", "", "acl")
+    f.poly([(530, 141), (530, 158), (750, 158), (750, 145)], "acl")
+    f.region(20, 175, 1020, 205, "EXAMPLES")
     f.raw('<rect class="rg plain" x="38" y="206" width="358" height="44" rx="6"/>', "back")
     for name, x in [("Catalog", 82), ("Orders", 172), ("Payments", 262), ("Shipping", 352)]:
         f.node("x" + name, x, 228, name, w=82, h=30)
@@ -643,6 +691,7 @@ def modules():
     f.node("xRoutes", 600, 228, "Routes", w=90, h=30)
     f.node("xGluing", 470, 305, "Gluing", "kern", w=100, h=30)
     f.node("xExchange", 885, 305, "Exchange", w=100, h=30)
+    f.node("xMerge", 600, 355, "Merge", "kern", w=100, h=30)
     f.node("xShowcase", 270, 305, "Showcase.ContextMapNotifications", "muted", w=240, h=26)
     f.node("xValues", 82, 305, "Values", w=82, h=30)
     f.poly([(397, 228), (413, 228)], "muted")
@@ -654,8 +703,10 @@ def modules():
     f.poly([(82, 321), (82, 338), (470, 338), (470, 322)], "muted")
     f.poly([(521, 313), (833, 313)], "muted")
     f.poly([(885, 72), (885, 288)], "muted")
-    f.text(1040, 366, "arrows point from a module to the modules that import it; "
-           "Certificate also imports Compose", "note", "end")
+    f.poly([(470, 244), (470, 260), (600, 260), (600, 336)], "muted")
+    f.poly([(790, 125), (810, 125), (810, 355), (654, 355)], "muted")
+    f.text(1040, 396, "arrows point from a module to the modules that import it; "
+           "Certificate and Union also import Compose", "note", "end")
     return f
 
 
@@ -683,7 +734,7 @@ def next_steps():
     return f
 
 
-# 14. The phase 4 pipeline -------------------------------------------------------
+# 13. The phase 4 pipeline -------------------------------------------------------
 
 def pipeline():
     f = Fig("pipeline", 920, 260,
@@ -705,7 +756,7 @@ def pipeline():
                               "restriction along images", "homomorphism search"]):
         f.text(345, 140 + 20 * i, line, "mono")
     for i, line in enumerate(["checkClaim per claim", "checkClaim_sound:",
-                              "a passing claim holds", "29 claims, all hold"]):
+                              "a passing claim holds", "32 claims, all hold"]):
         f.text(705, 140 + 20 * i, line, "mono acc" if i == 3 else "mono")
     for i, line in enumerate(["csd-export writes", "the map, the kernel", "expectations, the",
                               "failing scenario"]):
@@ -714,7 +765,7 @@ def pipeline():
 
 
 ALL = [embeddings, schema_orders, rewriting, translation, context_map, routes, lax,
-       published, pushout, failing, data_gluing, modules, next_steps, pipeline]
+       published, pushout, failing, merge, data_gluing, modules, next_steps, pipeline]
 
 
 def build():

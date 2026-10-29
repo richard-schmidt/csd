@@ -113,6 +113,8 @@ Phases 1 to 3 are done, revised after a review of their decisions. A schema is a
 
 Declared equations between routes are checked rather than proved: the two routes of each equation induce the same functor, which a decidable comparison of the composite translations shows. Phase 4 connects the library to Catlab. Lean exports the example map as JSON ([`cli/CsdExport.lean`](cli/CsdExport.lean)); [`julia/`](julia/) glues the schemas as acset pushouts, restricts finite states along translations and searches for homomorphisms between them, and writes a certificate of claims; `csd-check` ([`cli/CsdCheck.lean`](cli/CsdCheck.lean)) checks each claim with a checker proved sound. Finite states, in the shape of acsets, are states of the schema they pass the check for, and restriction on them agrees with restriction of states up to isomorphism. CI runs the three steps on each push. [`DDD/docs/approach.md`](DDD/docs/approach.md) describes the approach in depth, with diagrams.
 
+A kernel shared by more than two contexts, or contexts that share several kernels, merge as a component. The union of the member schemas is the colimit of `D` restricted to the component, when the members share names only through kernels, a condition checked along the list of members; it rests on a covering theorem that glues functors out of any number of agreeing parts. The merged map has the component as one context, with each arrow into a member composed with the leg of the member. [`Examples/Merge.lean`](DDD/Examples/Merge.lean) merges Orders, Shipping and Payments along the Customers kernel and a second kernel, Addresses, and checks the merged map.
+
 ```lean
 def Schema.cat (S : Schema) : Cat := Cat.of (CategoryTheory.Quotient S.rel)
 theorem pathEqAcyclic_iff (hS : S.WellFormed) (hA : S.Acyclic) (a : S.Obj) (l l' : List String) :
@@ -131,6 +133,7 @@ def FinState.restrictIso (hS : S.WellFormed) (hS' : S'.WellFormed) (hX : X.check
     (hT : T.Valid S S') :
     (X.restrict T S S').toState (restrict_check hS hX hT) ≅ restrictState hS' hT (X.toState hX)
 theorem Certificate.checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl
+noncomputable def ContextMap.Component.isColimit : IsColimit P.cocone  -- apex (glueAll members).cat
 ```
 
 ## Sketches

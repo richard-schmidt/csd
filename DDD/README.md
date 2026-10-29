@@ -82,7 +82,7 @@ General translations model anti-corruption layers.
 |-----------------------|----------------------------------------|
 | Conformist            | inclusion of the upstream schema       |
 | Anti-corruption layer | translation                            |
-| Shared kernel         | two inclusions out of a common schema  |
+| Shared kernel         | an inclusion of a common schema into each context that shares it |
 | Published language    | a context, included in its owner and translated into each consumer |
 | Separate ways         | coproduct                              |
 
@@ -139,6 +139,11 @@ kernel is a context with an inclusion into each context that shares it.
 - Check (strict non-interference): each leg into the merged schema is fully
   faithful. A merge can impose an equation of one context on another, so this
   check can fail. Names that clash outside the kernel are an error.
+- Theorem (merge): the contexts linked by kernels form a component, and the
+  union of their schemas is the colimit of `D` restricted to the component,
+  when the members share names only through kernels (a decidable check along
+  the list of members). The merged map has the component as one context, with
+  each arrow into a member composed with the leg of the member.
 
 ### States across contexts
 
@@ -223,12 +228,14 @@ DDD/
                      non-interference
   ContextMap.lean    J, D : J ⥤ Cat, lax integration, strict integration
                      along kernels
+  Union.lean         unions of schemas, the covering theorem
+  Merge.lean         components, their colimit, the merged map
   States.lean        states, migrations, gluing
   Data.lean          finite states, homomorphisms and restriction as data
   Json.lean          the exchange format csd-ddd/1
   Certificate.lean   certificates, their checks and soundness
   Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
-                     Gluing, Routes, Exchange
+                     Gluing, Routes, Exchange, Merge
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check and csd-export, run with lake env lean --run
 julia/               Catlab side: src/CsdDDD.jl, run.jl, test/, data/, out/
@@ -379,6 +386,10 @@ Next step 2, phase 4, is complete, with no `sorry`: Julia reproduces the
 phase 3 results on the example map, and `csd-check` accepts its certificate of
 32 claims, in CI.
 
+Next step 3, strict integration along several inclusions, is complete, with no
+`sorry`: the example map with a second kernel, shared by Orders, Shipping and
+Payments, is merged, and its merged map is checked (`Examples/Merge.lean`).
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -440,19 +451,35 @@ its certificate (`DDD/docs/approach.md`, section 10).
 
 ### 3. Strict integration along several inclusions
 
-- Gluing a kernel into more than two schemas, and gluing along several
-  kernels: the condition that the schemas share only kernel names pairwise,
-  and the glued schema.
-- The colimit of `D` restricted to the inclusions out of kernels: the glued
-  schema category of each merged component, with an `IsColimit` statement that
-  extends `isPushout_kernel`.
-- The context map after the merge: each merged component one context with its
-  glued schema, each other arrow composed with the leg into it (item 1's
-  `Translation.comp`); lax non-interference for the result, and strict
-  non-interference for each leg by `checkFullyFaithful`.
+Done. A component of kernels and the contexts they link merges into one
+context (`DDD/docs/approach.md`, section 8).
 
-Done when: the example map with a second kernel shared by three contexts is
-merged, and its merged map is checked.
+1. `Union.lean`: the union of a list of schemas, `Schema.glueAll`. The covering
+   theorem: a schema covered by parts (`Schema.Cover`) receives a unique functor
+   glued from functors out of the parts that agree where the parts overlap
+   (`Cover.desc`, `leg_desc`, `desc_unique`). The parts of a union cover it when
+   they give shared generators the same target (`Cover.glueAll`).
+2. `Merge.lean`: a component (`ContextMap.Component`) is a list of members
+   closed under the arrows out of them, with every kernel that has an arrow into
+   a member among them. The condition, decided by `checkComponent`: along the
+   list, each member shares entity types and generators with earlier members
+   through a kernel that has them and includes into both, and each member after
+   the first shares the value types with an earlier one through a kernel.
+   Agreement then extends to all pairs (`pairwise_of_checkSpanning`).
+3. The colimit: the glued schema category with the legs of the members is the
+   colimit of `D` restricted to the members (`Component.isColimit`); for one
+   kernel with two arrows it is the pushout of `isPushout_kernel`.
+4. The merged map (`Component.map` on `Merged`): the component one context with
+   its glued schema, each arrow into a member composed with the leg of the
+   member (`Translation.comp`, `diagram_into`), the other arrows kept. Lax
+   non-interference from a rank of the map (`Component.nonInterference`);
+   strict non-interference for each leg by `checkFullyFaithful`
+   (`leg_fullyFaithful`).
+5. `Examples/Merge.lean`: the example map with the kernel Addresses, included
+   into Orders, Shipping and Payments. The component of the two kernels and the
+   three contexts passes the check with `decide`; its glued schema has 13 entity
+   types; all five legs are fully faithful (`decide +kernel`); the merged map has
+   four contexts and lax non-interference.
 
 ### 4. Attributed states
 
@@ -487,7 +514,7 @@ merged, and its merged map is checked.
   phase 4.
 
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
-the gluing of item 3 and the states of item 4. Items 1 and 2 are done; item 3
+the gluing of item 3 and the states of item 4. Items 1 to 3 are done; item 4
 comes next.
 
 ## Decisions
@@ -548,3 +575,21 @@ Decision review after phase 3:
 - Generators: identified by source entity type and name. In the phase 4 JSON a
   generator is named `Entity.name`; a qualified clash becomes, for
   example, `Customer.Orders.createdAt`.
+
+Next step 3:
+
+- Components: a component is given as an ordered list of members with the
+  arrows out of its kernels, and is merged as a whole. Several components are
+  merged one after the other.
+- Sharing: along the list, each member shares a name with an earlier member
+  through a kernel that has it, instead of every pair through a common kernel.
+  Chains of kernels pass; kernels that overlap, as Customers and Addresses do,
+  need not include into each other.
+- Arrows out of a component: none. A translation out of a member is not a
+  translation out of the glued schema; a merged context serves others through
+  its published languages, which stay outside.
+- The merged map declares no equation between routes.
+- The binary gluing of `Glue.lean` keeps its own proof, on which data gluing
+  rests; the covering theorem of `Union.lean` covers any number of parts.
+- Julia: the Julia side glues the two targets of each kernel of the exchanged
+  map; `Examples/Merge.lean` extends that map in Lean only.
