@@ -236,6 +236,19 @@ theorem functor_empty_self (hS : S.WellFormed) (h : ({} : Translation).Valid S S
   rw [functor_map_mor, Functor.id_map]
   exact Schema.mor_eq_of_names (hobj a) (hobj b) _ _ (names_functorPath_empty hS h _)
 
+/-- Inclusions compose: the composite of the functors of two valid empty
+translations is the functor of the empty translation. -/
+theorem functor_empty_comp_empty (hS' : S'.WellFormed) (hS'' : S''.WellFormed)
+    (h₁ : ({} : Translation).Valid S S') (h₂ : ({} : Translation).Valid S' S'')
+    (h₃ : ({} : Translation).Valid S S'') :
+    functor hS' h₁ ⋙ functor hS'' h₂ = functor hS'' h₃ := by
+  have hobj : ∀ a : S.Obj, obj h₂ (obj h₁ a) = obj h₃ a :=
+    fun a => Subtype.ext (by simp [obj])
+  refine Schema.ext_functor (fun a => congrArg S''.obj (hobj a)) fun a b e => ?_
+  rw [Functor.comp_map, functor_map_mor, functor_map_mor, functor_map_mor]
+  apply Schema.mor_eq_of_names (hobj a) (hobj b)
+  rw [names_functorPath_empty, names_functorPath_empty, names_functorPath_empty]
+
 /-! ## Equality of functors -/
 
 /-- `T` and `T'` agree on the entity types of `S` and send each generator of `S` to

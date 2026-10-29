@@ -64,6 +64,12 @@ structure FinState (K : ValueType → Type) where
   refs : List ((String × String) × List Nat)
   attrs : List ((String × String) × List (Σ v, K v))
 
+instance {K : ValueType → Type} [∀ v, DecidableEq (K v)] : DecidableEq (FinState K) :=
+  fun X Y => decidable_of_iff (X.sizes = Y.sizes ∧ X.refs = Y.refs ∧ X.attrs = Y.attrs) (by
+    obtain ⟨_, _, _⟩ := X
+    obtain ⟨_, _, _⟩ := Y
+    simp)
+
 namespace FinState
 
 variable (X : FinState K)
