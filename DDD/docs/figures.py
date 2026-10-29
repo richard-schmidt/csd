@@ -275,7 +275,7 @@ def embeddings():
             "a proposition, which the shallow constructions consume.")
     f.region(150, 28, 380, 150, "DEEP EMBEDDING: FINITE DATA")
     f.region(600, 28, 290, 150, "SHALLOW EMBEDDING: MATHLIB")
-    f.node("julia", 70, 100, "Julia, Catlab", "muted", w=112, sub="phase 4")
+    f.node("julia", 70, 100, "Julia, Catlab", "muted", w=112, sub="untrusted")
     f.node("data", 245, 100, "deep data", w=140, sub="Schema, Translation")
     f.node("check", 435, 100, "Bool checker", w=150, sub="checkValid S S' peq")
     f.node("prop", 680, 100, "proposition", w=120, sub="T.Valid S S'")
@@ -286,8 +286,8 @@ def embeddings():
     f.arrow("prop", "sem", "uses", "acl", lside=-1)
     f.text(832, 140, "S.cat ⥤ S'.cat", "mono m", "middle")
     f.node("kernel", 330, 245, "decide, decide +kernel", w=190, sub="the kernel evaluates")
-    f.node("native", 590, 245, "native_decide, csd-check", "muted", w=200,
-           sub="trusts the compiler; marked")
+    f.node("native", 590, 245, "csd-check", "muted", w=200,
+           sub="interpreter; trusts the compiler")
     f.arrow("kernel", "check", "evaluates to true", "acl", lside=-1, loff=8, lpos=0.5)
     f.arrow("native", "check", "evaluates to true", "muted", lside=1, loff=8, lpos=0.5)
     return f
@@ -900,7 +900,7 @@ def next_steps():
     return f
 
 
-# 14. The phase 4 pipeline -------------------------------------------------------
+# 14. The pipeline --------------------------------------------------------------
 
 def pipeline():
     f = Fig("pipeline", 920, 260,
