@@ -459,7 +459,8 @@ glued state breaks (`Examples/Open.lean`).
 Next step 7, the native checker, is complete: `csd-check` is an executable
 compiled to native code, a default target of `lake build`, and checks the
 certificate of 32 claims in 0.3 s instead of 205 s; a second workflow builds it
-on aarch64 Linux.
+on aarch64 Linux, and that executable checks the certificate on an Android
+phone under Termux in 0.19 s.
 
 `docs/approach.md`, section 14, relates the schemas to the double theories of
 CatColab: a schema presents a model of the walking proarrow, a translation a
@@ -689,7 +690,14 @@ Done. `csd-check` runs as native code (`DDD/docs/approach.md`, section 10).
    phone under Termux, through glibc-runner, with `cli/measure_check.py`, which
    checks the certificate and a copy with a false claim and reports time and
    memory. CI runs the same script on aarch64 and ships it in the artifact.
-   Not yet run on a phone.
+   Run on 2026-11-02 on an aarch64 phone with Android 14 and glibc-runner
+   2.0-3, from the artifact of commit 20a91aa: the certificate in 0.19 s
+   (0.13 s user) and 42 MB, exit code 0; the copy with a false claim refused
+   with exit code 1; `RESULT: PASS`. The memory is not comparable with the
+   runner's: CI measures the unstripped executable run directly, the phone the
+   stripped one through `grun`. `measure_check.py` reads the maximum resident
+   memory over all child processes so far, so its second line reports the
+   larger of the two runs, not the second run alone.
 
 ### Conditional
 

@@ -3,7 +3,8 @@
 A test run of the native `csd-check` on an Android phone under Termux: whether
 the aarch64 executable runs there, how long it takes and how much memory it
 uses. The result decides whether the checker can serve an editor hosted on the
-phone. The pending run is on the A52 (ssh alias `a52`), driven from the Pixel.
+phone. The run is on the A52 (ssh alias `a52`), driven from the Pixel; the run
+of 2026-11-02 passed (`DDD/README.md`, next step 7).
 
 The A52 rules in the brain's `fleet.md` apply. Every change to the A52 is
 validated with the owner first: step 3 installs packages and needs the owner's
