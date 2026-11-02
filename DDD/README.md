@@ -266,7 +266,9 @@ DDD/
                      Gluing, Routes, Exchange, Merge, Sigma, Open
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check, a native executable (lake exe csd-check), and
-                     csd-export, run with lake env lean --run
+                     csd-export, run with lake env lean --run;
+                     android-test.md and measure_check.py, a test run of
+                     csd-check on Android under Termux
 julia/               Catlab side: src/CsdDDD.jl, run.jl, test/, data/, out/
 ```
 
@@ -683,6 +685,11 @@ Done. `csd-check` runs as native code (`DDD/docs/approach.md`, section 10).
    certificate and their SHA-256 sums. On that runner (two cores) the build
    with Mathlib's cache takes about four minutes, the check 0.09 s and 112 MB,
    and the stripped executable is 175 MB.
+4. `cli/android-test.md`: the test run of the aarch64 executable on an Android
+   phone under Termux, through glibc-runner, with `cli/measure_check.py`, which
+   checks the certificate and a copy with a false claim and reports time and
+   memory. CI runs the same script on aarch64 and ships it in the artifact.
+   Not yet run on a phone.
 
 ### Conditional
 
