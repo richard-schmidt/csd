@@ -818,7 +818,8 @@ library and keeps its compiled modules in the build cache. `csd-export` runs
 with `lake env lean --run`. A second workflow (`csd_check_arm.yml`) builds
 `csd-check` on aarch64 Linux, checks the committed certificate with it, and
 keeps the stripped executable as an artifact; the executable links glibc
-dynamically.
+dynamically. On the two-core aarch64 runner the check takes 0.09 s and 112 MB,
+and the stripped executable is 175 MB.
 
 ## 11. Open systems
 

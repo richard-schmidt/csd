@@ -680,7 +680,9 @@ Done. `csd-check` runs as native code (`DDD/docs/approach.md`, section 10).
 3. CI: `lake exe csd-check` checks the certificate that the Julia side writes.
    `csd_check_arm.yml` builds the executable on `ubuntu-24.04-arm`, checks the
    committed certificate with it, and uploads the stripped executable with the
-   certificate and their SHA-256 sums.
+   certificate and their SHA-256 sums. On that runner (two cores) the build
+   with Mathlib's cache takes about four minutes, the check 0.09 s and 112 MB,
+   and the stripped executable is 175 MB.
 
 ### Conditional
 
