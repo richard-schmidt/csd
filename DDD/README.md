@@ -474,6 +474,9 @@ schemas and translations list their failures one by one, none exactly when the
 check passes, and `csd-check --json` reports them for certificates and context
 map documents (`Examples/Problems.lean`).
 
+Next step 9, the model editor, is in progress: its code is in the repository
+`csd-editor`, and it is not yet deployed.
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -737,6 +740,23 @@ section 10).
    `#guard`. `csd-export` writes `brokenMap` to `cli/test/broken-map.json`; CI
    checks that it is up to date and runs `cli/test/check_report.py` on the
    output of `csd-check --json`.
+
+### 9. Model editor
+
+In progress, in the repository `csd-editor`. An editor of context map documents
+for desktops and phones, served from the A52 over Tailscale.
+
+1. A Python standard-library server stores each model as a context map document
+   in a git repository, refuses a save on top of a newer version, and checks a
+   document by running `csd-check --json` on it, through glibc-runner on the A52.
+2. The editor edits contexts (entity types, references, attributes, equations,
+   aggregates, value objects) and arrows (entity and generator images), carries
+   renames through the model, and shows the problems of the report at the rows
+   they name, in a problem list and in a diagram of each schema and of the map.
+3. Its `deploy/deploy.sh`, run from the Pixel, takes the aarch64 `csd-check` from
+   the artifact of `csd_check_arm.yml`.
+
+Done when the editor runs on the A52.
 
 ### Conditional
 
