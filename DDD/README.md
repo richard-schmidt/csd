@@ -474,8 +474,9 @@ schemas and translations list their failures one by one, none exactly when the
 check passes, and `csd-check --json` reports them for certificates and context
 map documents (`Examples/Problems.lean`).
 
-Next step 9, the model editor, is in progress: its code is in the repository
-`csd-editor`, and it is not yet deployed.
+Next step 9, the model editor, is complete: `csd-editor` runs on the A52 since
+2026-11-02, reached over Tailscale, and checks each document with the aarch64
+`csd-check` through glibc-runner (the example map: 13 claims in 0.17 s).
 
 ## Next steps
 
@@ -743,8 +744,8 @@ section 10).
 
 ### 9. Model editor
 
-In progress, in the repository `csd-editor`. An editor of context map documents
-for desktops and phones, served from the A52 over Tailscale.
+Done, in the repository `csd-editor`. An editor of context map documents for
+desktops and phones, served from the A52 over Tailscale.
 
 1. A Python standard-library server stores each model as a context map document
    in a git repository, refuses a save on top of a newer version, and checks a
@@ -756,7 +757,10 @@ for desktops and phones, served from the A52 over Tailscale.
 3. Its `deploy/deploy.sh`, run from the Pixel, takes the aarch64 `csd-check` from
    the artifact of `csd_check_arm.yml`.
 
-Done when the editor runs on the A52.
+Done when the editor runs on the A52: deployed on 2026-11-02 with the checker
+of commit 2204184; the deploy's check of the example map passes (13 claims,
+0.17 s). git is not installed on the A52, so models are stored without history
+there until it is.
 
 ### Conditional
 
@@ -776,7 +780,7 @@ Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
 the gluing along a kernel and the finite states of phase 4; item 6 uses the
 covering theorem of item 3 and the machines of phase 5; item 7 uses the
 certificates of phase 4, and item 8 the certificates and the executable of
-item 7. Items 1 to 8 are done.
+item 7. Items 1 to 9 are done.
 
 ## Decisions
 
