@@ -818,8 +818,10 @@ library and keeps its compiled modules in the build cache. `csd-export` runs
 with `lake env lean --run`. A second workflow (`csd_check_arm.yml`) builds
 `csd-check` on aarch64 Linux, checks the committed certificate with it, and
 keeps the stripped executable as an artifact; the executable links glibc
-dynamically. On the two-core aarch64 runner the check takes 0.09 s and 112 MB,
-and the stripped executable is 175 MB.
+dynamically. The stripped executable is 175 MB; on the two-core aarch64
+runner it checks the certificate in 0.09 s with 110 MB. On an Android 14 phone
+under Termux, through glibc-runner, it checks it in 0.19 s with 42 MB
+(`cli/android-test.md`).
 
 ## 11. Open systems
 

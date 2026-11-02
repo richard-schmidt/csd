@@ -31,8 +31,9 @@ The four files are the artifact `csd-check-linux-aarch64` of the workflow
 after its run. A push to `claude/ddd-design` that changes `cli/` or a Lean
 file of `DDD/` produces a new one.
 
-Reference, on GitHub's two-core aarch64 runner: 0.09 s and 112 MB for the
-certificate.
+Reference for the certificate: 0.09 s and 110 MB on GitHub's two-core aarch64
+runner, the stripped executable run directly; 0.19 s and 42 MB on the A52
+through `grun` (2026-11-02).
 
 ## Steps
 

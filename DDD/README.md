@@ -685,8 +685,8 @@ Done. `csd-check` runs as native code (`DDD/docs/approach.md`, section 10).
    `csd_check_arm.yml` builds the executable on `ubuntu-24.04-arm`, checks the
    committed certificate with it, and uploads the stripped executable with the
    certificate and their SHA-256 sums. On that runner (two cores) the build
-   with Mathlib's cache takes about four minutes, the check 0.09 s and 112 MB,
-   and the stripped executable is 175 MB.
+   with Mathlib's cache takes about four minutes, and the stripped executable
+   is 175 MB; it checks the certificate in 0.09 s with 110 MB.
 4. `cli/android-test.md`: the test run of the aarch64 executable on an Android
    phone under Termux, through glibc-runner, with `cli/measure_check.py`, which
    checks the certificate and a copy with a false claim and reports time and
@@ -698,7 +698,9 @@ Done. `csd-check` runs as native code (`DDD/docs/approach.md`, section 10).
    that version of `measure_check.py`, which read the maximum resident memory
    over all child processes so far; its second line gave the larger of the two
    runs. The script now reads time and memory per run (`os.wait4`), and CI
-   measures the stripped executable of the artifact, run directly.
+   measures the stripped executable of the artifact, run directly: 110 MB on
+   the runner against 42 MB on the phone, so the difference comes from neither
+   stripping nor the measurement.
 
 ### Conditional
 
