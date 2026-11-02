@@ -70,9 +70,11 @@ The checks and their lemmas:
 | Property | Checker | Lemma | Complete when |
 |---|---|---|---|
 | `S.WellFormed` | `checkWellFormed` | `checkWellFormed_iff` | always |
+| the failures of that check, one by one | `Schema.problems` | `problems_eq_nil_iff`, `problems_eq_nil_iff_wellFormed` | always |
 | `S.Acyclic` | `checkAcyclic` | `checkAcyclic_iff` | always |
 | `S.PathEq a l l'` | `pathEqFree`, `pathEqAcyclic`, `pathEq` | `pathEq_sound` | `S` free or acyclic (`pathEq_iff_of_free`, `pathEq_iff_of_acyclic`) |
 | `T.Valid S S'` | `checkValid` with a path-equality checker for `S'` | `checkValid_sound`, `checkValid_iff` | the path-equality checker is complete |
+| the failures of `checkValid`, one by one | `Translation.problems` | `Translation.problems_eq_nil_iff` | always |
 | `Schema.Gluable K B₁ B₂` | `checkGluable` | `checkGluable_sound` | not stated |
 | members of a context map share names only through kernels | `checkComponent` | `Component.agree`, `Component.isColimit` | not stated; depends on the order of the members |
 | functor of `T` full and faithful | `checkFullyFaithful` | `checkFullyFaithful_sound` | not stated; needs `S`, `S'` acyclic |
@@ -775,6 +777,46 @@ among them, since the checkers share modules with their soundness proofs. Its
 first build compiles their C code, about three minutes on four cores, and the
 stripped executable is 171 MB.
 
+### Reports
+
+A check answers with a `Bool`. `Problems.lean` lists the failures one by one,
+with the names they concern. `Schema.problems` has one problem per failed
+condition of `WellFormed` and per element at fault, of thirteen kinds: among
+them a name declared twice, a reference to an undeclared entity type, an
+equation whose sides end at different objects, and a reference from outside an
+aggregate to one of its members. There are none exactly when the check passes
+(`problems_eq_nil_iff`). `Translation.problems` does the same for `checkValid`:
+an entity type sent outside the target, a generator sent to a path that ends
+elsewhere or is not a path of the target, an equation sent to paths that path
+equality in the target does not show equal.
+
+`Report.lean` explains each failing claim of a certificate:
+
+- well-formedness and translations, by these problems;
+- acyclicity, by a path with more generators than the schema has entity types;
+- gluing, by the names two schemas share outside the kernel;
+- every claim, by the parts of its check that fail.
+
+Whether a claim holds is still decided by `checkClaim`. A context map document
+(`MapDoc`) is checked as the certificate of its claims: each context is well
+formed and each arrow a valid translation (`MapDoc.certificate`).
+`csd-check --json` prints the report. It gives, for each claim of a
+certificate, or each context and arrow of a map, whether it holds and its
+problems: JSON objects with a `kind`, the names concerned and a `message`.
+Without `--json`, each failing claim is followed by the messages of its
+problems.
+
+`Examples/Problems.lean` states the problems of:
+
+- a schema that breaks every condition;
+- the variants of Orders and Catalog that break the aggregate rule;
+- two translations into Payments;
+- the report of a map with a broken context, a failing arrow and an arrow to a
+  missing context.
+
+`csd-export` writes that map to `cli/test/broken-map.json`, and CI checks the
+output of `csd-check --json` on it with `cli/test/check_report.py`.
+
 ### The Julia side
 
 `julia/src/CsdDDD.jl` uses Catlab 0.16.20 and JSON3 on Julia 1.10; the pushout
@@ -801,16 +843,18 @@ which restrict to the same kernel state) and of the anti-corruption layer from
 OrdersPL into Payments; and a homomorphism between two Shipping states. All 32
 claims pass `csd-check`.
 
-CI checks that the exported workspace equals the committed
-`julia/data/workspace.json`, runs `julia/run.jl` and the Julia tests, and runs
-`csd-check` on the certificate:
+CI checks that the exported workspace and broken map equal the committed
+`julia/data/workspace.json` and `cli/test/broken-map.json`, runs `julia/run.jl`
+and the Julia tests, runs `csd-check` on the certificate, and checks its
+reports:
 
 ```sh
-lake env lean --run cli/CsdExport.lean julia/data/workspace.json
+lake env lean --run cli/CsdExport.lean
 julia --project=julia -e 'using Pkg; Pkg.instantiate()'
 julia --project=julia julia/run.jl
 julia --project=julia julia/test/runtests.jl
 lake exe csd-check julia/out/certificate.json
+python3 cli/test/check_report.py
 ```
 
 `csd-check` is a default target of `lake build`, so CI builds it with the
@@ -1078,6 +1122,8 @@ are outside the library.*
 | `Data.lean` | `FinState`, `check`, `toState`, value objects, `FinHom`, `restrict`, `restrictIso` |
 | `Json.lean` | the exchange format `csd-ddd/1` |
 | `Certificate.lean` | `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`, claims, `checkClaim_sound` |
+| `Problems.lean` | `Schema.problems`, `problems_eq_nil_iff`, `Translation.problems`, their sentences |
+| `Report.lean` | problems as JSON, `Certificate.explain`, `Certificate.report`, `MapDoc.certificate`, `MapDoc.report` |
 | `Examples/Catalog.lean` | a free schema with a cycle; CatalogPL |
 | `Examples/Orders.lean` | an acyclic schema with two equations; OrdersPL and a failing one |
 | `Examples/Payments.lean`, `Shipping.lean` | the other two contexts |
@@ -1088,6 +1134,7 @@ are outside the library.*
 | `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, a qualified second ordering context, machines in series, aggregate machines and the report of the context, events of the example map |
 | `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along OrdersPL → Orders or CatalogPL → Orders |
 | `Examples/Exchange.lean` | the example map as a workspace document, round trips, the `createdAt` clash |
+| `Examples/Problems.lean` | the problems of broken schemas and translations, the report of `brokenMap` |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
 The core modules share the namespace `DDD`, with the operations on schemas in
@@ -1095,7 +1142,9 @@ The core modules share the namespace `DDD`, with the operations on schemas in
 glob (`lake build DDD`), with no root file importing all modules. Outside it:
 
 - `cli/`: `CsdCheck.lean`, built as the executable `csd-check`, and
-  `CsdExport.lean`, run with `lake env lean --run`;
+  `CsdExport.lean`, run with `lake env lean --run`; `test/`, the broken map and
+  the check of the reports; `android-test.md` and `measure_check.py`, the run on
+  a phone;
 - `julia/`: `src/CsdDDD.jl`, `run.jl`, `test/`, `data/` (the exported
   workspace) and `out/` (the certificate);
 - `docs/`: this document, its figures, and `figures.py`, which draws them.
@@ -1226,6 +1275,14 @@ The correspondence leaves out part of each side:
 - `csd-check` trusts the Lean compiler and runtime. It links every module it
   imports, Mathlib's category theory among them, because the checkers share
   modules with their soundness proofs; the stripped executable is 171 MB.
+- Problems are proved to be none exactly when the check passes for
+  well-formedness and translations. For the other claims the report lists the
+  parts of the check that fail; a state that fails its check is not explained
+  violation by violation, since `FinState.violations` lives with the aggregate
+  machines.
+- A context map document is checked for well-formed contexts and valid
+  translations; its route equations, kernels and published languages are not
+  checked from the document.
 - The checks compare names as strings in the kernel. The strict
   non-interference checks of the example take 14 to 22 seconds of kernel time
   each, which bounds the size of schemas checked with `decide`.

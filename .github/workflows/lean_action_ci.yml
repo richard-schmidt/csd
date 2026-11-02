@@ -20,10 +20,10 @@ jobs:
       - uses: leanprover/lean-action@v1
       # DDD phase 4: the exported workspace is up to date, the Julia side
       # reproduces the examples, and Lean accepts its certificate.
-      - name: Export the DDD example workspace
+      - name: Export the DDD example workspace and the broken map
         run: |
-          lake env lean --run cli/CsdExport.lean julia/data/workspace.json
-          git diff --exit-code julia/data/workspace.json
+          lake env lean --run cli/CsdExport.lean
+          git diff --exit-code julia/data/workspace.json cli/test/broken-map.json
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.10'
@@ -36,6 +36,9 @@ jobs:
       # csd-check is a default target, built natively by lean-action.
       - name: Check the certificate with csd-check
         run: lake exe csd-check julia/out/certificate.json
+      # The JSON report: the problems of the broken map, none for the certificate.
+      - name: Check the reports of csd-check
+        run: python3 cli/test/check_report.py
       # API docs take ~30 min and deploy to GitHub Pages, which a private
       # repo cannot host: only on main, once the repository is public.
       - uses: leanprover-community/docgen-action@v1

@@ -1,0 +1,111 @@
+{"routeEquations": [],
+ "kind": "map",
+ "format": "csd-ddd/1",
+ "contexts":
+ [{"schema":
+   {"valueObjects": ["Address"],
+    "references":
+    [{"target": "Address", "name": "Customer.address"},
+     {"target": "Customer", "name": "Order.customer"},
+     {"target": "Address", "name": "Order.billTo"},
+     {"target": "Address", "name": "Order.shipTo"}],
+    "equations":
+    [{"source": "Order", "rhs": ["customer", "address"], "lhs": ["billTo"]}],
+    "entities": ["Customer", "Address", "Order"],
+    "attributes":
+    [{"type": "string", "name": "Customer.name"},
+     {"type": "string", "name": "Address.street"},
+     {"type": "string", "name": "Address.city"},
+     {"type": "uuid", "name": "Order.id"},
+     {"type": "date", "name": "Order.placedOn"}],
+    "aggregates":
+    [{"root": "Customer", "members": []},
+     {"root": "Address", "members": []},
+     {"root": "Order", "members": []}]},
+   "name": "OrdersPL",
+   "kernel": false},
+  {"schema":
+   {"valueObjects": ["Address"],
+    "references":
+    [{"target": "Address", "name": "Payer.address"},
+     {"target": "Payer", "name": "Invoice.payer"},
+     {"target": "Address", "name": "Invoice.shipTo"},
+     {"target": "Invoice", "name": "InvoiceLine.invoice"},
+     {"target": "Invoice", "name": "Payment.invoice"},
+     {"target": "Payment", "name": "Refund.payment"},
+     {"target": "Invoice", "name": "Refund.invoice"}],
+    "equations":
+    [{"source": "Refund", "rhs": ["payment", "invoice"], "lhs": ["invoice"]}],
+    "entities":
+    ["Payer", "Address", "Invoice", "InvoiceLine", "Payment", "Refund"],
+    "attributes":
+    [{"type": "string", "name": "Payer.name"},
+     {"type": "string", "name": "Address.street"},
+     {"type": "string", "name": "Address.city"},
+     {"type": "uuid", "name": "Invoice.orderId"},
+     {"type": "date", "name": "Invoice.orderedOn"},
+     {"type": "int", "name": "InvoiceLine.quantity"},
+     {"type": "decimal", "name": "InvoiceLine.unitPrice"},
+     {"type": "string", "name": "InvoiceLine.description"},
+     {"type": "decimal", "name": "Payment.amount"},
+     {"type": "date", "name": "Payment.paidOn"},
+     {"type": {"named": "PaymentMethod"}, "name": "Payment.method"},
+     {"type": "decimal", "name": "Refund.amount"},
+     {"type": "date", "name": "Refund.issuedOn"}],
+    "aggregates":
+    [{"root": "Payer", "members": []},
+     {"root": "Address", "members": []},
+     {"root": "Invoice",
+      "members": [{"owner": "invoice", "entity": "InvoiceLine"}]},
+     {"root": "Payment",
+      "members": [{"owner": "payment", "entity": "Refund"}]}]},
+   "name": "Payments",
+   "kernel": false},
+  {"schema":
+   {"valueObjects": ["A", "V"],
+    "references":
+    [{"target": "B", "name": "A.b"},
+     {"target": "C", "name": "A.b"},
+     {"target": "B", "name": "Z.x"}],
+    "equations":
+    [{"source": "A", "rhs": ["b"], "lhs": ["b", "name"]},
+     {"source": "Q", "rhs": [], "lhs": []}],
+    "entities": ["A", "B", "A"],
+    "attributes":
+    [{"type": "string", "name": "B.name"}, {"type": "int", "name": "Y.v"}],
+    "aggregates":
+    [{"root": "A", "members": [{"owner": "a", "entity": "B"}]},
+     {"root": "B", "members": []},
+     {"root": "W", "members": []}]},
+   "name": "Broken",
+   "kernel": false}],
+ "arrows":
+ [{"translation":
+   {"generators":
+    [{"path": ["payer"], "name": "Order.customer"},
+     {"path": ["payer", "address"], "name": "Order.billTo"},
+     {"path": ["orderId"], "name": "Order.id"},
+     {"path": ["orderedOn"], "name": "Order.placedOn"}],
+    "entities":
+    [{"target": "Payer", "source": "Customer"},
+     {"target": "Invoice", "source": "Order"}]},
+   "target": "Payments",
+   "source": "OrdersPL",
+   "name": "billing"},
+  {"translation":
+   {"generators":
+    [{"path": ["shipTo"], "name": "Order.billTo"},
+     {"path": ["payer"], "name": "Order.customer"},
+     {"path": ["payer", "address"], "name": "Order.billTo"},
+     {"path": ["orderId"], "name": "Order.id"},
+     {"path": ["orderedOn"], "name": "Order.placedOn"}],
+    "entities":
+    [{"target": "Payer", "source": "Customer"},
+     {"target": "Invoice", "source": "Order"}]},
+   "target": "Payments",
+   "source": "OrdersPL",
+   "name": "billingToShipping"},
+  {"translation": {"generators": [], "entities": []},
+   "target": "Nowhere",
+   "source": "OrdersPL",
+   "name": "dangling"}]}

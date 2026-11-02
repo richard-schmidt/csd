@@ -262,13 +262,16 @@ DDD/
   Data.lean          finite states, homomorphisms and restriction as data
   Json.lean          the exchange format csd-ddd/1
   Certificate.lean   certificates, their checks and soundness
+  Problems.lean      the failures of the checks of schemas and translations
+  Report.lean        reports of certificates and context map documents
   Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
-                     Gluing, Routes, Exchange, Merge, Sigma, Open
+                     Gluing, Routes, Exchange, Merge, Sigma, Open, Problems
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check, a native executable (lake exe csd-check), and
                      csd-export, run with lake env lean --run;
                      android-test.md and measure_check.py, a test run of
-                     csd-check on Android under Termux
+                     csd-check on Android under Termux; test/, the broken map
+                     and the check of the reports of csd-check
 julia/               Catlab side: src/CsdDDD.jl, run.jl, test/, data/, out/
 ```
 
@@ -465,6 +468,11 @@ phone under Termux in 0.19 s.
 `docs/approach.md`, section 14, relates the schemas to the double theories of
 CatColab: a schema presents a model of the walking proarrow, a translation a
 morphism of models, and the section lists what the correspondence leaves out.
+
+Next step 8, problems and reports, is complete, with no `sorry`: the checks of
+schemas and translations list their failures one by one, none exactly when the
+check passes, and `csd-check --json` reports them for certificates and context
+map documents (`Examples/Problems.lean`).
 
 ## Next steps
 
@@ -702,6 +710,34 @@ Done. `csd-check` runs as native code (`DDD/docs/approach.md`, section 10).
    the runner against 42 MB on the phone, so the difference comes from neither
    stripping nor the measurement.
 
+### 8. Problems and reports
+
+Done. Failures one by one, for reports and editors (`DDD/docs/approach.md`,
+section 10).
+
+1. `Problems.lean`: `Schema.problems`, the failures of the conditions of
+   `WellFormed`, thirteen kinds, each with the names it concerns; none exactly
+   when `checkWellFormed` passes (`problems_eq_nil_iff`, one lemma per group of
+   conditions). `Translation.problems`, the failures of `checkValid`: entity
+   images outside the target, generators sent to paths that end elsewhere or are
+   not paths, source images of equations, and equations whose images path
+   equality does not show equal; none exactly when the check passes. A sentence
+   (`describe`) and a `kind` for each problem.
+2. `Report.lean`: problems as JSON objects with their kind, names and message;
+   `Certificate.explain`, the problems of a failing claim, and
+   `Certificate.result`, whether it holds by `checkClaim` and why not;
+   `Certificate.report`. `MapDoc.certificate`, the claims of a context map
+   document, and `MapDoc.report`, the results by context and by arrow.
+3. `csd-check [--json] file.json` reads a certificate or a context map
+   document; the text output lists the problems of each failing claim, `--json`
+   prints the report. An unreadable file gives exit code 2.
+4. `Examples/Problems.lean`: the problems of a schema that breaks every
+   condition, of the two variants that break the aggregate rule, and of two
+   translations into Payments, by `decide`; the report of `brokenMap` by
+   `#guard`. `csd-export` writes `brokenMap` to `cli/test/broken-map.json`; CI
+   checks that it is up to date and runs `cli/test/check_report.py` on the
+   output of `csd-check --json`.
+
 ### Conditional
 
 - Names as indices instead of strings in the checkers, with a lemma relating
@@ -719,7 +755,8 @@ Done. `csd-check` runs as native code (`DDD/docs/approach.md`, section 10).
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
 the gluing along a kernel and the finite states of phase 4; item 6 uses the
 covering theorem of item 3 and the machines of phase 5; item 7 uses the
-certificates of phase 4. Items 1 to 7 are done.
+certificates of phase 4, and item 8 the certificates and the executable of
+item 7. Items 1 to 8 are done.
 
 ## Decisions
 
@@ -886,3 +923,21 @@ Next step 7:
   compiled modules; `csd-export` stays interpreted.
 - The aarch64 build runs on pushes that change `cli/`, the Lean files of `DDD/`,
   the committed certificate or the build configuration.
+
+Next step 8:
+
+- Whether a claim holds is decided by `checkClaim` alone; problems explain a
+  failure. For well-formedness and translations the problems are complete: none
+  exactly when the check passes. For the other claims the report lists the
+  parts of the check that fail.
+- The problem lists follow the conditions of the checks, group by group, so each
+  lemma is proved per group against the conjunct of the check.
+- A context map document is checked through a certificate derived in Lean, so
+  the claims of a map are defined next to the checks, not by the tools that call
+  `csd-check`.
+- Problems carry names (entity types, generators as `Entity.name`, equations as
+  data), not positions in lists, so an editor can locate them in its own
+  document.
+- `Report.lean` does not explain a failing state violation by violation:
+  `FinState.violations` is defined with the aggregate machines, which import
+  `Production`.

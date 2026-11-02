@@ -798,10 +798,10 @@ def aggregates():
 # 17. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1060, 546,
+    f = Fig("modules", 1180, 546,
             "Imports between the modules of the DDD library: a chain from value types to "
-            "certificates, context maps, states and open systems beside it, and the examples on "
-            "top.")
+            "certificates and reports, context maps, states and open systems beside it, and the "
+            "examples on top.")
     f.text(20, 18, "on Mathlib: Paths, Quotient, Grothendieck, IsPushout, Kan extensions", "note")
     core = [("Values", 55), ("Schema", 158), ("Semantics", 263), ("PathEq", 368),
             ("Translation", 475), ("Glue", 582), ("States", 685), ("Data", 785),
@@ -810,6 +810,10 @@ def modules():
         f.node(name, x, 55, name, w=92 if name != "Certificate" else 100, h=30)
     for (a, _), (b, _) in zip(core, core[1:]):
         f.arrow(a, b, "", "acl")
+    f.node("Report", 1112, 55, "Report", "pl", w=84, h=30)
+    f.node("Problems", 1112, 125, "Problems", w=92, h=30)
+    f.arrow("Certificate", "Report", "", "acl")
+    f.arrow("Problems", "Report", "", "acl")
     f.node("Compose", 420, 125, "Compose", w=92, h=30)
     f.node("ContextMap", 530, 125, "ContextMap", w=100, h=30)
     f.node("Union", 640, 125, "Union", w=80, h=30)
@@ -837,7 +841,7 @@ def modules():
     f.arrow("Aggregates", "AggregateMachine", "", "acl")
     f.arrow("OpenMachine", "AggregateMachine", "", "acl")
     dy = 50
-    f.region(20, 235 + dy, 1020, 220, "EXAMPLES")
+    f.region(20, 235 + dy, 1140, 220, "EXAMPLES")
     f.raw(f'<rect class="rg plain" x="38" y="{266 + dy}" width="358" height="44" rx="6"/>', "back")
     for name, x in [("Catalog", 82), ("Orders", 172), ("Payments", 262), ("Shipping", 352)]:
         f.node("x" + name, x, 288 + dy, name, w=82, h=30)
@@ -866,20 +870,24 @@ def modules():
     f.poly([(790, 125), (810, 125), (810, 442 + dy), (600, 442 + dy), (600, 433 + dy)], "muted")
     f.poly([(752, 208), (752, 398 + dy)], "muted")
     f.arrow("xMerge", "xOpen", "", "muted")
-    f.text(1040, 518, "arrows point from a module to the modules that import it; Certificate "
-           "and Union also import Compose, Open imports Compose and Glue,", "note", "end")
-    f.text(1040, 534, "OpenMachine imports Data and Production.Wiring, Aggregates imports Union "
-           "and States, the example Open imports Rename and AggregateMachine", "note", "end")
+    f.node("xProblems", 1105, 365 + dy, "Problems", w=90, h=30)
+    f.poly([(1154, 55), (1170, 55), (1170, 365 + dy), (1150, 365 + dy)], "muted")
+    f.text(1160, 518, "arrows point from a module to the modules that import it; Certificate "
+           "and Union also import Compose, Open imports Compose and Glue, Problems imports "
+           "Translation,", "note", "end")
+    f.text(1160, 534, "OpenMachine imports Data and Production.Wiring, Aggregates imports Union "
+           "and States, the example Open imports Rename and AggregateMachine, the example "
+           "Problems imports Integration", "note", "end")
     return f
 
 
 # Next steps, in DDD/README.md ---------------------------------------------------
 
 def next_steps():
-    f = Fig("next-steps", 1210, 300,
+    f = Fig("next-steps", 1380, 300,
             "The next steps in order, left to right, with the dependencies between them.")
     f.text(24, 28, "order of work", "rgl")
-    f.poly([(120, 23), (1180, 23)], "muted")
+    f.poly([(120, 23), (1350, 23)], "muted")
     f.node("s1", 85, 120, "1. Coherence by check", w=152, sub="Translation.comp", h=44)
     f.node("s2", 255, 120, "2. Phase 4", "pl", w=150, sub="JSON, certificates", h=44)
     f.node("s3", 425, 120, "3. Several inclusions", w=150, sub="n-ary gluing", h=44)
@@ -887,6 +895,7 @@ def next_steps():
     f.node("s5", 765, 120, "5. Phase 5", "kern", w=150, sub="open systems", h=44)
     f.node("s6", 945, 120, "6. Aggregates", w=150, sub="aggregate machines", h=44)
     f.node("s7", 1115, 120, "7. Native checker", "pl", w=150, sub="csd-check compiled", h=44)
+    f.node("s8", 1285, 120, "8. Problems", w=150, sub="reports, --json", h=44)
     f.arrow("s1", "s3", "composite translations", "acl", bend=-26, lpos=0.5, lside=-1,
             loff=10)
     f.arrow("s2", "s5", "finite states", "acl", bend=34, lpos=0.5, lside=1, loff=10)
@@ -894,6 +903,7 @@ def next_steps():
     f.arrow("s5", "s6", "machines", "acl", lside=1, loff=34)
     f.arrow("s3", "s6", "covering theorem", "acl", bend=-34, lpos=0.5, lside=-1, loff=10)
     f.arrow("s2", "s7", "certificates", "acl", bend=60, lpos=0.62, lside=1, loff=10)
+    f.arrow("s7", "s8", "", "acl")
     f.node("c1", 300, 250, "names as indices", "muted", w=190,
            sub="if checks exceed CI time", h=40)
     f.node("c2", 580, 250, "rewriting certificates", "muted", w=260,

@@ -1,0 +1,287 @@
+import DDD.Certificate
+import DDD.Problems
+
+/-!
+# Reports
+
+A report says, for each claim of a certificate, whether its check passes and,
+when it fails, which problems explain the failure. Whether a claim holds is
+decided by `Certificate.checkClaim` alone, which is sound
+(`Certificate.checkClaim_sound`). The problems explain a failure:
+
+- well-formedness: the problems of the schema (`Schema.problems`), none exactly
+  when the check passes;
+- acyclicity: those, and a path longer than the number of entity types;
+- translation: the problems of the target schema and of the translation
+  (`Translation.problems`), none exactly when the check passes;
+- gluing, state, restriction, homomorphism: the parts of the check that fail, with
+  the problems of the schemas and translations involved and the names that two
+  schemas share outside a kernel.
+
+A failing claim with no explanation reports that its check fails.
+
+A context map document (`MapDoc`) is checked through the certificate of its
+claims (`MapDoc.certificate`): each context is well formed, and each arrow is a
+valid translation from the schema of its source to the schema of its target.
+`MapDoc.report` gives the results by context and by arrow.
+
+Every problem is a JSON object with a `kind`, the names it concerns, and a
+`message`. `Certificate.report` and `MapDoc.report` are the output of
+`csd-check --json`.
+-/
+
+namespace DDD
+
+open Lean
+
+/-! ## Problems as JSON -/
+
+def Ob.toJson : Ob → Json
+  | .entity e => Json.mkObj [("entity", .str e)]
+  | .value v => Json.mkObj [("value", Lean.toJson v)]
+
+def Equation.toJson (q : Equation) : Json :=
+  Json.mkObj [("source", .str q.src), ("lhs", Lean.toJson q.lhs), ("rhs", Lean.toJson q.rhs)]
+
+def endJson : Option Ob → Json
+  | some o => o.toJson
+  | none => .null
+
+/-- A problem: its kind, the names it concerns, and a sentence. -/
+def problemJson (kind : String) (fields : List (String × Json)) (message : String) : Json :=
+  Json.mkObj ([("kind", .str kind)] ++ fields ++ [("message", .str message)])
+
+namespace Schema.Problem
+
+/-- The names a problem concerns. Generators are named `Entity.name`, as in the
+exchange format. -/
+def fields : Problem → List (String × Json)
+  | .duplicateEntity e => [("entity", .str e)]
+  | .duplicateGenerator e n => [("entity", .str e), ("generator", .str s!"{e}.{n}")]
+  | .refSource r | .refTarget r =>
+    [("generator", .str s!"{r.src}.{r.name}"), ("source", .str r.src), ("target", .str r.tgt)]
+  | .attrSource a =>
+    [("generator", .str s!"{a.src}.{a.name}"), ("source", .str a.src),
+      ("type", Lean.toJson a.tgt)]
+  | .eqnSource q => [("equation", q.toJson)]
+  | .eqnNotParallel q l r =>
+    [("equation", q.toJson), ("lhsEnd", endJson l), ("rhsEnd", endJson r)]
+  | .aggregateEntity root e => [("aggregate", .str root), ("entity", .str e)]
+  | .aggregateOverlap e => [("entity", .str e)]
+  | .missingOwner root m =>
+    [("aggregate", .str root), ("entity", .str m.entity),
+      ("generator", .str s!"{m.entity}.{m.owner}")]
+  | .boundary r root =>
+    [("generator", .str s!"{r.src}.{r.name}"), ("source", .str r.src), ("target", .str r.tgt),
+      ("aggregate", .str root)]
+  | .valueObjectEntity e | .valueObjectAttrs e => [("entity", .str e)]
+
+/-- A problem of the schema named `schema`. -/
+def toJson (schema : String) (p : Problem) : Json :=
+  problemJson p.kind ([("schema", .str schema)] ++ p.fields) p.describe
+
+end Schema.Problem
+
+namespace Translation.Problem
+
+def fields : Problem → List (String × Json)
+  | .entity e image => [("entity", .str e), ("image", .str image)]
+  | .ref r path expected ends =>
+    [("generator", .str s!"{r.src}.{r.name}"), ("path", Lean.toJson path),
+      ("expected", expected.toJson), ("ends", endJson ends)]
+  | .attr a path ends =>
+    [("generator", .str s!"{a.src}.{a.name}"), ("path", Lean.toJson path),
+      ("expected", (Ob.value a.tgt).toJson), ("ends", endJson ends)]
+  | .eqnSource q image => [("equation", q.toJson), ("image", .str image)]
+  | .eqn q l r =>
+    [("equation", q.toJson), ("lhsImage", Lean.toJson l), ("rhsImage", Lean.toJson r)]
+
+/-- A problem of the translation from the schema named `source` to the schema named
+`target`. -/
+def toJson (source target : String) (p : Problem) : Json :=
+  problemJson p.kind ([("source", .str source), ("target", .str target)] ++ p.fields) p.describe
+
+end Translation.Problem
+
+/-- A path out of an entity type of `S` with more generators than `S` has entity
+types, if there is one; such a path runs through a cycle. -/
+def Schema.longPath? (S : Schema) : Option (String × List String) :=
+  S.entities.findSome? fun e =>
+    ((S.paths (.entity e) (S.entities.length + 1)).find? fun l =>
+      S.entities.length < l.length).map (e, ·)
+
+/-! ## Claims -/
+
+/-- The names a claim is about, as in the certificate format. -/
+def Claim.refFields : Claim → List (String × Json)
+  | .wellFormed s => [("claim", .str "wellFormed"), ("schema", .str s)]
+  | .acyclic s => [("claim", .str "acyclic"), ("schema", .str s)]
+  | .translation s t _ => [("claim", .str "translation"), ("source", .str s), ("target", .str t)]
+  | .gluing k l r g _ => [("claim", .str "gluing"), ("kernel", .str k), ("left", .str l),
+      ("right", .str r), ("glued", .str g)]
+  | .state x => [("claim", .str "state"), ("state", .str x)]
+  | .restriction s t _ x y => [("claim", .str "restriction"), ("source", .str s),
+      ("target", .str t), ("state", .str x), ("result", .str y)]
+  | .homomorphism x y _ => [("claim", .str "homomorphism"), ("from", .str x), ("to", .str y)]
+
+namespace Certificate
+
+variable (c : Certificate)
+
+def unknown (what name : String) : Json :=
+  problemJson s!"unknown{what.capitalize}" [(what, .str name)] s!"there is no {what} named {name}"
+
+/-- The problems of a named schema, or that it is missing. -/
+def schemaProblems (n : String) : List Json :=
+  match c.schema? n with
+  | some S => S.problems.map (Schema.Problem.toJson n)
+  | none => [unknown "schema" n]
+
+/-- The parts of a check that fail, each with its kind and sentence. -/
+def failing (parts : List (Bool × String × String)) : List Json :=
+  parts.filterMap fun (ok, kind, message) => if ok then none else some (problemJson kind [] message)
+
+/-- The problems of the inclusion of `n` into `m` by the empty translation. -/
+def inclusionProblems (n m : String) (S S' : Schema) : List Json :=
+  ((({} : Translation).problems S S' S'.pathEq).map (Translation.Problem.toJson n m))
+
+/-- The problems that explain a failing claim. -/
+def explain : Claim → List Json
+  | .wellFormed s => c.schemaProblems s
+  | .acyclic s => match c.schema? s with
+    | some S => c.schemaProblems s ++
+      if S.checkAcyclic then [] else match S.longPath? with
+        | some (e, l) => [problemJson "cycle" [("schema", .str s), ("entity", .str e),
+            ("path", Lean.toJson l)]
+            s!"the path {pathText l} out of {e} has more generators than {s} has entity types, \
+              so it runs through a cycle"]
+        | none => [problemJson "cycle" [("schema", .str s)] s!"{s} has a cycle"]
+    | none => [unknown "schema" s]
+  | .translation s t T => match c.schema? s, c.schema? t with
+    | some S, some S' =>
+      c.schemaProblems t ++ (T.problems S S' S'.pathEq).map (Translation.Problem.toJson s t)
+    | _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
+      (if (c.schema? t).isNone then [unknown "schema" t] else [])
+  | .gluing k l r g ff => match c.schema? k, c.schema? l, c.schema? r, c.schema? g with
+    | some K, some L, some R, some G =>
+      let glued := Schema.glue L R
+      c.schemaProblems k ++ c.schemaProblems l ++ c.schemaProblems r ++ c.schemaProblems g ++
+        glued.problems.map (Schema.Problem.toJson s!"{l} + {r}") ++
+        inclusionProblems k l K L ++ inclusionProblems k r K R ++
+        (Schema.gluingClashes K L R).map (fun n => problemJson "clash"
+          [("name", .str n), ("left", .str l), ("right", .str r), ("kernel", .str k)]
+          s!"{l} and {r} both have {n}, which is not in the kernel {k}") ++
+        failing [(glued.checkSameUpToOrder G, "gluedDiffers",
+          s!"{g} does not list the same entity types, generators, equations, aggregates and \
+            value objects as the gluing of {l} and {r}")] ++
+        inclusionProblems l g L G ++ inclusionProblems r g R G ++
+        match ff with
+        | none => []
+        | some (b₁, b₂) => failing [
+            (L.checkAcyclic, "notAcyclic", s!"{l} is not acyclic"),
+            (R.checkAcyclic, "notAcyclic", s!"{r} is not acyclic"),
+            (G.checkAcyclic, "notAcyclic", s!"{g} is not acyclic"),
+            (({} : Translation).checkFullyFaithful L G == b₁, "fullyFaithful",
+              s!"the strict non-interference check of {l} gives {!b₁}, not {b₁}"),
+            (({} : Translation).checkFullyFaithful R G == b₂, "fullyFaithful",
+              s!"the strict non-interference check of {r} gives {!b₂}, not {b₂}")]
+    | _, _, _, _ => [k, l, r, g].filterMap fun n =>
+      if (c.schema? n).isNone then some (unknown "schema" n) else none
+  | .state x => match c.state? x with
+    | some (s, X) => match c.schema? s with
+      | some S => c.schemaProblems s ++ failing [
+          (X.check S, "stateCheck", s!"{x} does not pass the check of {s}"),
+          (X.litsFit, "valueType", s!"a value of {x} does not have its declared type"),
+          (X.checkValueObjects S, "valueObject",
+            s!"two entities of a value object of {x} have the same attributes")]
+      | none => [unknown "schema" s]
+    | none => [unknown "state" x]
+  | .restriction s t T x y => match c.schema? s, c.schema? t, c.state? x, c.state? y with
+    | some S, some S', some (sx, X), some (sy, Y) =>
+      failing [(sx == t, "stateSchema", s!"{x} is a state of {sx}, not of {t}"),
+        (sy == s, "stateSchema", s!"{y} is a state of {sy}, not of {s}")] ++
+      c.schemaProblems s ++ c.schemaProblems t ++
+      (T.problems S S' S'.pathEq).map (Translation.Problem.toJson s t) ++
+      failing [(X.check S', "stateCheck", s!"{x} does not pass the check of {t}"),
+        (decide (Y = X.restrict T S S'), "restriction",
+          s!"{y} is not the restriction of {x} along {s} → {t}")]
+    | _, _, _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
+      (if (c.schema? t).isNone then [unknown "schema" t] else []) ++
+      (if (c.state? x).isNone then [unknown "state" x] else []) ++
+      (if (c.state? y).isNone then [unknown "state" y] else [])
+  | .homomorphism x y h => match c.state? x, c.state? y with
+    | some (sx, X), some (sy, Y) =>
+      failing [(sx == sy, "stateSchema", s!"{x} is a state of {sx} and {y} a state of {sy}")] ++
+      match c.schema? sx with
+      | some S => c.schemaProblems sx ++ failing [
+          (X.check S, "stateCheck", s!"{x} does not pass the check of {sx}"),
+          (Y.check S, "stateCheck", s!"{y} does not pass the check of {sx}"),
+          (h.check S X Y, "homomorphism", s!"the components do not form a homomorphism {x} → {y}")]
+      | none => [unknown "schema" sx]
+    | _, _ => (if (c.state? x).isNone then [unknown "state" x] else []) ++
+      (if (c.state? y).isNone then [unknown "state" y] else [])
+
+/-- Whether a claim holds, and its problems when it fails: those of `explain`, or
+the failure of its check when `explain` finds none. -/
+def result (cl : Claim) : Bool × List Json :=
+  if c.checkClaim cl then (true, [])
+  else match c.explain cl with
+    | [] => (false, [problemJson "check" [] s!"the check of the claim fails: {cl.describe}"])
+    | ps => (false, ps)
+
+/-- The report of a certificate. -/
+def report : Json :=
+  let rs := c.claims.map fun cl => (cl, c.result cl)
+  let claims := rs.map fun (cl, ok, ps) => Json.mkObj (cl.refFields ++
+    [("description", .str cl.describe), ("ok", .bool ok), ("problems", Json.arr ps.toArray)])
+  Json.mkObj [("format", .str formatVersion), ("kind", .str "report"),
+    ("producer", .str c.producer), ("claims", Json.arr claims.toArray),
+    ("failed", ((rs.filter fun r => !r.2.1).length : Nat))]
+
+end Certificate
+
+/-! ## Context map documents -/
+
+namespace MapDoc
+
+variable (M : MapDoc)
+
+/-- The schema of the context named `n`, if there is one. -/
+def schema? (n : String) : Option Schema := (M.contexts.lookup n).map (·.1)
+
+/-- The certificate of a context map document: its contexts as schemas, and the
+claims that each context is well formed and each arrow a valid translation, the
+contexts first, then the arrows, in their order. -/
+def certificate : Certificate where
+  producer := "map"
+  schemas := M.contexts.map fun ctx => (ctx.1, ctx.2.1)
+  states := []
+  claims := M.contexts.map (fun ctx => .wellFormed ctx.1) ++
+    M.arrows.map fun a => .translation a.2.1 a.2.2.1 a.2.2.2
+
+/-- The report of a context map document, by context and by arrow. -/
+def report : Json :=
+  let c := M.certificate
+  let contexts := M.contexts.map fun ctx =>
+    let (ok, ps) := c.result (.wellFormed ctx.1)
+    Json.mkObj [("name", .str ctx.1), ("ok", .bool ok), ("problems", Json.arr ps.toArray)]
+  let arrows := M.arrows.map fun a =>
+    let (ok, ps) := c.result (.translation a.2.1 a.2.2.1 a.2.2.2)
+    Json.mkObj [("name", .str a.1), ("source", .str a.2.1), ("target", .str a.2.2.1),
+      ("ok", .bool ok), ("problems", Json.arr ps.toArray)]
+  let failed := (contexts ++ arrows).filter fun j => j.getObjValD "ok" != .bool true
+  Json.mkObj [("format", .str formatVersion), ("kind", .str "mapReport"),
+    ("contexts", Json.arr contexts.toArray), ("arrows", Json.arr arrows.toArray),
+    ("failed", (failed.length : Nat))]
+
+/-- A context map document, read from JSON with its format and kind checked. -/
+def ofJson (j : Json) : Except String MapDoc := do
+  let fmt ← j.getObjValAs? String "format"
+  unless fmt == formatVersion do throw s!"unsupported format {fmt}"
+  let kind ← j.getObjValAs? String "kind"
+  unless kind == "map" do throw s!"expected a map, found {kind}"
+  MapDoc.fromJson j
+
+end MapDoc
+
+end DDD
