@@ -207,9 +207,9 @@ the rules across aggregates that the glued state breaks
 
 `decide` is checked by the kernel and is used for the examples; `decide +kernel`
 leaves out the evaluation by the elaborator and is used for the larger checks.
-`native_decide` and `csd-check` (`cli/CsdCheck.lean`, run by the Lean
-interpreter) trust the compiler; they are used for large certificates, and each
-use is marked.
+`native_decide` and `csd-check` (`cli/CsdCheck.lean`, compiled to native code)
+trust the compiler; they are used for large certificates, and each use is
+marked.
 
 ## Julia
 
@@ -265,7 +265,8 @@ DDD/
   Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
                      Gluing, Routes, Exchange, Merge, Sigma, Open
   docs/              approach.md, its figures, and figures.py, which draws them
-cli/                 csd-check and csd-export, run with lake env lean --run
+cli/                 csd-check, a native executable (lake exe csd-check), and
+                     csd-export, run with lake env lean --run
 julia/               Catlab side: src/CsdDDD.jl, run.jl, test/, data/, out/
 ```
 
@@ -453,6 +454,15 @@ the equations across aggregates; a machine per aggregate checks a step against
 its own schema, and the context reports the rules across aggregates that the
 glued state breaks (`Examples/Open.lean`).
 
+Next step 7, the native checker, is complete: `csd-check` is an executable
+compiled to native code, a default target of `lake build`, and checks the
+certificate of 32 claims in 0.3 s instead of 205 s; a second workflow builds it
+on aarch64 Linux.
+
+`docs/approach.md`, section 14, relates the schemas to the double theories of
+CatColab: a schema presents a model of the walking proarrow, a translation a
+morphism of models, and the section lists what the correspondence leaves out.
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -504,6 +514,7 @@ its certificate (`DDD/docs/approach.md`, section 10).
    claim; `csd-export` (`cli/CsdExport.lean`) writes the example workspace. Both
    run with `lake env lean --run`: a compiled executable would compile Mathlib
    to native code. The evaluation trusts the compiler, and the output says so.
+   Step 7 builds `csd-check` as a native executable instead.
 5. `julia/`: Catlab 0.16.20 and JSON3. Schemas as acsets on a schema of
    schemas, gluing as an acset pushout with the union of equations, names that
    clash outside a kernel qualified with the context name, homomorphism search
@@ -655,6 +666,22 @@ schema and kept between steps (`DDD/docs/approach.md`, section 12).
    equation `billTo = customer.address` at it (`remove_ada_report`). A step
    that breaks a rule of its own aggregate is refused (`bad_address_refused`).
 
+### 7. Native checker
+
+Done. `csd-check` runs as native code (`DDD/docs/approach.md`, section 10).
+
+1. `lakefile.toml`: the executable `csd-check`, with root `cli/CsdCheck.lean`,
+   a default target. Its build compiles the C code of the 816 modules it
+   imports, which Mathlib's cache provides, in about three minutes on four
+   cores; the stripped executable is 171 MB.
+2. On the example certificate, on four x86-64 cores: 0.3 s and 110 MB of
+   memory, against 205 s and 1.8 GB in the interpreter, with the same results;
+   a false claim gives exit code 1, an unreadable file exit code 2.
+3. CI: `lake exe csd-check` checks the certificate that the Julia side writes.
+   `csd_check_arm.yml` builds the executable on `ubuntu-24.04-arm`, checks the
+   committed certificate with it, and uploads the stripped executable with the
+   certificate and their SHA-256 sums.
+
 ### Conditional
 
 - Names as indices instead of strings in the checkers, with a lemma relating
@@ -664,10 +691,15 @@ schema and kept between steps (`DDD/docs/approach.md`, section 12).
 - Path equality for schemas with both cycles and equations, from a rewriting
   system supplied as a certificate, if a model needs it. It is not part of
   phase 4.
+- Checking functions in modules apart from their soundness proofs, so that
+  `csd-check` imports neither the proofs nor Mathlib's category theory, if the
+  size of the executable or the time of its first build matters, for example on
+  a device with little storage.
 
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
 the gluing along a kernel and the finite states of phase 4; item 6 uses the
-covering theorem of item 3 and the machines of phase 5. Items 1 to 6 are done.
+covering theorem of item 3 and the machines of phase 5; item 7 uses the
+certificates of phase 4. Items 1 to 7 are done.
 
 ## Decisions
 
@@ -823,3 +855,14 @@ Next step 6:
 - The equations across aggregates are not checked inside a step, and the
   context does not refuse a step that breaks one; the policies that restore
   them are not modelled.
+
+Next step 7:
+
+- The executable links every module the checker imports, Mathlib's included.
+  Speed does not require separating the checking functions from their proofs:
+  the interpreter's 205 s were evaluation, not the size of the import closure.
+  The separation stays a conditional item.
+- `csd-check` is a default target, so `lean-action` builds it and caches its
+  compiled modules; `csd-export` stays interpreted.
+- The aarch64 build runs on pushes that change `cli/`, the Lean files of `DDD/`,
+  the committed certificate or the build configuration.

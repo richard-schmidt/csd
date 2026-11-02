@@ -10,8 +10,8 @@ lake exe cache get
 lake build
 ```
 
-`lake build` builds the default targets: `Showcase`, `Sketches`, `Production`
-and `DDD`. CI runs the same build on every push.
+`lake build` builds the default targets: `Showcase`, `Sketches`, `Production`,
+`DDD` and the executable `csd-check`. CI runs the same build on every push.
 
 ## Libraries
 
@@ -21,8 +21,9 @@ and `DDD`. CI runs the same build on every push.
   `sorry`.
 - `DDD/`: bounded contexts as finitely presented categories; `sorry` is
   allowed.
-- `cli/`: Lean programs of `DDD` (`csd-check`, `csd-export`), run with
-  `lake env lean --run`; not built by `lake build`.
+- `cli/`: Lean programs of `DDD`. `csd-check` is a native executable, built by
+  `lake build` and run with `lake exe csd-check`; `csd-export` runs with
+  `lake env lean --run`.
 - `julia/`: the Julia side of `DDD` (Catlab), run in CI after the Lean build.
 - `wip/` and `deprecated/` are not built.
 

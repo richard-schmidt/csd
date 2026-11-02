@@ -17,14 +17,15 @@ format of `DDD/Json.lean` (`csd-ddd/1`):
 contexts, validity of the translations, the gluing of Orders and Shipping along
 the Customers kernel and of the failing scenario, sample states of Orders,
 Shipping, the glued schema, Payments and the kernel, the restrictions that relate
-them, and a homomorphism of Shipping states. `cli/CsdCheck.lean` checks it.
+them, and a homomorphism of Shipping states. `csd-check` (`cli/CsdCheck.lean`)
+checks it.
 
 ```sh
 lake env lean --run cli/CsdExport.lean julia/data/workspace.json
 julia --project=julia -e 'using Pkg; Pkg.instantiate()'
 julia --project=julia julia/run.jl
 julia --project=julia julia/test/runtests.jl
-lake env lean --run cli/CsdCheck.lean julia/out/certificate.json
+lake exe csd-check julia/out/certificate.json
 ```
 
 Catlab is pinned to 0.16.20 (`Project.toml`, `Manifest.toml`), on Julia 1.10.

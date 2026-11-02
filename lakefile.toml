@@ -1,7 +1,7 @@
 name = "Categorical"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["Showcase", "Sketches", "Production", "DDD"]
+defaultTargets = ["Showcase", "Sketches", "Production", "DDD", "csd-check"]
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`
@@ -36,3 +36,9 @@ globs = ["Production.+"]
 [[lean_lib]]
 name = "DDD"
 globs = ["DDD.+"]
+
+# csd-check: the certificate checker of DDD, cli/CsdCheck.lean compiled to
+# native code with the modules it imports. Run with lake exe csd-check.
+[[lean_exe]]
+name = "csd-check"
+root = "cli.CsdCheck"

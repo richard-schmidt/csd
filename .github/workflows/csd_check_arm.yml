@@ -1,0 +1,58 @@
+name: csd-check on aarch64
+
+# Builds the native csd-check on aarch64 Linux, checks the committed
+# certificate with it, and uploads the stripped executable. The executable
+# links glibc dynamically.
+
+on:
+  push:
+    paths:
+      - 'cli/**'
+      - 'DDD/**'
+      - '!DDD/docs/**'
+      - '!**/*.md'
+      - 'julia/out/certificate.json'
+      - 'lakefile.toml'
+      - 'lake-manifest.json'
+      - 'lean-toolchain'
+      - '.github/workflows/csd_check_arm.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  csd-check-aarch64:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: leanprover/lean-action@v1
+        with:
+          build-args: csd-check
+      - name: Check the certificate
+        shell: python3 {0}
+        run: |
+          import platform, resource, subprocess, sys, time
+          print("machine:", platform.machine())
+          t = time.monotonic()
+          r = subprocess.run([".lake/build/bin/csd-check", "julia/out/certificate.json"])
+          wall = time.monotonic() - t
+          ru = resource.getrusage(resource.RUSAGE_CHILDREN)
+          print(f"exit {r.returncode}, wall {wall:.2f} s, user {ru.ru_utime:.2f} s, "
+                f"max RSS {ru.ru_maxrss // 1024} MB")
+          sys.exit(r.returncode)
+      - name: Strip the executable
+        run: |
+          mkdir dist
+          strip -o dist/csd-check .lake/build/bin/csd-check
+          dist/csd-check julia/out/certificate.json > /dev/null
+          cp julia/out/certificate.json dist/
+          (cd dist && sha256sum csd-check certificate.json > SHA256SUMS)
+          file dist/csd-check
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: csd-check-linux-aarch64
+          path: dist/
+          retention-days: 30

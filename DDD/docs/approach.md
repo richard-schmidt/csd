@@ -31,7 +31,8 @@ Contents:
 11. Open systems
 12. Aggregates
 13. Modules, examples and tools
-14. Limits
+14. Schemas as models of a double theory
+15. Limits
 
 ## 1. Two kinds of guarantee, two embeddings
 
@@ -61,7 +62,7 @@ The two kinds meet through two embeddings of the same objects.
 
 *Figure 1. The path from data to semantics. A checker evaluated to `true` by
 the kernel (`decide`, `decide +kernel`) gives a kernel-checked proposition.
-`csd-check` (section 10) evaluates checkers in the Lean interpreter and trusts
+`csd-check` (section 10) evaluates checkers as compiled native code and trusts
 the compiler and runtime.*
 
 The checks and their lemmas:
@@ -95,8 +96,8 @@ Evaluation: the examples use `decide`, which the kernel checks. The largest
 checks, strict non-interference, use `decide +kernel`, which leaves out the
 evaluation by the elaborator and lets the kernel reduce the checker directly;
 each takes 14 to 22 seconds of kernel time on the example. The library does not
-use `native_decide`. `csd-check` (section 10) evaluates the checkers with the Lean
-interpreter and trusts the compiler and runtime, which its output states. The
+use `native_decide`. `csd-check` (section 10) evaluates the checkers as compiled
+native code and trusts the compiler and runtime, which its output states. The
 intended scale is tens of entity types per context.
 
 ## 2. Value types and schemas
@@ -760,9 +761,19 @@ passes its check holds (`checkClaim_sound`):
   state is isomorphic to `restrictState`;
 - a homomorphism of finite states that is a morphism of their states.
 
-`csd-check` (`cli/CsdCheck.lean`) runs these checks with the Lean interpreter and
-reports each claim. The evaluation trusts the Lean compiler and runtime, as
-`native_decide` would.
+`csd-check` (`cli/CsdCheck.lean`) runs these checks and reports each claim. It is
+built as an executable, the program compiled to native code together with the
+modules it imports (`lake build csd-check`, `lake exe csd-check`). The
+evaluation trusts the Lean compiler and runtime, as `native_decide` would.
+
+On the example certificate of 32 claims, on a four-core x86-64 machine, the
+executable takes 0.3 s and 110 MB of memory. The same program in the Lean
+interpreter (`lake env lean --run cli/CsdCheck.lean`) took 205 s and 1.8 GB:
+it loads the environment of every imported module and interprets the checkers.
+The executable links the 816 modules it imports, Mathlib's category theory
+among them, since the checkers share modules with their soundness proofs. Its
+first build compiles their C code, about three minutes on four cores, and the
+stripped executable is 171 MB.
 
 ### The Julia side
 
@@ -799,12 +810,15 @@ lake env lean --run cli/CsdExport.lean julia/data/workspace.json
 julia --project=julia -e 'using Pkg; Pkg.instantiate()'
 julia --project=julia julia/run.jl
 julia --project=julia julia/test/runtests.jl
-lake env lean --run cli/CsdCheck.lean julia/out/certificate.json
+lake exe csd-check julia/out/certificate.json
 ```
 
-`csd-check` and `csd-export` run with `lake env lean --run`: a compiled
-executable would compile Mathlib to native code, and the interpreter loads the
-built modules.
+`csd-check` is a default target of `lake build`, so CI builds it with the
+library and keeps its compiled modules in the build cache. `csd-export` runs
+with `lake env lean --run`. A second workflow (`csd_check_arm.yml`) builds
+`csd-check` on aarch64 Linux, checks the committed certificate with it, and
+keeps the stripped executable as an artifact; the executable links glibc
+dynamically.
 
 ## 11. Open systems
 
@@ -1077,7 +1091,8 @@ The core modules share the namespace `DDD`, with the operations on schemas in
 `DDD.Schema`; each example module has its own namespace. The library is built by
 glob (`lake build DDD`), with no root file importing all modules. Outside it:
 
-- `cli/`: `CsdCheck.lean` and `CsdExport.lean`, run with `lake env lean --run`;
+- `cli/`: `CsdCheck.lean`, built as the executable `csd-check`, and
+  `CsdExport.lean`, run with `lake env lean --run`;
 - `julia/`: `src/CsdDDD.jl`, `run.jl`, `test/`, `data/` (the exported
   workspace) and `out/` (the certificate);
 - `docs/`: this document, its figures, and `figures.py`, which draws them.
@@ -1097,7 +1112,70 @@ Relation to other modules of the repository:
 - `wip/DDD.lean`, not built: `System` is the state category of the schema with
   one reference `Entity ⟶ Domain`, once morphisms carry the commuting condition.
 
-## 14. Limits
+## 14. Schemas as models of a double theory
+
+CatColab, the modelling environment of the Topos Institute, builds on double
+theories (Lambert and Patterson, *Cartesian double theories*, Advances in
+Mathematics 444, 2024). A double theory is a small double category; a model of
+it is a lax double functor into spans of sets, and a morphism of models is a
+natural transformation. The theory of simple schemas is the walking proarrow,
+`th_schema` in CatColab's `catlog`: two objects, `Entity` and `AttrType`, and a
+proarrow `Attr` between them. A model is a category of entities, a category of
+attribute types and a profunctor between them: mappings between entities,
+operations between attribute types, and attributes from entities to attribute
+types.
+
+The schemas of this library present a class of these models.
+
+- Schemas. The objects of `S.cat` are the declared entity types and all value
+  types. A morphism out of a value type ends at that value type
+  (`Schema.eq_value_of_hom`), there is at most one to each object
+  (`Subsingleton (S.valueObj v ⟶ b)`), and none goes from a value type to an
+  entity type (`Schema.not_hom_value_entity`). So `S.cat` is the collage of a
+  profunctor from the category of entity types and paths of references, up to
+  the equations, to the discrete category on the value types, with the
+  morphisms `e ⟶ v` of `S.cat` at `e` and `v`. A schema presents a model of
+  the walking proarrow whose category of attribute types is discrete on the
+  value types.
+- Translations. The functor of a translation sends entity types to entity types
+  and each value type to itself (section 4), so it gives a morphism of models
+  whose component on attribute types is the identity.
+- Context maps. A context map is a diagram of such models and morphisms.
+
+| CatColab | This library |
+|---|---|
+| double theory, logic | the notion of schema (the walking proarrow) |
+| model | schema, presenting `S.cat` |
+| morphism of models | translation |
+| instance | state (section 9) |
+| attribute type | value type |
+| mapping | reference |
+
+In DDD, the domain model of a bounded context is the schema, so "model" names
+the same thing in both columns.
+
+The correspondence leaves out part of each side:
+
+- Value types. A model has its own attribute types, with operations between
+  them. Here the value types are shared by all contexts and have no operations
+  (section 2), and translations fix them. Instances differ in the same way:
+  Carlson and Patterson (*Presheaves on lax double functors; or, Instances of
+  models of double theories*, Applied Categorical Structures 34, 2026) define
+  instances of models of any double theory, and an instance of a model of the
+  walking proarrow gives each attribute type a set of its own, while a state
+  gives each value type `v` a set with a bijection to `K v`.
+- Equations. Schemas here have equations between paths, possibly ending in an
+  attribute. CatColab's schema editor does not support them (October 2026);
+  the categories they present are models of the walking proarrow all the same.
+- Aggregates and value objects. Neither is part of a model of the walking
+  proarrow. Aggregates are roots and ownership references from the members to
+  their root; value objects are a condition on states (two entities with the
+  same attributes are equal). They stay annotations of the presentation.
+- Proof. The library does not formalize double theories or their models. The
+  correspondence is stated here, not proved in Lean; the facts about `S.cat` it
+  rests on are proved.
+
+## 15. Limits
 
 - Path equality is decided for free and for acyclic schemas only; a schema with
   both cycles and equations would need a rewriting system as a certificate.
@@ -1142,7 +1220,9 @@ Relation to other modules of the repository:
   isomorphism; no machine has the glued schema as its state.
 - Events are typed at the level of contexts in Lean only; `Svc` of the Showcase
   map is unchanged, and the Julia side has no events.
-- `csd-check` trusts the Lean compiler and runtime.
+- `csd-check` trusts the Lean compiler and runtime. It links every module it
+  imports, Mathlib's category theory among them, because the checkers share
+  modules with their soundness proofs; the stripped executable is 171 MB.
 - The checks compare names as strings in the kernel. The strict
   non-interference checks of the example take 14 to 22 seconds of kernel time
   each, which bounds the size of schemas checked with `decide`.

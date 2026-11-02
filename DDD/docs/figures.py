@@ -876,26 +876,30 @@ def modules():
 # Next steps, in DDD/README.md ---------------------------------------------------
 
 def next_steps():
-    f = Fig("next-steps", 1040, 300,
+    f = Fig("next-steps", 1210, 300,
             "The next steps in order, left to right, with the dependencies between them.")
     f.text(24, 28, "order of work", "rgl")
-    f.poly([(120, 23), (1010, 23)], "muted")
+    f.poly([(120, 23), (1180, 23)], "muted")
     f.node("s1", 85, 120, "1. Coherence by check", w=152, sub="Translation.comp", h=44)
     f.node("s2", 255, 120, "2. Phase 4", "pl", w=150, sub="JSON, certificates", h=44)
     f.node("s3", 425, 120, "3. Several inclusions", w=150, sub="n-ary gluing", h=44)
     f.node("s4", 595, 120, "4. Attributed states", w=150, sub="limits, colimits, Σ", h=44)
     f.node("s5", 765, 120, "5. Phase 5", "kern", w=150, sub="open systems", h=44)
     f.node("s6", 945, 120, "6. Aggregates", w=150, sub="aggregate machines", h=44)
+    f.node("s7", 1115, 120, "7. Native checker", "pl", w=150, sub="csd-check compiled", h=44)
     f.arrow("s1", "s3", "composite translations", "acl", bend=-26, lpos=0.5, lside=-1,
             loff=10)
     f.arrow("s2", "s5", "finite states", "acl", bend=34, lpos=0.5, lside=1, loff=10)
     f.arrow("s4", "s5", "states", "acl", lside=1, loff=34)
     f.arrow("s5", "s6", "machines", "acl", lside=1, loff=34)
     f.arrow("s3", "s6", "covering theorem", "acl", bend=-34, lpos=0.5, lside=-1, loff=10)
+    f.arrow("s2", "s7", "certificates", "acl", bend=60, lpos=0.62, lside=1, loff=10)
     f.node("c1", 300, 250, "names as indices", "muted", w=190,
            sub="if checks exceed CI time", h=40)
     f.node("c2", 580, 250, "rewriting certificates", "muted", w=260,
            sub="if a model has cycles and equations", h=40)
+    f.node("c3", 900, 250, "checkers apart from proofs", "muted", w=260,
+           sub="if the executable's size matters", h=40)
     f.text(24, 254, "conditional", "rgl")
     return f
 

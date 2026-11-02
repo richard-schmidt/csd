@@ -3,20 +3,25 @@ import DDD.Certificate
 /-!
 `csd-check`: checks a certificate.
 
-    lake env lean --run cli/CsdCheck.lean certificate.json
+    lake build csd-check
+    lake exe csd-check certificate.json
 
-Each claim is checked by its checker (`DDD.Certificate.checkClaim`), evaluated by
-the Lean interpreter. A claim that passes holds, by
+The executable `csd-check` (`lakefile.toml`) is this program compiled to native
+code, with the modules it imports. Each claim is checked by its checker
+(`DDD.Certificate.checkClaim`). A claim that passes holds, by
 `DDD.Certificate.checkClaim_sound`; the evaluation trusts the Lean compiler and
 runtime, as `native_decide` does. The exit code is 0 when every claim passes,
 1 when one fails, and 2 when the file cannot be read.
+
+`lake env lean --run cli/CsdCheck.lean certificate.json` runs the same program
+in the interpreter.
 -/
 
 open DDD Lean
 
 def main (args : List String) : IO UInt32 := do
   let [path] := args
-    | IO.eprintln "usage: lake env lean --run cli/CsdCheck.lean certificate.json"
+    | IO.eprintln "usage: csd-check certificate.json"
       pure 2
   let text ← IO.FS.readFile path
   match Json.parse text >>= Certificate.fromJson with
@@ -25,7 +30,7 @@ def main (args : List String) : IO UInt32 := do
     pure 2
   | .ok c =>
     IO.println s!"csd-check: {path}: {c.claims.length} claims from {c.producer}"
-    IO.println "csd-check: checkers evaluated by the Lean interpreter (trusts the compiler)"
+    IO.println "csd-check: checkers evaluated outside the kernel (trusts the Lean compiler)"
     let mut failed := 0
     for cl in c.claims do
       let ok := c.checkClaim cl
