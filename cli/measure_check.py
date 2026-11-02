@@ -6,8 +6,9 @@ The defaults are ./csd-check and certificate.json. Under Termux the
 executable, which links glibc, runs through glibc-runner's grun when grun is
 installed; elsewhere it runs directly. LD_PRELOAD is removed from its
 environment. For each run the script prints the exit code, the wall time, the
-user time and the maximum resident memory of the child processes, and the last
-line of the output.
+user time, the maximum resident memory, and the last line of the output. Time
+and memory are those of that run alone: the child process with the processes
+it waited for (`os.wait4`), so `grun` and the checker it starts.
 
 The false claim states that Catalog is acyclic; Catalog has a cycle. The run
 passes when the checker exits 0 on the certificate and 1 on the copy. The exit
@@ -17,7 +18,6 @@ code of the script is 0 when the run passes and 1 otherwise.
 import json
 import os
 import platform
-import resource
 import shutil
 import subprocess
 import sys
@@ -35,6 +35,18 @@ def device_info():
             out = ""
         lines.append(f"{label}: {out or 'not found'}")
     return lines
+
+
+def run(cmd, env):
+    """Exit code, output, errors and resource usage of one run of `cmd`."""
+    with tempfile.TemporaryFile() as out, tempfile.TemporaryFile() as err:
+        p = subprocess.Popen(cmd, stdout=out, stderr=err, env=env)
+        _, status, usage = os.wait4(p.pid, 0)
+        p.returncode = os.waitstatus_to_exitcode(status)
+        out.seek(0)
+        err.seek(0)
+        return (p.returncode, out.read().decode(errors="replace"),
+                err.read().decode(errors="replace"), usage)
 
 
 def main(argv):
@@ -59,19 +71,16 @@ def main(argv):
     failed = False
     for label, path, expected in (("certificate", cert_path, 0),
                                   ("certificate with a false claim", false_path, 1)):
-        before = resource.getrusage(resource.RUSAGE_CHILDREN)
         start = time.monotonic()
         try:
-            r = subprocess.run(runner + [exe, path], capture_output=True, text=True, env=env)
-            code, out, err = r.returncode, r.stdout, r.stderr
+            code, out, err, usage = run(runner + [exe, path], env)
+            user, rss = f"{usage.ru_utime:.2f} s", f"{usage.ru_maxrss // 1024} MB"
         except OSError as e:
-            code, out, err = None, "", str(e)
+            code, out, err, user, rss = None, "", str(e), "-", "-"
         wall = time.monotonic() - start
-        after = resource.getrusage(resource.RUSAGE_CHILDREN)
         last = (out.strip().splitlines() or [""])[-1]
         print(f"{label}: exit {code} (expected {expected}), wall {wall:.2f} s, "
-              f"user {after.ru_utime - before.ru_utime:.2f} s, "
-              f"max RSS {after.ru_maxrss // 1024} MB")
+              f"user {user}, max RSS {rss}")
         print(f"  last line: {last}")
         if err.strip():
             print(f"  stderr: {err.strip()[-800:]}")

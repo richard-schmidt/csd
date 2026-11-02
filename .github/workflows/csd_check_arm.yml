@@ -31,17 +31,17 @@ jobs:
       - uses: leanprover/lean-action@v1
         with:
           build-args: csd-check
-      - name: Check the certificate and a false claim
-        run: python3 cli/measure_check.py .lake/build/bin/csd-check julia/out/certificate.json
       - name: Strip the executable
         run: |
           mkdir dist
           strip -o dist/csd-check .lake/build/bin/csd-check
-          dist/csd-check julia/out/certificate.json > /dev/null
           cp julia/out/certificate.json cli/measure_check.py dist/
           (cd dist && sha256sum csd-check certificate.json measure_check.py > SHA256SUMS)
           file dist/csd-check
           ls -l dist
+      # The executable of the artifact, as the phone runs it (cli/android-test.md).
+      - name: Check the certificate and a false claim
+        run: python3 dist/measure_check.py dist/csd-check dist/certificate.json
       - uses: actions/upload-artifact@v4
         with:
           name: csd-check-linux-aarch64

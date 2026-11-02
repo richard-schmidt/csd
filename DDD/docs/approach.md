@@ -767,7 +767,7 @@ modules it imports (`lake build csd-check`, `lake exe csd-check`). The
 evaluation trusts the Lean compiler and runtime, as `native_decide` would.
 
 On the example certificate of 32 claims, on a four-core x86-64 machine, the
-executable takes 0.3 s and 110 MB of memory. The same program in the Lean
+executable takes 0.3 s and 90 to 120 MB of memory across runs. The same program in the Lean
 interpreter (`lake env lean --run cli/CsdCheck.lean`) took 205 s and 1.8 GB:
 it loads the environment of every imported module and interprets the checkers.
 The executable links the 816 modules it imports, Mathlib's category theory
