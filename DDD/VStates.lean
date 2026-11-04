@@ -20,9 +20,13 @@ A state of `S` with conversions (`Schema.VState I S`) is a functor out of
   each conversion acting through `I` and the bijections of the state; its
   restriction is the state (`toState_vext`).
 - `VState.equivalence`: in a well-formed schema, restriction is an equivalence
-  between the states with conversions and the attributed states. The results
-  on attributed states hold for states with conversions through it: limits and
-  colimits, `Σ_T`, and data gluing.
+  between the states with conversions and the attributed states, and a bijection
+  on objects (`VState.equivState`). The results on attributed states hold for
+  states with conversions through it: limits and colimits (`VState.hasLimits`,
+  `VState.hasColimits`), `Δ_T` and `Σ_T` (`Translation.vrestrictStateFunctor`,
+  `Translation.vsigmaStateAdjunction`, `Translation.isRightAdjoint_vrestrict_iff`),
+  and data gluing (`Gluing.vstateEquiv`). Restriction to `S.cat` commutes with
+  `Δ_T` (`Translation.toStateIso`).
 -/
 
 namespace DDD
@@ -373,6 +377,200 @@ theorem VState.hasColimits (hS : S.WellFormed) : HasColimits (S.VState I) :=
   @Adjunction.has_colimits_of_equivalence _ _ _ _ (VState.toStateFunctor I S)
     (toStateFunctor_isEquivalence hS) _
 
+/-! ## Objects -/
+
+/-- Two states with conversions are equal when their functors are equal and their
+isomorphisms agree along that equality. -/
+theorem VState.ext' {X Y : S.VState I} (hF : X.F = Y.F)
+    (hv : ∀ c (x : (S.vvals L ⋙ X.F).obj c),
+      Y.values.hom.app c (cast (by rw [hF]) x) = X.values.hom.app c x) : X = Y := by
+  obtain ⟨F, vX⟩ := X
+  obtain ⟨G, vY⟩ := Y
+  obtain rfl : F = G := hF
+  congr
+  ext c x
+  exact (hv c x).symm
+
+/-- The extension of the restriction of a state with conversions is the state. -/
+theorem vext_toState (hS : S.WellFormed) (X : S.VState I) : X.toState.vext I hS = X := by
+  have hF : vextF hS X.toState = X.F := by
+    refine vext_functor (fun _ => rfl) fun a b e => ?_
+    simp only [eqToHom_refl, Category.id_comp, Category.comp_id]
+    obtain ⟨⟨ea⟩ | ⟨v⟩, ha⟩ := a
+    · rfl
+    obtain ⟨⟨eb⟩ | ⟨w⟩, hb⟩ := b
+    · exact absurd e.2 not_vstep?_value_entity
+    have hc := conv?_of_vstep? e.2
+    have hX : X.F.map (vmor e.toPath) ≫ (X.values.app (L.vobjOf w)).hom =
+        (X.values.app (L.vobjOf v)).hom ≫ I.F.map (L.convMor e.1 hc) :=
+      X.values.hom.naturality (L.convMor e.1 hc)
+    funext x
+    have hX' := congrFun hX x
+    simp only [types_comp_apply] at hX'
+    change (X.values.app (L.vobjOf w)).toEquiv.symm
+        (I.F.map (L.convMor e.1 hc) ((X.values.app (L.vobjOf v)).toEquiv x)) =
+      X.F.map (vmor e.toPath) x
+    rw [Equiv.symm_apply_eq]
+    exact hX'.symm
+  refine VState.ext' hF fun c x => ?_
+  obtain ⟨⟨⟨eo⟩ | ⟨v⟩, ho⟩⟩ := c
+  · exact absurd ho (by simp [IsOb, emptySchema])
+  · rfl
+
+variable (I S) in
+/-- In a well-formed schema, restriction to `S.cat` is a bijection between the
+states with conversions and the attributed states. -/
+def VState.equivState (hS : S.WellFormed) : S.VState I ≃ S.State I.K where
+  toFun := VState.toState
+  invFun X := X.vext I hS
+  left_inv := vext_toState hS
+  right_inv := toState_vext hS
+
 end Schema
+
+/-! ## Restriction along translations -/
+
+namespace Schema
+
+theorem State.comp_α' {K : ValueType → Type} {S : Schema} {X Y Z : S.State K} (f : X ⟶ Y)
+    (g : Y ⟶ Z) : (f ≫ g).α = f.α ≫ g.α := rfl
+
+theorem State.eqToHom_α {K : ValueType → Type} {S : Schema} {X Y : S.State K} (h : X = Y) :
+    (eqToHom h).α = eqToHom (congrArg State.F h) := by
+  subst h
+  rfl
+
+end Schema
+
+namespace Translation
+
+open Schema
+
+variable {L : TypeList} {I : Interp L} {S S' : Schema} (T : Translation)
+
+/-- Whiskering commutes with the equality of two functors. -/
+theorem whiskerLeft_eqToHom {C D E : Type*} [Category C] [Category D] [Category E]
+    {P Q : C ⥤ D} (h : P = Q) {F G : D ⥤ E} (α : F ⟶ G) :
+    Functor.whiskerLeft P α ≫ eqToHom (congrArg (· ⋙ G) h) =
+      eqToHom (congrArg (· ⋙ F) h) ≫ Functor.whiskerLeft Q α := by
+  subst h
+  simp
+
+/-- `Δ_T` on states with conversions: precomposition with the functor of `T`, which
+is the identity on the value types. -/
+def vrestrictState (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S')
+    (X : S'.VState I) : S.VState I where
+  F := T.vfunctor hS hS' hT ⋙ X.F
+  values := eqToIso (by rw [← Functor.assoc, T.vvals_comp_vfunctor hS hS' hT]) ≪≫ X.values
+
+/-- `Δ_T` on states with conversions, as a functor. -/
+def vrestrictStateFunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S') :
+    S'.VState I ⥤ S.VState I where
+  obj := T.vrestrictState hS hS' hT
+  map {X Y} f := ⟨Functor.whiskerLeft (T.vfunctor hS hS' hT) f.α, by
+    ext ⟨⟨⟨eo⟩ | ⟨v⟩, ho⟩⟩ x
+    · exact absurd ho (by simp [IsOb, emptySchema])
+    · simpa [vrestrictState] using congrFun (congrArg (fun φ => φ.app (L.vobjOf v)) f.values) x⟩
+
+/-- Restriction to `S.cat` commutes with `Δ_T`, on objects. -/
+theorem toState_vrestrict (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S')
+    (X : S'.VState I) :
+    (T.vrestrictState hS hS' hT X).toState = T.restrictState hS' hT X.toState :=
+  State.ext' (congrArg (· ⋙ X.F) (T.vinc_comp_vfunctor hS hS' hT)) fun v x => by
+    change X.values.hom.app (L.vobjOf v) x =
+      X.values.hom.app (L.vobjOf v) ((eqToHom (by rw [← Functor.assoc,
+        T.vvals_comp_vfunctor hS hS' hT]) : S.vvals L ⋙ T.vfunctor hS hS' hT ⋙ X.F ⟶
+          S'.vvals L ⋙ X.F).app (L.vobjOf v) x)
+    rw [eqToHom_app]
+    rfl
+
+/-- Restriction to `S.cat` commutes with `Δ_T`. -/
+def toStateIso (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S') :
+    T.vrestrictStateFunctor (I := I) hS hS' hT ⋙ VState.toStateFunctor I S ≅
+      VState.toStateFunctor I S' ⋙ T.restrictStateFunctor hS' hT :=
+  NatIso.ofComponents (fun X => eqToIso (T.toState_vrestrict hS hS' hT X)) fun {X Y} f => by
+    apply State.Hom.ext
+    simp only [State.comp_α', eqToIso.hom, State.eqToHom_α]
+    exact whiskerLeft_eqToHom (T.vinc_comp_vfunctor hS hS' hT) f.α
+
+/-- `Δ_T` on states with conversions has a left adjoint exactly when `T` is bijective
+on paths into value types, when every `I.K v` has two elements. -/
+theorem isRightAdjoint_vrestrict_iff (hS : S.WellFormed) (hS' : S'.WellFormed)
+    (hT : T.Valid S S') [∀ v, Nontrivial (I.K v)] :
+    (T.vrestrictStateFunctor (I := I) hS hS' hT).IsRightAdjoint ↔ AttrBijective hS' hT := by
+  haveI := toStateFunctor_isEquivalence (I := I) hS
+  haveI := toStateFunctor_isEquivalence (I := I) hS'
+  refine Iff.trans ?_ (isRightAdjoint_restrictStateFunctor_iff (K := I.K) (hS' := hS') (hT := hT))
+  let R := T.vrestrictStateFunctor (I := I) hS hS' hT
+  let E := VState.toStateFunctor I S
+  let E' := VState.toStateFunctor I S'
+  let D := T.restrictStateFunctor (K := I.K) hS' hT
+  constructor
+  · intro
+    haveI : (E' ⋙ D).IsRightAdjoint := Functor.isRightAdjoint_of_iso (T.toStateIso hS hS' hT)
+    haveI : E'.inv.IsRightAdjoint := E'.asEquivalence.toAdjunction.isRightAdjoint
+    exact Functor.isRightAdjoint_of_iso (F := E'.inv ⋙ E' ⋙ D) ((Functor.associator _ _ _).symm ≪≫
+      Functor.isoWhiskerRight E'.asEquivalence.counitIso D ≪≫ Functor.leftUnitor D)
+  · intro
+    haveI : (R ⋙ E).IsRightAdjoint := Functor.isRightAdjoint_of_iso (T.toStateIso hS hS' hT).symm
+    haveI : E.inv.IsRightAdjoint := E.asEquivalence.toAdjunction.isRightAdjoint
+    exact Functor.isRightAdjoint_of_iso (F := (R ⋙ E) ⋙ E.inv) (Functor.associator _ _ _ ≪≫
+      Functor.isoWhiskerLeft R E.asEquivalence.unitIso.symm ≪≫ Functor.rightUnitor R)
+
+/-- `Σ_T` on states with conversions, under `AttrBijective`: `Σ_T` on attributed
+states, through the two equivalences. -/
+noncomputable def vsigmaStateFunctor (hS' : S'.WellFormed) (hT : T.Valid S S')
+    (hb : AttrBijective hS' hT) : S.VState I ⥤ S'.VState I :=
+  VState.toStateFunctor I S ⋙ sigmaStateFunctor hb ⋙ (VState.equivalence I hS').inverse
+
+/-- `Σ_T ⊣ Δ_T` on states with conversions, under `AttrBijective`. -/
+noncomputable def vsigmaStateAdjunction (hS : S.WellFormed) (hS' : S'.WellFormed)
+    (hT : T.Valid S S') (hb : AttrBijective hS' hT) :
+    T.vsigmaStateFunctor hS' hT hb ⊣ T.vrestrictStateFunctor (I := I) hS hS' hT :=
+  let e := VState.equivalence I hS
+  let e' := VState.equivalence I hS'
+  Adjunction.ofNatIsoRight
+    ((e.toAdjunction.comp (sigmaStateAdjunction hb)).comp e'.symm.toAdjunction)
+    ((Functor.associator _ _ _).symm ≪≫
+      Functor.isoWhiskerRight (T.toStateIso hS hS' hT).symm e.inverse ≪≫
+      Functor.associator _ _ _ ≪≫ Functor.isoWhiskerLeft _ e.unitIso.symm ≪≫
+      Functor.rightUnitor _)
+
+end Translation
+
+/-! ## Data gluing -/
+
+namespace Gluing
+
+variable (D : Gluing) {L : TypeList} {I : Interp L}
+
+/-- Data gluing for states with conversions: a state of the glued schema is a pair of
+states of the two schemas with equal restrictions to the kernel. -/
+def vstateEquiv :
+    D.glued.VState I ≃ { P : D.left.VState I × D.right.VState I //
+      Translation.vrestrictState {} D.wf_kernel D.wf_left D.gluable.left P.1 =
+        Translation.vrestrictState {} D.wf_kernel D.wf_right D.gluable.right P.2 } :=
+  (Schema.VState.equivState I D.glued D.wf_glued).trans <| D.stateEquiv.trans <|
+    (Equiv.subtypeEquiv ((Schema.VState.equivState I D.left D.wf_left).prodCongr
+      (Schema.VState.equivState I D.right D.wf_right)) fun P => by
+        change _ ↔ Translation.restrictState D.wf_left D.gluable.left P.1.toState =
+          Translation.restrictState D.wf_right D.gluable.right P.2.toState
+        rw [← Translation.toState_vrestrict _ D.wf_kernel,
+          ← Translation.toState_vrestrict _ D.wf_kernel]
+        exact (Schema.VState.equivState I D.kernel D.wf_kernel).injective.eq_iff.symm).symm
+
+/-- The two components of `vstateEquiv` are the restrictions to the two schemas. -/
+theorem vstateEquiv_apply (X : D.glued.VState I) :
+    (D.vstateEquiv X).1 = (Translation.vrestrictState {} D.wf_left D.wf_glued D.inl_valid X,
+      Translation.vrestrictState {} D.wf_right D.wf_glued D.inr_valid X) := by
+  refine Prod.ext ?_ ?_
+  · change (Schema.VState.equivState I D.left D.wf_left).symm _ = _
+    rw [Equiv.symm_apply_eq]
+    exact (Translation.toState_vrestrict _ D.wf_left D.wf_glued D.inl_valid X).symm
+  · change (Schema.VState.equivState I D.right D.wf_right).symm _ = _
+    rw [Equiv.symm_apply_eq]
+    exact (Translation.toState_vrestrict _ D.wf_right D.wf_glued D.inr_valid X).symm
+
+end Gluing
 
 end DDD
