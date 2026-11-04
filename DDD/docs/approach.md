@@ -85,6 +85,7 @@ The checks and their lemmas:
 | declared route equations hold | `checkRouteEqn` | `coherent_of_check` | refuted by `routeDiagram_map_ne` when path equality in the target is decided |
 | a finite state is a state of `S` | `FinState.check` | `FinState.toState` | not stated |
 | the failures of that check, one by one | `FinState.violations` | `violations_eq_nil_iff` | always |
+| keys on a state: declared keys, value objects, subtypes | `checkKeys` | `toState_keys` | not stated; `keyViolations` lists the pairs that break a key |
 | value-object condition on a state | `checkValueObjects` | `toState_valueObjects` | not stated |
 | a morphism of finite states | `FinHom.check` | `FinHom.toHom` | not stated |
 | a claim of a certificate | `Certificate.checkClaim` | `checkClaim_sound` | not stated |
@@ -156,8 +157,13 @@ A schema, one per bounded context, is a presentation (`DDD/Schema.lean`):
 - equations between two paths out of the same entity type, possibly ending in
   an attribute;
 - aggregates: a root entity type and its members, each member with an ownership
-  reference to the root;
-- value objects: entity types identified by their attributes.
+  reference to the root or to another member, so that the ownership references
+  form a tree;
+- value objects: entity types identified by all their fields, attributes and
+  references;
+- keys: an entity type and some of its fields, which together identify its
+  entities;
+- subtypes: an entity type with an is-a reference to its supertype.
 
 References and attributes are the generators. A generator is identified by its
 source entity type and its name, so `Customer.name` and `Product.name` are two
@@ -184,10 +190,15 @@ sense:
 - each equation starts at a declared entity type and its two sides are
   parallel paths;
 - aggregates consist of declared entity types, no entity type belongs to two
-  aggregates, and each member has its ownership reference to the root;
+  aggregates, each member has its ownership reference to an entity type of its
+  aggregate, and following ownership references from any member reaches the
+  root, in at most as many steps as there are members (`Schema.ownerIter`);
 - the aggregate boundary: a reference to a member of an aggregate starts inside
   that aggregate, so from outside, references target roots only;
-- value objects are declared entity types with at least one attribute.
+- value objects are declared entity types with at least one field;
+- keys are on declared entity types, have a field, and name generators out of
+  their entity type; subtypes are declared entity types with their is-a
+  reference.
 
 `checkWellFormed` decides it (`checkWellFormed_iff`). In the examples,
 `Catalog.withFeatured` (a category referring to a product image, a member of
@@ -630,9 +641,15 @@ Entity-only and attributed states are separate types. Attributed states carry a
 specified bijection at each value type rather than an equality of types, so
 reading an attribute is a function application. The alternative, states over a
 fixed object built from `K`, gets colimits from Mathlib's `Over`, but a state then
-carries value slots that may repeat a value. The value-object condition is a
-separate predicate on attributed states (`State.ValueObjects`), checked on finite
-states (section 10).
+carries value slots that may repeat a value. Keys are a separate predicate on
+attributed states (`State.Keys`): two entities that agree on every field of a
+key are equal, so the fields of a key are jointly monic. The keys of a schema
+(`Schema.allKeys`) are its declared keys, the key of all fields of each value
+object (`State.ValueObjects`, implied by `State.Keys`), and the is-a reference of
+each subtype, which is then injective (`State.Keys.isA_injective`): a subtype is
+a subobject of its supertype. Optional and many-valued references are
+intermediate entity types with the keys `{owner}` and `{owner, item}`. The keys
+are checked on finite states (section 10).
 
 ### Limits and colimits
 
@@ -642,7 +659,7 @@ again. They are not the limits and colimits of `S.cat ⥤ Type`, in which the
 product of two states has `K v × K v` at `v` and the coproduct `K v ⊕ K v`. They
 are constructed directly, not through an equivalence with a slice or coslice of
 `S.cat ⥤ Type`, so the constructions give the entities at each object; they are
-limits and colimits of states without the value-object condition.
+limits and colimits of states without the keys.
 
 No generator leaves a value type, so the only morphisms out of a value type are
 identities, and a state is determined at value types by its bijections. The
@@ -735,8 +752,9 @@ existing entities, values of the declared types, and every equation at every
 entity. A finite state that passes is a state with values in `K`
 (`FinState.toState`): its set at an entity type is the entities numbered below
 its count, and following the names of a path through the columns is applying the
-state to the path (`eval_lift`). The value-object condition is checked on this
-form (`toState_valueObjects`). `FinHom.check` is sound for morphisms of states
+state to the path (`eval_lift`). Keys are checked on this form: no two distinct
+entities agree on the fields of a key (`checkKeys`, sound by `toState_keys`), and
+`keyViolations` lists the pairs that do. `FinHom.check` is sound for morphisms of states
 (`FinHom.toHom`).
 
 Restriction along a translation is computed on data: `FinState.restrict T S S' X`
@@ -771,7 +789,7 @@ passes its check holds (`checkClaim_sound`):
   strict non-interference check are compared, and a result `true` proves that
   the leg is full and faithful;
 - a finite state is a state of its schema, with literals of the declared types,
-  that satisfies the value-object condition;
+  that satisfies the keys of its schema;
 - a finite state is the restriction of another along a translation, so that its
   state is isomorphic to `restrictState`;
 - a homomorphism of finite states that is a morphism of their states.
@@ -821,7 +839,7 @@ problems.
 
 `Examples/Problems.lean` states the problems of:
 
-- a schema that breaks every condition;
+- a schema that breaks every condition, ownership, keys and subtypes included;
 - the variants of Orders and Catalog that break the aggregate rule;
 - two translations into Payments;
 - the report of a map with a broken context, a failing arrow and an arrow to a
@@ -1114,7 +1132,7 @@ are outside the library.*
 | Module | Defines and proves |
 |---|---|
 | `Values.lean` | `ValueType` |
-| `Schema.lean` | the presentation, `WellFormed`, `checkWellFormed_iff`, `RootsOnly` |
+| `Schema.lean` | the presentation, keys and subtypes, `ownerIter`, `allKeys`, `WellFormed`, `checkWellFormed_iff`, `RootsOnly` |
 | `Semantics.lean` | `Schema.cat`, `PathEq`, the correspondence of deep and quiver paths |
 | `PathEq.lean` | `pathEqFree`, `Acyclic`, `Rewrite`, `classOf`, `pathEqAcyclic`, their iff lemmas |
 | `Translation.lean` | `Translation`, `Valid`, `checkValid_iff`, `functor`, `restrict` |
@@ -1132,7 +1150,7 @@ are outside the library.*
 | `States.lean` | entity-only and attributed states, `Σ`, `Δ`, `Π`, data gluing |
 | `StateLimits.lean` | profiles, the terminal and initial states, `limitCone`, `colimitCocone`, connected limits and colimits pointwise, colimits pointwise at entity types |
 | `StateSigma.lean` | `AttrBijective`, `sigmaState`, `sigmaStateAdjunction`, `isRightAdjoint_restrictStateFunctor_iff`, `not_attrBijective` |
-| `Data.lean` | `FinState`, `check`, `toState`, value objects, `FinHom`, `restrict`, `restrictIso` |
+| `Data.lean` | `FinState`, `check`, `toState`, keys (`checkKeys`, `State.Keys`, `toState_keys`), `FinHom`, `restrict`, `restrictIso` |
 | `Json.lean` | the exchange format `csd-ddd/1` |
 | `Certificate.lean` | `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`, claims, `checkClaim_sound` |
 | `Problems.lean` | `Schema.problems`, `problems_eq_nil_iff`, `Translation.problems`, their sentences |
@@ -1143,10 +1161,11 @@ are outside the library.*
 | `Examples/Integration.lean` | the seven-context map, its projection onto the Showcase map, non-interference, references |
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, the failing kernel |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
+| `Examples/Structure.lean` | a value object with references, a nested aggregate, intermediate entity types with the keys `{owner}` and `{owner, item}`, a subtype, states that keep and break each key, and a broken variant |
 | `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
 | `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, a qualified second ordering context, machines in series, aggregate machines and the report of the context, events of the example map |
 | `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along OrdersPL → Orders or CatalogPL → Orders |
-| `Examples/Exchange.lean` | the example map as a workspace document, round trips, the `createdAt` clash |
+| `Examples/Exchange.lean` | the example map as a workspace document with two samples, round trips, the `createdAt` clash |
 | `Examples/Problems.lean` | the problems of broken schemas and translations, the report of `brokenMap` |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
@@ -1232,10 +1251,11 @@ The correspondence leaves out part of each side:
 - Equations. Schemas here have equations between paths, possibly ending in an
   attribute. CatColab's schema editor does not support them (October 2026);
   the categories they present are models of the walking proarrow all the same.
-- Aggregates and value objects. Neither is part of a model of the walking
-  proarrow. Aggregates are roots and ownership references from the members to
-  their root; value objects are a condition on states (two entities with the
-  same attributes are equal). They stay annotations of the presentation.
+- Aggregates, value objects, keys and subtypes. None is part of a model of the
+  walking proarrow. Aggregates are roots and trees of ownership references; value
+  objects, keys and subtypes are conditions on states (two entities that agree
+  on the fields of a key are equal), which a finite-limit sketch would state as
+  monic families. They stay annotations of the presentation.
 - Proof. The library does not formalize double theories or their models. The
   correspondence is stated here, not proved in Lean; the facts about `S.cat` it
   rests on are proved.
@@ -1256,8 +1276,13 @@ The correspondence leaves out part of each side:
 - Gluing needs the same names on both sides; names that clash outside the
   kernel are reported, and the Julia side qualifies them; inclusions that rename
   are not covered.
-- Limits and colimits of attributed states do not consider the value-object
-  condition, which stays a separate predicate (`State.ValueObjects`).
+- Limits and colimits of attributed states do not consider the keys, which stay a
+  separate predicate (`State.Keys`). Restriction and gluing are not yet shown to
+  keep keys, and no construction identifies the entities that agree on a key
+  (items 14 and 15 of `DDD/README.md`). Machine steps do not check keys.
+- That the ownership condition, which follows ownership references at most as
+  many times as an aggregate has members, holds exactly when the references form
+  a tree is stated, not proved.
 - The condition for `Σ_T` on attributed states is proved through
   `checkFullyFaithful`, which needs acyclic schemas and is sufficient only, or
   refuted from a missing path; no check decides it.

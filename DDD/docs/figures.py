@@ -871,13 +871,15 @@ def modules():
     f.poly([(752, 208), (752, 398 + dy)], "muted")
     f.arrow("xMerge", "xOpen", "", "muted")
     f.node("xProblems", 1105, 365 + dy, "Problems", w=90, h=30)
+    f.node("xStructure", 1105, 288 + dy, "Structure", w=90, h=30)
     f.poly([(1154, 55), (1170, 55), (1170, 365 + dy), (1150, 365 + dy)], "muted")
+    f.poly([(1170, 288 + dy), (1150, 288 + dy)], "muted")
     f.text(1160, 518, "arrows point from a module to the modules that import it; Certificate "
            "and Union also import Compose, Open imports Compose and Glue, Problems imports "
            "Translation,", "note", "end")
     f.text(1160, 534, "OpenMachine imports Data and Production.Wiring, Aggregates imports Union "
            "and States, the example Open imports Rename and AggregateMachine, the example "
-           "Problems imports Integration", "note", "end")
+           "Problems imports Integration, Exchange imports Structure", "note", "end")
     return f
 
 

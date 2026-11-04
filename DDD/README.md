@@ -530,6 +530,20 @@ of the workspace, whose literals are written in other forms, and its 43 claims
 hold; literals that do not parse are problems (`Examples/Literals.lean`). The
 editor edits the list of value types and the new types (csd-editor 09af7b5).
 
+Next step 11, schema structure, is complete, with no `sorry`: value objects are
+identified by all their fields, ownership references form a tree that reaches the
+root (`Schema.ownerIter`), and schemas declare keys and subtypes
+(`Schema.lean`); `Schema.State.Keys` is the condition on states, decided on
+finite states by `FinState.checkKeys` (`toState_keys`), with value-object
+identity and injective is-a references as consequences; gluing, qualification
+and aggregate schemas carry keys and subtypes, and the claim `state` checks the
+keys. `Examples/Structure.lean` has a value object with references, a nested
+aggregate, intermediate entity types with the keys `{owner}` and
+`{owner, item}`, a subtype, states that break each key, and the problems of a
+broken variant, checked by `decide`. The Julia side reads, writes, glues and
+qualifies keys and subtypes; its certificate of 46 claims holds. The editor
+edits keys, members owned by members and subtypes (csd-editor 95aa7fb).
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
