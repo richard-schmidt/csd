@@ -338,6 +338,10 @@ theorem vmor_comp {a b c : S.VObj L} (p : Quiver.Path a b) (q : Quiver.Path b c)
     vmor (p.comp q) = vmor p ≫ vmor q :=
   (CategoryTheory.Quotient.functor (S.vrel L)).map_comp (X := a) (Y := b) (Z := c) p q
 
+theorem vmor_cons {a b c : S.VObj L} (p : Quiver.Path a b) (e : b ⟶ c) :
+    vmor (p.cons e) = vmor p ≫ vmor e.toPath :=
+  vmor_comp p e.toPath
+
 /-- Every morphism of `S.vcat L` is presented by a path. -/
 theorem vmor_surjective {a b : S.VObj L} (f : S.vobj L a ⟶ S.vobj L b) :
     ∃ p : Quiver.Path a b, vmor p = f :=

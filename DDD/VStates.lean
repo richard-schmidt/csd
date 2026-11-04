@@ -1,0 +1,378 @@
+import DDD.ValueCat
+import DDD.StateSigma
+
+/-!
+# States over the category of value types
+
+An interpretation of the value types of a list `L` is a functor out of the
+category of value types (`Interp`): it gives each value type `v` a set `I.K v`
+and each conversion a function between these sets, and it satisfies the
+equations of `TypeList.Basic`, which hold in `L.cat`. The general theorems hold
+for every interpretation.
+
+A state of `S` with conversions (`Schema.VState I S`) is a functor out of
+`S.vcat L` with an isomorphism between its restriction to the value types and
+`I`: the states that agree with `I` on the value types.
+
+- `VState.toState`: the restriction along `S.cat ⥤ S.vcat L`, an attributed state
+  of `S` with values in `I.K`.
+- `State.vext`: an attributed state of `S` extends to a state with conversions,
+  each conversion acting through `I` and the bijections of the state; its
+  restriction is the state (`toState_vext`).
+- `VState.equivalence`: in a well-formed schema, restriction is an equivalence
+  between the states with conversions and the attributed states. The results
+  on attributed states hold for states with conversions through it: limits and
+  colimits, `Σ_T`, and data gluing.
+-/
+
+namespace DDD
+
+open CategoryTheory Limits
+
+/-- An interpretation of the value types of `L`: a functor out of the category of
+value types. It satisfies the equations between conversions, which hold in
+`L.cat`. -/
+structure Interp (L : TypeList) where
+  F : L.cat ⥤ Type
+
+namespace TypeList
+
+/-- The object of the value type `v` in the category of value types. -/
+def vobjOf (L : TypeList) (v : ValueType) : L.cat := emptySchema.vobj L ⟨.value v, trivial⟩
+
+/-- The conversion named `n` from `v` to `w`, as a morphism of the category of
+value types. -/
+def convMor (L : TypeList) {v w : ValueType} (n : String) (h : L.conv? v n = some w) :
+    L.vobjOf v ⟶ L.vobjOf w :=
+  Schema.vmor (Quiver.Hom.toPath (show @Quiver.Hom (emptySchema.VObj L) _
+    ⟨.value v, trivial⟩ ⟨.value w, trivial⟩ from ⟨n, by simp [Schema.vstep?, h]⟩))
+
+end TypeList
+
+namespace Interp
+
+variable {L : TypeList} (I : Interp L)
+
+/-- The values of the value type `v`. -/
+def K (v : ValueType) : Type := I.F.obj (L.vobjOf v)
+
+end Interp
+
+/-- The schema without entity types is well formed. -/
+theorem emptySchema_wellFormed : emptySchema.WellFormed := by decide
+
+namespace Schema
+
+variable {L : TypeList} (I : Interp L) (S : Schema)
+
+/-- A state of `S` that agrees with `I` on the value types: a functor out of the
+category of `S` with conversions, with an isomorphism between its restriction to
+the value types and `I`. -/
+structure VState where
+  F : S.vcat L ⥤ Type
+  values : S.vvals L ⋙ F ≅ I.F
+
+variable {I S}
+
+/-- A morphism of states with conversions: a natural transformation that commutes
+with the isomorphisms, so it is the identity on values. -/
+@[ext]
+structure VState.Hom (X Y : S.VState I) where
+  α : X.F ⟶ Y.F
+  values : Functor.whiskerLeft (S.vvals L) α ≫ Y.values.hom = X.values.hom
+
+instance : Category (S.VState I) where
+  Hom := VState.Hom
+  id X := ⟨𝟙 X.F, by simp⟩
+  comp f g := ⟨f.α ≫ g.α, by rw [Functor.whiskerLeft_comp, Category.assoc, g.values, f.values]⟩
+  id_comp f := VState.Hom.ext (Category.id_comp f.α)
+  comp_id f := VState.Hom.ext (Category.comp_id f.α)
+  assoc f g h := VState.Hom.ext (Category.assoc f.α g.α h.α)
+
+@[simp] theorem VState.id_α (X : S.VState I) : (𝟙 X : X ⟶ X).α = 𝟙 X.F := rfl
+
+@[simp] theorem VState.comp_α {X Y Z : S.VState I} (f : X ⟶ Y) (g : Y ⟶ Z) :
+    (f ≫ g).α = f.α ≫ g.α := rfl
+
+/-! ## Restriction to `S.cat` -/
+
+/-- The restriction of a state with conversions to `S.cat`: an attributed state with
+values in `I.K`. -/
+def VState.toState (X : S.VState I) : S.State I.K where
+  F := S.vinc L ⋙ X.F
+  values v := (X.values.app (L.vobjOf v)).toEquiv
+
+variable (I S) in
+/-- Restriction to `S.cat`, as a functor. -/
+def VState.toStateFunctor : S.VState I ⥤ S.State I.K where
+  obj := VState.toState
+  map {X Y} f := ⟨Functor.whiskerLeft (S.vinc L) f.α, fun v x => by
+    have h := congrArg (fun φ => φ.app (L.vobjOf v) x) f.values
+    simpa using h⟩
+
+/-! ## Extension to conversions -/
+
+theorem conv?_of_vstep? {v w : ValueType} {n : String}
+    (h : S.vstep? L (.value v) n = some (.value w)) : L.conv? v n = some w := by
+  simp only [vstep?, Option.map_eq_some_iff, Ob.value.injEq] at h
+  obtain ⟨u, hu, rfl⟩ := h
+  exact hu
+
+theorem not_vstep?_value_entity {v : ValueType} {e n : String} :
+    S.vstep? L (.value v) n ≠ some (.entity e) := by
+  simp [vstep?]
+
+/-- Out of a value type, the targets of the conversions are the same in every
+schema. -/
+theorem vtgt?_value_eq {S S' : Schema} {v : ValueType} :
+    ∀ l : List String, S.vtgt? L (.value v) l = S'.vtgt? L (.value v) l
+  | [] => rfl
+  | n :: ns => by
+    simp only [vtgt?_cons, vstep?]
+    cases L.conv? v n with
+    | none => rfl
+    | some w => exact vtgt?_value_eq ns
+
+/-- A path of conversions ends at a value type. -/
+theorem vtgt?_value {v : ValueType} : ∀ {l : List String} {o : Ob},
+    S.vtgt? L (.value v) l = some o → ∃ w, o = .value w
+  | [], _, h => ⟨v, (Option.some.inj h).symm⟩
+  | n :: ns, o, h => by
+    simp only [vtgt?_cons, vstep?] at h
+    cases hc : L.conv? v n with
+    | none => simp [hc] at h
+    | some w =>
+      simp only [hc, Option.map_some, Option.bind_some] at h
+      exact vtgt?_value h
+
+variable (I) in
+/-- The bijection of `X` at an object of the category of value types. -/
+def valEquiv (X : S.State I.K) : ∀ (o : Ob) (ho : emptySchema.IsOb o),
+    X.F.obj (S.obj ⟨o, isOb_of_empty ho⟩) ≃ I.F.obj (emptySchema.vobj L ⟨o, ho⟩)
+  | .entity _, ho => absurd ho (by simp [IsOb, emptySchema])
+  | .value v, _ => X.values v
+
+/-- `I`, carried onto the sets of `X` at the value types by its bijections. -/
+def conj (X : S.State I.K) : L.cat ⥤ Type where
+  obj c := X.F.obj (S.obj ⟨c.as.1, isOb_of_empty c.as.2⟩)
+  map {c d} g x := (valEquiv I X d.as.1 d.as.2).symm (I.F.map g (valEquiv I X c.as.1 c.as.2 x))
+  map_id c := by
+    funext x
+    simp only [CategoryTheory.Functor.map_id, types_id_apply, Equiv.symm_apply_apply]
+  map_comp f g := by
+    funext x
+    simp only [CategoryTheory.Functor.map_comp, types_comp_apply, Equiv.apply_symm_apply]
+
+/-- The step of `X` along a generator or a conversion. -/
+def vextStep (X : S.State I.K) : ∀ (a b : S.VObj L), (a ⟶ b) → X.F.obj (S.obj a) → X.F.obj (S.obj b)
+  | ⟨.entity e, ha⟩, b, f => X.F.map (S.genMor (a := ⟨.entity e, ha⟩) (b := b) f.1 f.2)
+  | ⟨.value v, _⟩, ⟨.value w, _⟩, f => fun x =>
+    (X.values w).symm (I.F.map (L.convMor f.1 (conv?_of_vstep? f.2)) (X.values v x))
+  | ⟨.value _, _⟩, ⟨.entity _, _⟩, f => absurd f.2 not_vstep?_value_entity
+
+/-- The steps of `X` along generators and conversions. -/
+def vextPre (X : S.State I.K) : S.VObj L ⥤q Type where
+  obj a := X.F.obj (S.obj a)
+  map {a b} f := vextStep X a b f
+
+/-- On paths of `S`, the extension is `X`. -/
+theorem vincPre_vextPre (X : S.State I.K) :
+    Paths.lift (S.vincPre L) ⋙ Paths.lift (vextPre X) =
+      CategoryTheory.Quotient.functor S.rel ⋙ X.F := by
+  refine Paths.ext_functor rfl fun a b e => ?_
+  simp only [eqToHom_refl, Category.id_comp, Category.comp_id, Functor.comp_map,
+    Paths.lift_toPath]
+  obtain ⟨⟨ea⟩ | ⟨v⟩, ha⟩ := a
+  · rfl
+  · exact absurd e.2 (by simp [step?])
+
+/-- On paths of conversions, the extension is `I`, carried onto `X`. -/
+theorem vvalsPre_vextPre (X : S.State I.K) :
+    Paths.lift (S.vvalsPre L) ⋙ Paths.lift (vextPre X) =
+      CategoryTheory.Quotient.functor (emptySchema.vrel L) ⋙ conj X := by
+  refine Paths.ext_functor rfl fun a b e => ?_
+  simp only [eqToHom_refl, Category.id_comp, Category.comp_id, Functor.comp_map,
+    Paths.lift_toPath]
+  obtain ⟨⟨ea⟩ | ⟨v⟩, ha⟩ := a
+  · exact absurd ha (by simp [IsOb, emptySchema])
+  obtain ⟨⟨eb⟩ | ⟨w⟩, hb⟩ := b
+  · exact absurd hb (by simp [IsOb, emptySchema])
+  rfl
+
+/-- The extension of `X` respects the equations of `S` and the equations between
+conversions. -/
+theorem vext_resp (hS : S.WellFormed) (X : S.State I.K) :
+    ∀ (a b : Paths (S.VObj L)) (f₁ f₂ : a ⟶ b), S.vrel L f₁ f₂ →
+      (Paths.lift (vextPre X)).map f₁ = (Paths.lift (vextPre X)).map f₂ := by
+  rintro ⟨ao, hao⟩ ⟨bo, hbo⟩ f₁ f₂ (⟨q, hq, ha, h₁, h₂⟩ | ⟨v, ha, h⟩)
+  · simp only at ha
+    subst ha
+    obtain ⟨o, hl, hr⟩ := hS.eqn_parallel q hq
+    have t₁ := vtgt?_vnames f₁
+    simp only at t₁
+    rw [h₁, vtgt?_of_tgt? hl] at t₁
+    obtain rfl : o = bo := Option.some.inj t₁
+    obtain ⟨⟨b₁, hb₁'⟩, p₁, hb₁, hp₁⟩ := exists_path hS ⟨.entity q.src, hao⟩ q.lhs hl
+    obtain ⟨⟨b₂, hb₂'⟩, p₂, hb₂, hp₂⟩ := exists_path hS ⟨.entity q.src, hao⟩ q.rhs hr
+    simp only at hb₁ hb₂
+    subst hb₁ hb₂
+    have e₁ : f₁ = (Paths.lift (S.vincPre L)).map p₁ :=
+      vnames_injective _ _ (by rw [vnames_vincPath, hp₁, h₁])
+    have e₂ : f₂ = (Paths.lift (S.vincPre L)).map p₂ :=
+      vnames_injective _ _ (by rw [vnames_vincPath, hp₂, h₂])
+    rw [e₁, e₂]
+    have k₁ := Functor.congr_hom (vincPre_vextPre X) p₁
+    have k₂ := Functor.congr_hom (vincPre_vextPre X) p₂
+    simp only [eqToHom_refl, Category.id_comp, Category.comp_id, Functor.comp_map] at k₁ k₂
+    rw [k₁, k₂]
+    exact congrArg X.F.map (CategoryTheory.Quotient.sound _ ⟨q, hq, rfl, hp₁, hp₂⟩)
+  · simp only at ha
+    subst ha
+    obtain ⟨w, rfl⟩ := vtgt?_value (vtgt?_vnames f₁)
+    have t₁ : emptySchema.vtgt? L (.value v) (vnames f₁) = some (.value w) :=
+      (vtgt?_value_eq _).trans (vtgt?_vnames f₁)
+    have t₂ : emptySchema.vtgt? L (.value v) (vnames f₂) = some (.value w) :=
+      (vtgt?_value_eq _).trans (vtgt?_vnames f₂)
+    let g₁ := emptySchema.vpathOf emptySchema_wellFormed ⟨.value v, trivial⟩ ⟨.value w, trivial⟩
+      (vnames f₁) t₁
+    let g₂ := emptySchema.vpathOf emptySchema_wellFormed ⟨.value v, trivial⟩ ⟨.value w, trivial⟩
+      (vnames f₂) t₂
+    have e₁ : f₁ = (Paths.lift (S.vvalsPre L)).map g₁ :=
+      vnames_injective _ _ (by rw [vnames_vvalsPath, vnames_vpathOf])
+    have e₂ : f₂ = (Paths.lift (S.vvalsPre L)).map g₂ :=
+      vnames_injective _ _ (by rw [vnames_vvalsPath, vnames_vpathOf])
+    rw [e₁, e₂]
+    have k₁ := Functor.congr_hom (vvalsPre_vextPre X) g₁
+    have k₂ := Functor.congr_hom (vvalsPre_vextPre X) g₂
+    simp only [eqToHom_refl, Category.id_comp, Category.comp_id, Functor.comp_map] at k₁ k₂
+    rw [k₁, k₂]
+    exact congrArg (conj X).map (CategoryTheory.Quotient.sound _
+      (Or.inr ⟨v, rfl, by rw [vnames_vpathOf, vnames_vpathOf]; exact h⟩))
+
+/-- The functor of the extension of `X`. -/
+def vextF (hS : S.WellFormed) (X : S.State I.K) : S.vcat L ⥤ Type :=
+  CategoryTheory.Quotient.lift (S.vrel L) (Paths.lift (vextPre X)) (vext_resp hS X)
+
+theorem vvals_vextF (hS : S.WellFormed) (X : S.State I.K) : S.vvals L ⋙ vextF hS X = conj X := by
+  apply CategoryTheory.Quotient.lift_unique'
+  calc CategoryTheory.Quotient.functor (emptySchema.vrel L) ⋙ S.vvals L ⋙ vextF hS X
+      = Paths.lift (S.vvalsPre L) ⋙ CategoryTheory.Quotient.functor (S.vrel L) ⋙ vextF hS X := by
+        rw [← Functor.assoc, vvals, CategoryTheory.Quotient.lift_spec, Functor.assoc]
+    _ = Paths.lift (S.vvalsPre L) ⋙ Paths.lift (vextPre X) := by
+        rw [vextF, CategoryTheory.Quotient.lift_spec]
+    _ = _ := vvalsPre_vextPre X
+
+theorem vinc_vextF (hS : S.WellFormed) (X : S.State I.K) : S.vinc L ⋙ vextF hS X = X.F := by
+  apply CategoryTheory.Quotient.lift_unique'
+  calc CategoryTheory.Quotient.functor S.rel ⋙ S.vinc L ⋙ vextF hS X
+      = Paths.lift (S.vincPre L) ⋙ CategoryTheory.Quotient.functor (S.vrel L) ⋙ vextF hS X := by
+        rw [← Functor.assoc, vinc, CategoryTheory.Quotient.lift_spec, Functor.assoc]
+    _ = Paths.lift (S.vincPre L) ⋙ Paths.lift (vextPre X) := by
+        rw [vextF, CategoryTheory.Quotient.lift_spec]
+    _ = _ := vincPre_vextPre X
+
+/-- The values of the extension of `X` are those of `I`, by the bijections of
+`X`. -/
+def vextValues (hS : S.WellFormed) (X : S.State I.K) : S.vvals L ⋙ vextF hS X ≅ I.F :=
+  NatIso.ofComponents (fun c => (valEquiv I X c.as.1 c.as.2).toIso) fun {c d} g => by
+    rw [Functor.congr_hom (vvals_vextF hS X) g]
+    funext x
+    simp only [conj, eqToHom_refl, Category.id_comp, Category.comp_id, types_comp_apply,
+      Equiv.toIso_hom]
+    exact Equiv.apply_symm_apply _ _
+
+variable (I) in
+/-- The extension of an attributed state to a state with conversions: each
+conversion acts through `I` and the bijections of the state. -/
+def _root_.DDD.Schema.State.vext (hS : S.WellFormed) (X : S.State I.K) : S.VState I where
+  F := vextF hS X
+  values := vextValues hS X
+
+/-- The restriction of the extension of `X` is `X`. -/
+theorem toState_vext (hS : S.WellFormed) (X : S.State I.K) : (X.vext I hS).toState = X :=
+  State.ext' (vinc_vextF hS X) fun _ _ => rfl
+
+/-! ## The equivalence -/
+
+/-- A family of maps between two functors out of `S.vcat L` is natural when it
+commutes with the generators and the conversions. -/
+theorem natural_of_vgen {F G : S.vcat L ⥤ Type} (app : ∀ c, F.obj c ⟶ G.obj c)
+    (h : ∀ (a b : S.VObj L) (e : a ⟶ b),
+      F.map (vmor e.toPath) ≫ app (S.vobj L b) = app (S.vobj L a) ≫ G.map (vmor e.toPath)) :
+    ∀ {c d : S.vcat L} (g : c ⟶ d), F.map g ≫ app d = app c ≫ G.map g := by
+  rintro ⟨a⟩ ⟨b⟩ g
+  obtain ⟨p, rfl⟩ := vmor_surjective (a := a) (b := b) g
+  induction p with
+  | nil => erw [vmor_nil, F.map_id, G.map_id, Category.id_comp]
+  | cons p e ih =>
+    erw [vmor_cons, F.map_comp, G.map_comp, Category.assoc, h, ← Category.assoc, ih,
+      Category.assoc]
+
+instance : (VState.toStateFunctor I S).Faithful where
+  map_injective {X Y} f g h := by
+    apply VState.Hom.ext
+    ext ⟨a⟩ x
+    exact congrArg (fun φ : X.toState ⟶ Y.toState => φ.α.app (S.obj a) x) h
+
+instance : (VState.toStateFunctor I S).Full where
+  map_surjective {X Y} φ := by
+    refine ⟨⟨⟨fun c => φ.α.app (S.obj c.as), fun _ _ g =>
+      natural_of_vgen (F := X.F) (G := Y.F) (fun c => φ.α.app (S.obj c.as)) ?_ g⟩, ?_⟩, rfl⟩
+    · rintro ⟨ao, hao⟩ b e
+      cases ao with
+      | entity ea => exact φ.α.naturality (S.genMor (a := ⟨.entity ea, hao⟩) (b := b) e.1 e.2)
+      | value v =>
+        obtain ⟨⟨eb⟩ | ⟨w⟩, hb⟩ := b
+        · exact absurd e.2 not_vstep?_value_entity
+        have hc := conv?_of_vstep? e.2
+        have hX : X.F.map (vmor e.toPath) ≫ (X.values.app (L.vobjOf w)).hom =
+            (X.values.app (L.vobjOf v)).hom ≫ I.F.map (L.convMor e.1 hc) :=
+          X.values.hom.naturality (L.convMor e.1 hc)
+        have hY : Y.F.map (vmor e.toPath) ≫ (Y.values.app (L.vobjOf w)).hom =
+            (Y.values.app (L.vobjOf v)).hom ≫ I.F.map (L.convMor e.1 hc) :=
+          Y.values.hom.naturality (L.convMor e.1 hc)
+        have hφ : ∀ u (y : X.F.obj (S.vobj L ⟨.value u, trivial⟩)),
+            (Y.values.app (L.vobjOf u)).hom (φ.α.app (S.obj ⟨.value u, trivial⟩) y) =
+              (X.values.app (L.vobjOf u)).hom y := fun u y => φ.values u y
+        funext x
+        apply (Y.values.app (L.vobjOf w)).toEquiv.injective
+        have hX' := congrFun hX x
+        have hY' := congrFun hY (φ.α.app (S.obj ⟨.value v, trivial⟩) x)
+        simp only [types_comp_apply] at hX' hY'
+        change (Y.values.app (L.vobjOf w)).hom
+            (φ.α.app (S.obj ⟨.value w, trivial⟩) (X.F.map (vmor e.toPath) x)) =
+          (Y.values.app (L.vobjOf w)).hom
+            (Y.F.map (vmor e.toPath) (φ.α.app (S.obj ⟨.value v, trivial⟩) x))
+        rw [hφ, hX', hY', hφ]
+    · ext ⟨⟨⟨eo⟩ | ⟨v⟩, ho⟩⟩ x
+      · exact absurd ho (by simp [IsOb, emptySchema])
+      · exact φ.values v x
+
+/-- In a well-formed schema, every attributed state is the restriction of a state
+with conversions. -/
+theorem toStateFunctor_essSurj (hS : S.WellFormed) : (VState.toStateFunctor I S).EssSurj :=
+  ⟨fun X => ⟨X.vext I hS, ⟨eqToIso (toState_vext hS X)⟩⟩⟩
+
+theorem toStateFunctor_isEquivalence (hS : S.WellFormed) :
+    (VState.toStateFunctor I S).IsEquivalence where
+  essSurj := toStateFunctor_essSurj hS
+
+variable (I) in
+/-- In a well-formed schema, the states with conversions are equivalent to the
+attributed states, by restriction to `S.cat`. -/
+noncomputable def VState.equivalence (hS : S.WellFormed) : S.VState I ≌ S.State I.K :=
+  @Functor.asEquivalence _ _ _ _ (VState.toStateFunctor I S) (toStateFunctor_isEquivalence hS)
+
+/-- States with conversions have all small limits. -/
+theorem VState.hasLimits (hS : S.WellFormed) : HasLimits (S.VState I) :=
+  @Adjunction.has_limits_of_equivalence _ _ _ _ (VState.toStateFunctor I S)
+    (toStateFunctor_isEquivalence hS) _
+
+/-- States with conversions have all small colimits. -/
+theorem VState.hasColimits (hS : S.WellFormed) : HasColimits (S.VState I) :=
+  @Adjunction.has_colimits_of_equivalence _ _ _ _ (VState.toStateFunctor I S)
+    (toStateFunctor_isEquivalence hS) _
+
+end Schema
+
+end DDD
