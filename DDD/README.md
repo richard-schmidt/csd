@@ -762,6 +762,196 @@ of commit 2204184; the deploy's check of the example map passes (13 claims,
 0.17 s). git is not installed on the A52, so models are stored without history
 there until it is.
 
+Items 10 to 17 follow the design review of 2026-11-04 (see Decisions). Their
+order is 10, 11, 12, then 13 to 16, then 17: the import of Context Mapper
+models comes early in a first version, so that real models exist for the larger
+items, and again in full at the end.
+
+### 10. Value types
+
+1. `Values.lean`: the built-ins `datetime` (a date and a time of day, without
+   time zone), `timestamp` (an instant, written in UTC), `time` (a time of
+   day) and `duration` (days, hours, minutes and seconds, without months or
+   years), and `optional v`, whose values are absent or a value of `v`. Two
+   absent values are equal; `optional (optional v)` is refused.
+2. One list of value types per context map document, shared by all contexts:
+   enumerations with their values, and named types over a built-in. A named
+   type is a type of its own. An undeclared `named n`, an enumeration value the
+   list lacks, and a literal that does not parse as its type are problems.
+3. Normal forms: each value type has a function that parses a literal and
+   prints its normal form: decimals without trailing zeros or a leading `+`,
+   timestamps in UTC with `Z`, seconds always written, fractions of a second
+   without trailing zeros, UUIDs in lower case, durations with hours below 24
+   and minutes and seconds below 60. `FinState.fromJson`, the editor and the
+   import normalize what they read and refuse only literals that do not parse,
+   so equality of literals is equality of values. The normalizers belong to the
+   reader, as the JSON parser does, and are tested on examples.
+4. `Lit` gains `null`; `Examples/Values.lean` interprets the new types, with
+   `DecidableEq`.
+5. The editor edits the list of value types and the new types; the Julia side
+   reads and writes them.
+
+Done when a map document with each new type, an enumeration and optional
+attributes passes `csd-check` and the Julia certificate covers it; a literal
+written in another form is normalized, and one that does not parse is a
+problem.
+
+### 11. Schema structure
+
+1. Value objects: identified by all their fields, attributes and references
+   (`State.ValueObjects`, `checkValueObjects`, `toState_valueObjects`). A value
+   object needs one field; the problem `valueObjectAttrs` becomes
+   `valueObjectFields`.
+2. Ownership as a tree: the ownership reference of a member targets the root or
+   another member of the same aggregate, and following ownership references
+   from any member reaches the root without a cycle (`agg_owner`, a new
+   condition, the problem `ownerCycle`). The boundary rule is unchanged.
+3. Keys: a schema lists keys, each an entity type and a set of its own
+   attributes and references. `State.Keys`: two entities that agree on a key
+   are equal; `checkKeys` decides it on finite states and is sound for it.
+   Value-object identity is the key of all fields. A key that names an unknown
+   field is a schema problem. `glue`, `glueAll`, `qualify`, `aggregateBase` and
+   `checkSameUpToOrder` carry keys as they carry value objects.
+4. Subtypes: an entity type with an is-a reference to its supertype that is a
+   key on its own. Inherited fields are reached through it.
+5. The editor edits keys and the new ownership; the Julia side carries keys.
+
+Done when an example with a value object with references, a nested aggregate,
+an intermediate entity type with the key {owner}, one with the key
+{owner, item}, and a subtype passes, and the problems of a broken variant are
+checked by `decide`.
+
+### 12. Context Mapper import, first version
+
+In `csd-editor`: a parser, in Python with the standard library only, for the
+part of the Context Mapper language that csd reads. It produces a context map
+document and a report of what it dropped or guessed; the editor checks the
+document with `csd-check` as any other model.
+
+- Bounded contexts, aggregates and entities become contexts, aggregates and
+  entity types. `Date`, `DateTime` and `Timestamp` become `date`, `datetime`
+  and `timestamp`; the report notes that a Java `Date` holds an instant.
+  `nullable` attributes become `optional v`; enums become enumerations of the
+  list of value types; `key` attributes become keys.
+- References stay references. A containment list inside an aggregate becomes
+  the reversed ownership reference; any other collection becomes an
+  intermediate entity type with the key {owner, item}, and a `nullable`
+  reference one with the key {owner}.
+- `extends` becomes an is-a reference with its key; abstract and disjoint
+  hierarchies are reported.
+- Value objects become owned members; records come with item 17.
+- A shared kernel becomes a kernel context `A_B_Kernel` holding what both
+  contexts declare alike: entity types with the same name, their fields with
+  the same name and type, and the references whose targets enter. A name
+  present in both with another type stays out and is reported.
+- An upstream-downstream relationship becomes a published language per
+  distinct set of exposed aggregates, with their roots, included in the owner
+  and translated name for name into each consumer. Without
+  `exposedAggregates`, the published roots are the upstream roots that the
+  downstream declares by name; when there are none, the relationship is a
+  label. Conformists and anti-corruption layers start alike; open host
+  services and partnerships are labels.
+- Domain events, services, operations and use cases are reported.
+
+Done when the example models of Context Mapper import into documents whose
+remaining problems are listed in the report, with tests in the editor's CI.
+
+### 13. Category of value types
+
+1. The value types form a category, presented by conversions: tables between
+   finite types (enumerations and `bool`) that cover every source value;
+   coercions between a named type and its base, both ways; the built-ins
+   `timestamp → datetime`, `timestamp → date`, `timestamp → time` (in UTC),
+   `datetime → date`, `datetime → time`, `int → decimal`, and every type to
+   `string` (its normal form); `some : v → optional v`, and the lift
+   `optional c` of each conversion `c`; record types, products of value types,
+   with their projections. No user-written functions.
+2. Equations: coercions are inverse; a path of tables equals the table it
+   computes; lifts preserve composition and `some` commutes with them;
+   `timestamp → datetime → date = timestamp → date`, and the same for `time`;
+   a coercion followed by `string` is `string`. Path equality rewrites to a
+   normal form; an equation outside the list is not derived.
+3. Every schema category contains the category of value types, and
+   translations are the identity on it. The interpretation `K` is a functor
+   that satisfies the equations and sends records to products; the general
+   theorems hold for every such `K`. Attributed states are the states that
+   agree with `K` on the value types.
+4. The results that use `Schema.eq_value_of_hom` (morphisms out of a value type
+   are identities) are proved again: limits and colimits of states
+   (`StateLimits.lean`), `Σ_T` (`StateSigma.lean`), path equality
+   (`PathEq.lean`), and the evaluation of finite states (`Data.lean`).
+5. The list of value types declares conversions and records; record literals
+   are JSON objects with normalized fields. The Julia side evaluates
+   conversions on normal forms.
+
+Done when the existing results hold over the category of value types, an
+example uses each kind of conversion and a record, and the Julia certificate
+covers it.
+
+### 14. Translations that convert, keys through restriction and gluing
+
+1. A translation may send an attribute to a path that ends in conversions,
+   including a translation out of a published language into its owner.
+2. Normal form: a translation that is injective on entity types factors as an
+   inclusion into a definitional extension of its target, one derived
+   generator `g` with the equation `g = T g` per generator of the source; the
+   extension presents an isomorphic category. Gluing, open schemas and the
+   roots-only check apply to the normal form. A translation that sends two
+   entity types to one has no such normal form and is not glued along.
+3. `KeysKept T`: for each key `(e, F)` of the source, the target has a key on
+   `T e` whose fields are images `T f` of fields in `F`, or a field of `F` goes
+   to the empty path. The restriction of a keyed state is keyed
+   (`restrictState_keys`, `restrict_checkKeys`); an arrow that fails the
+   condition has the problem `keyNotKept`.
+4. A glued state satisfies the keys of the parts exactly when its restrictions
+   do; `Gluing.stateEquiv` and `familyEquiv` restrict to keyed states.
+
+Done when the example map publishes a converted field through the translation
+of its published language into the owner, the normal form is proved to present
+an isomorphic category, and restriction and gluing keep keys.
+
+### 15. Closure: Σ and merges that respect keys
+
+1. The closure of a finite state identifies the entities that agree on a key,
+   then what they reference, until nothing changes. It fails when it identifies
+   two distinct values. A state is consistent when its closure does not fail.
+2. Keyed states are reflective in the consistent states, with the closure as
+   the reflection.
+3. Merges: the pushout of states along a shared sub-state, then the closure;
+   when it is consistent, it is the pushout among keyed states, and otherwise
+   no keyed state receives both sides. `Σ_T` on keyed states: the closure of
+   `Σ_T X`, left adjoint of `Δ_T` on the states whose `Σ_T X` is consistent,
+   under `AttrBijective`.
+4. Limits of non-empty diagrams preserve keys; the terminal state does not
+   satisfy them in general, so `isRightAdjoint_restrictStateFunctor_iff` has no
+   counterpart for keyed states.
+
+Done when an example merges two states by a natural key, another merge fails
+on two distinct values, and the universal properties are proved.
+
+### 16. Event types
+
+An event type is a schema with one entity type, identified by all its fields,
+with references to roots of the published language; it is published and
+translated with the published language. An occurrence is a one-entity state of
+the event schema whose references resolve in the current state of its context.
+Machines emit occurrences, `Events.lean` routes them along `J`, and states do
+not store them.
+
+Done when an example context publishes an event type, a consumer receives an
+occurrence through a translation, and an occurrence with a dangling reference
+is refused.
+
+### 17. Context Mapper import, full version
+
+Value objects without references become record types; domain events become
+event types of their context, published when their aggregate is exposed, and
+references from an event to anything but a root are reported. Models imported
+with item 12 are imported again.
+
+Done when the example models of Context Mapper import with records and event
+types.
+
 ### Conditional
 
 - Names as indices instead of strings in the checkers, with a lemma relating
@@ -775,12 +965,20 @@ there until it is.
   `csd-check` imports neither the proofs nor Mathlib's category theory, if the
   size of the executable or the time of its first build matters, for example on
   a device with little storage.
+- Keys in the check of a machine step (`CheckedState`, the aggregate machines),
+  when the machines are next worked on.
+- The closure on the Julia side, with a certificate claim for merges, if merging
+  data across contexts happens in Julia or states grow large.
 
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
 the gluing along a kernel and the finite states of phase 4; item 6 uses the
 covering theorem of item 3 and the machines of phase 5; item 7 uses the
 certificates of phase 4, and item 8 the certificates and the executable of
-item 7. Items 1 to 9 are done.
+item 7. Items 1 to 9 are done. Item 12 uses items 10 and 11; item 13 uses the list of value types of item 10; item 14 uses
+the keys of item 11 and the conversions of item 13; item 15 uses items 13 and
+14, so that the closure is proved once, over the category of value types;
+item 16 uses value-object identity and records; item 17 uses items 12, 13
+and 16.
 
 ## Decisions
 
@@ -965,3 +1163,88 @@ Next step 8:
 - `Report.lean` does not explain a failing state violation by violation:
   `FinState.violations` is defined with the aggregate machines, which import
   `Production`.
+
+Design review after step 9 (2026-11-04), for items 10 to 17:
+
+- Context Mapper: `csd-editor` is where models live. A `.cml` file is imported
+  once per model, and the import reports what it drops or guesses; there is no
+  export to Context Mapper. Each adaptation of csd is judged by what csd needs,
+  not by parity with Context Mapper.
+- References: total functions. Optional and many-valued references are
+  intermediate entity types; keys give "at most one" and "no duplicates". An
+  optional flag on references can follow as notation over a link with the key
+  {owner}. Partial functions as the target of states would change the whole
+  state layer.
+- Value objects: identified by all their fields, attributes and references. A
+  value object made of attributes only becomes a record value type (below).
+- Ownership: a tree that reaches the root without cycles, instead of one
+  reference to the root per member; nested aggregates need no composite
+  reference.
+- Value types: one list per model, shared by all contexts, with enumerations
+  and named types over a built-in, matching the single interpretation `K` of
+  all contexts. One list per context would need conversions to relate two
+  definitions of the same name.
+- Built-ins: `datetime`, `timestamp`, `time` and `duration`. A duration is an
+  exact length; months and years have no fixed length and go through named
+  types.
+- Values: normalized when read, so that equality of literals is equality of
+  values; only literals that do not parse are refused. Normalization drops the
+  offset of a timestamp and the scale of a decimal; when they matter, they are
+  separate attributes or types.
+- Optional attributes: the value type `optional v`, so that the rule that
+  translations leave value types unchanged also covers optionality. Two absent
+  values are equal, unlike `NULL` in SQL.
+- Keys: a key is a family of fields that is jointly monic in every state, a
+  condition of a finite-limit sketch. Keys are checked on states, kept by
+  restriction under `KeysKept` and by gluing, and the closure gives `Σ_T` and
+  merges that respect them. With free values the keyed states are reflective;
+  with the fixed values of attributed states, the closure fails when it
+  identifies two distinct values, so `Σ_T` and merges are defined on
+  consistent states only. Machine steps do not check keys in this round.
+- Subtypes: an is-a reference that is a key on its own; a subtype is a
+  subobject of its supertype. Copying inherited fields would lose the identity
+  shared with the supertype; one entity type per hierarchy would lose typed
+  references to subtypes.
+- Conversions: the value types form a category whose arrows are conversions,
+  and `K` is a functor. It comes before the closure, so that the closure is
+  proved once.
+- Direction of arrows: a published language is the apex of a span of views,
+  into its owner and into each consumer, and either leg may convert. States
+  that agree on it are the states of the pushout, for any functors. Coarsening
+  happens on the leg whose context is finer; a consumer that needs less than
+  what is published gets its own published language. Which side is
+  authoritative belongs to the dynamics, not to this structure, so the arrows
+  keep their direction.
+- Normal form of translations: any translation may convert, and csd computes
+  with its normal form, an inclusion into a definitional extension of the
+  target. Gluing and open schemas stay defined on inclusions.
+- Kinds of conversion: tables, coercions, a fixed list of built-ins, `some` and
+  lifts, projections of records. Expressions written by users would make
+  equality of conversions undecidable.
+- Equality of conversions: a fixed list of equations, each proved for the
+  interpretations, decided by rewriting. Equality as functions would make the
+  schema category depend on one interpretation; with the list, the theorems
+  hold for every interpretation that satisfies it.
+- Events: an event type is structure, a small schema published and translated
+  with the published language; an occurrence is dynamics, emitted by machines
+  and routed by `Events.lean`. States do not store occurrences; an
+  event-sourced context models its log with ordinary entity types.
+- Partnership: a label on the map, with no arrow in `J` and no check. Shared
+  data between partners is a context included in both; arrows both ways would
+  give `J` a cycle and the map no rank.
+- Imported shared kernels: what both contexts declare alike. The merge check
+  reports a wrong guess as a clash instead of merging it.
+- Imported published languages: without `exposedAggregates`, the upstream roots
+  that the downstream declares by name, the same rule as for kernels.
+- Imported value objects: records when they have no references, owned members
+  otherwise. A value object made of attributes is a set of tuples of values; an
+  entity type would add identities and unused tuples.
+- The importer: Python with the standard library, in the editor server. It runs
+  where the editor runs, needs no install, and anything it does not read goes
+  into the report. The grammar of Context Mapper through its Java tooling would
+  need a JVM on the server.
+- Order: value types and schema structure first, then a first import, then the
+  category of value types, translations that convert, the closure and event
+  types, then the full import.
+- Julia: follows the format, computes restriction with conversions and gluing,
+  and does not compute the closure; Lean is its only implementation.
