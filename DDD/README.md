@@ -544,6 +544,17 @@ broken variant, checked by `decide`. The Julia side reads, writes, glues and
 qualifies keys and subtypes; its certificate of 46 claims holds. The editor
 edits keys, members owned by members and subtypes (csd-editor 95aa7fb).
 
+Next step 12, the first version of the Context Mapper import, is complete:
+`cml_import.py` in csd-editor (bfc05c9), Python with the standard library, reads
+a `.cml` file into a context map document and a report of what it did not
+import, what it guessed, and notes, with their lines; the editor imports a file
+into a new model through `POST /api/import` and shows the report. The 54 example
+models of Context Mapper (`context-mapper-examples` at 3c28b41) import, and
+`csd-check` holds 213 of the 218 claims of their documents; the 5 that fail are
+aggregate-boundary problems in two models, where an entity type refers to a
+member of another aggregate. The editor's CI imports the examples, and its tests
+cover each rule of the import.
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -1339,3 +1350,24 @@ Next step 11:
   products, so the gluing of the example map carries keys and the Julia side
   is tested on them. `Examples/Structure.lean` has the other cases of the item,
   and the workspace carries its schema and a state as a sample.
+
+Next step 12:
+
+- Containment: a reference to a member of the same aggregate that nothing else in
+  the aggregate refers to. It becomes the ownership reference of the member,
+  reversed, or the member's own reference back to the container when it has one;
+  a single one gives the key `{owner}`, so "exactly one" becomes "at most one".
+  A member that nothing contains is owned by the root, through its reference to
+  the root when it has one.
+- A value object that another aggregate refers to stays outside aggregates: it has
+  no identity to keep inside one. Entities stay members, and references to them
+  from outside their aggregate are the problems `csd-check` reports.
+- A reference to an object of another context gives the referring context an
+  entity type of that name without fields; a published language into that
+  context gives the entity types the import added the published fields.
+- Domain events and commands inside aggregates become entity types; item 17 makes
+  them event types. Basic types become value objects. A type name that is neither
+  built in nor an enum becomes a named type over `string`.
+- A Java `Date` becomes `date` and `double` becomes `decimal`, each reported.
+- The editor's CI fetches the examples of Context Mapper at a fixed commit rather
+  than copying them into the repository.
