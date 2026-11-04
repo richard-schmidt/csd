@@ -8,7 +8,8 @@ An interpretation of the value types of a list `L` is a functor out of the
 category of value types (`Interp`): it gives each value type `v` a set `I.K v`
 and each conversion a function between these sets, and it satisfies the
 equations of `TypeList.Basic`, which hold in `L.cat`. The general theorems hold
-for every interpretation.
+for every interpretation; `Interp.RecordsAreProducts` is the condition that it
+sends records to the products of their fields.
 
 A state of `S` with conversions (`Schema.VState I S`) is a functor out of
 `S.vcat L` with an isomorphism between its restriction to the value types and
@@ -59,6 +60,15 @@ variable {L : TypeList} (I : Interp L)
 
 /-- The values of the value type `v`. -/
 def K (v : ValueType) : Type := I.F.obj (L.vobjOf v)
+
+/-- `I` sends each record to the product of its fields: the projections give a
+bijection between the values of the record and the families of values of its
+fields. The theorems below hold without it. -/
+def RecordsAreProducts : Prop :=
+  ∀ (r : String) (fs : List (String × ValueType)), L.fields? r = some fs →
+    Function.Bijective fun (x : I.K (.named r))
+        (f : { f : String × ValueType // f ∈ fs ∧ L.conv? (.named r) f.1 = some f.2 }) =>
+      I.F.map (L.convMor f.1.1 f.2.2) x
 
 end Interp
 

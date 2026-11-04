@@ -3,6 +3,7 @@ import DDD.Report
 import DDD.Examples.Integration
 import DDD.Examples.Gluing
 import DDD.Examples.Structure
+import DDD.Examples.Conversions
 
 /-!
 # Example: the context map in the exchange format
@@ -17,13 +18,19 @@ outside the kernel (`created_clash`), which the Julia side qualifies with the
 context names before gluing. `cli/CsdExport.lean` writes it to
 `julia/data/workspace.json`.
 
-The map declares its value types (`valueTypes`). The workspace also carries two
-samples: the schema `deliveries` with a value type of each kind and a finite
-state whose literals are written in other forms than their normal forms, and
-the schema `sales` of `Structure.lean` with value objects, keys and a subtype,
-and a state that satisfies its keys. The Julia side passes them through to its
-certificate, whose reader puts the literals in normal form and checks the
-keys.
+The map declares its value types (`valueTypes`, the list `Conversions.types`
+with its tables and record). The workspace also carries three samples: the
+schema `deliveries` with a value type of each kind and a finite state whose
+literals are written in other forms than their normal forms, the schema `sales`
+of `Structure.lean` with value objects, keys and a subtype, and a state that
+satisfies its keys, and the schema `billing` of `Conversions.lean` with a record
+value. The Julia side passes them through to its certificate, whose reader puts
+the literals in normal form and checks the keys.
+
+`conversions` lists paths of conversions and literals in normal form; the Julia
+side applies the conversions and claims the results, which Lean checks with
+`TypeList.applyLit`. `pathEqualities` lists equal paths of `billing`; the Julia
+side passes them on as claims, and Lean checks them with `Schema.pathEqV`.
 
 The round trips through JSON text are tested with `#guard`: schemas,
 translations, the map, and finite states of the Customers kernel and of the
@@ -59,12 +66,8 @@ def arrows : List (String × String × String × Translation) :=
    ("customers_orders", "Customers", "Orders", translation Arrow.customers_orders),
    ("customers_shipping", "Customers", "Shipping", translation Arrow.customers_shipping)]
 
-/-- The value types of the example map and of the sample. -/
-def valueTypes : TypeList where
-  decls := [("OrderStatus", .enum ["placed", "paid", "shipped", "cancelled"]),
-    ("PaymentMethod", .enum ["card", "invoice", "transfer"]),
-    ("DeliveryStatus", .enum ["scheduled", "dispatched", "delivered"]),
-    ("Money", .over .decimal)]
+/-- The value types of the example map and of the samples. -/
+def valueTypes : TypeList := Conversions.types
 
 /-- The context map as data. -/
 def map : MapDoc where
@@ -130,7 +133,15 @@ def workspace : Json := Json.mkObj [
   ("samples", Json.arr #[Json.mkObj [("name", .str "Deliveries"),
     ("schema", deliveries.toJson), ("state", deliveriesState.toJson)],
     Json.mkObj [("name", .str "Sales"), ("schema", Structure.sales.toJson),
-    ("state", Structure.state.toJson)]])]
+    ("state", Structure.state.toJson)],
+    Json.mkObj [("name", .str "Billing"), ("schema", Conversions.billing.toJson),
+    ("state", Conversions.state.toJson)]]),
+  ("conversions", Json.arr (Conversions.conversions.map fun (v, l, x, _) =>
+    Json.mkObj [("type", Lean.toJson v), ("path", Lean.toJson l),
+      ("value", Lean.toJson x)]).toArray),
+  ("pathEqualities", Json.arr (Conversions.pathEqualities.map fun (l, r) =>
+    Json.mkObj [("schema", .str "Billing"), ("from", Json.mkObj [("entity", .str "Invoice")]),
+      ("lhs", Lean.toJson l), ("rhs", Lean.toJson r)]).toArray)]
 
 /-! ## Round trips -/
 
@@ -166,16 +177,27 @@ def customersState : FinState LitK where
 #guard roundTrip Schema.toJson Schema.fromJson Structure.sales
 #guard roundTrip Schema.toJson Schema.fromJson Structure.broken
 #guard roundTrip FinState.toJson (FinState.fromJson Structure.sales) Structure.state
+#guard roundTrip Schema.toJson Schema.fromJson Conversions.billing
+-- JSON objects are sorted by key, so the round trip holds for the record literals
+-- in normal form.
+#guard roundTrip FinState.toJson (FinState.fromJson Conversions.billing)
+  (Conversions.state.normalize valueTypes)
 
 /-- The samples as the Julia side passes them on: their schemas, their states, and
 the claims about them, with the list of value types of the map. -/
 def sampleCertificate : Certificate where
   valueTypes := valueTypes
-  schemas := [("Deliveries", deliveries), ("Sales", Structure.sales)]
+  schemas := [("Deliveries", deliveries), ("Sales", Structure.sales),
+    ("Billing", Conversions.billing)]
   states := [("XDeliveries", "Deliveries", deliveriesState.normalize valueTypes),
-    ("XSales", "Sales", Structure.state.normalize valueTypes)]
+    ("XSales", "Sales", Structure.state.normalize valueTypes),
+    ("XBilling", "Billing", Conversions.state.normalize valueTypes)]
   claims := [.valueTypes, .wellFormed "Deliveries", .declared "Deliveries",
-    .state "XDeliveries", .wellFormed "Sales", .declared "Sales", .state "XSales"]
+    .state "XDeliveries", .wellFormed "Sales", .declared "Sales", .state "XSales",
+    .wellFormed "Billing", .declared "Billing", .state "XBilling"] ++
+    Conversions.pathEqualities.map (fun (l, r) =>
+      .pathEquality "Billing" (.entity "Invoice") l r) ++
+    Conversions.conversions.map fun (v, l, x, y) => .conversion v l x y
 
 #guard sampleCertificate.check
 

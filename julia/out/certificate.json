@@ -1278,6 +1278,84 @@
           }
         ]
       }
+    },
+    {
+      "name": "XBilling",
+      "schema": "Billing",
+      "state": {
+        "references": [
+          {
+            "name": "Invoice.customer",
+            "column": [
+              0,
+              0
+            ]
+          }
+        ],
+        "entities": [
+          {
+            "type": "Invoice",
+            "count": 2
+          },
+          {
+            "type": "Customer",
+            "count": 1
+          }
+        ],
+        "attributes": [
+          {
+            "name": "Invoice.total",
+            "column": [
+              "33.00",
+              8
+            ]
+          },
+          {
+            "name": "Invoice.lines",
+            "column": [
+              2,
+              1
+            ]
+          },
+          {
+            "name": "Invoice.issuedAt",
+            "column": [
+              "2026-11-04T09:30:00+01:00",
+              "2026-11-05T10:00:00Z"
+            ]
+          },
+          {
+            "name": "Invoice.status",
+            "column": [
+              "paid",
+              "placed"
+            ]
+          },
+          {
+            "name": "Invoice.dueIn",
+            "column": [
+              "P30D",
+              null
+            ]
+          },
+          {
+            "name": "Customer.name",
+            "column": [
+              "Ada"
+            ]
+          },
+          {
+            "name": "Customer.address",
+            "column": [
+              {
+                "zip": null,
+                "street": "Bahnhofstrasse 1",
+                "city": "Bern"
+              }
+            ]
+          }
+        ]
+      }
     }
   ],
   "schemas": [
@@ -3798,6 +3876,66 @@
           }
         ]
       }
+    },
+    {
+      "name": "Billing",
+      "schema": {
+        "valueObjects": [],
+        "subtypes": [],
+        "references": [
+          {
+            "target": "Customer",
+            "name": "Invoice.customer"
+          }
+        ],
+        "keys": [],
+        "equations": [],
+        "entities": [
+          "Invoice",
+          "Customer"
+        ],
+        "attributes": [
+          {
+            "type": {
+              "named": "Money"
+            },
+            "name": "Invoice.total"
+          },
+          {
+            "type": "int",
+            "name": "Invoice.lines"
+          },
+          {
+            "type": {
+              "named": "Instant"
+            },
+            "name": "Invoice.issuedAt"
+          },
+          {
+            "type": {
+              "named": "OrderStatus"
+            },
+            "name": "Invoice.status"
+          },
+          {
+            "type": {
+              "optional": "duration"
+            },
+            "name": "Invoice.dueIn"
+          },
+          {
+            "type": "string",
+            "name": "Customer.name"
+          },
+          {
+            "type": {
+              "named": "PostalAddress"
+            },
+            "name": "Customer.address"
+          }
+        ],
+        "aggregates": []
+      }
     }
   ],
   "claims": [
@@ -4173,6 +4311,322 @@
       "state": "XSales"
     },
     {
+      "claim": "wellFormed",
+      "schema": "Billing"
+    },
+    {
+      "claim": "declared",
+      "schema": "Billing"
+    },
+    {
+      "claim": "state",
+      "state": "XBilling"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "Instant"
+      },
+      "path": [
+        "timestamp",
+        "date"
+      ],
+      "value": "2026-11-04T08:30:00Z",
+      "result": "2026-11-04"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "Instant"
+      },
+      "path": [
+        "timestamp",
+        "time"
+      ],
+      "value": "2026-11-04T08:30:00Z",
+      "result": "08:30:00"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "Instant"
+      },
+      "path": [
+        "timestamp",
+        "datetime"
+      ],
+      "value": "2026-11-04T08:30:00Z",
+      "result": "2026-11-04T08:30:00"
+    },
+    {
+      "claim": "conversion",
+      "type": "int",
+      "path": [
+        "decimal",
+        "Money",
+        "string"
+      ],
+      "value": 3,
+      "result": "3"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "OrderStatus"
+      },
+      "path": [
+        "phase",
+        "isOpen"
+      ],
+      "value": "shipped",
+      "result": false
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "OrderStatus"
+      },
+      "path": [
+        "active",
+        "string"
+      ],
+      "value": "paid",
+      "result": "true"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "PostalAddress"
+      },
+      "path": [
+        "city"
+      ],
+      "value": {
+        "zip": null,
+        "street": "Bahnhofstrasse 1",
+        "city": "Bern"
+      },
+      "result": "Bern"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "PostalAddress"
+      },
+      "path": [
+        "zip"
+      ],
+      "value": {
+        "zip": null,
+        "street": "Bahnhofstrasse 1",
+        "city": "Bern"
+      },
+      "result": null
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "PostalAddress"
+      },
+      "path": [
+        "string"
+      ],
+      "value": {
+        "zip": null,
+        "street": "Bahnhofstrasse 1",
+        "city": "Bern"
+      },
+      "result": "{city: Bern, street: Bahnhofstrasse 1, zip: null}"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "optional": {
+          "named": "Money"
+        }
+      },
+      "path": [
+        "decimal",
+        "string"
+      ],
+      "value": "12.5",
+      "result": "12.5"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "optional": {
+          "named": "Money"
+        }
+      },
+      "path": [
+        "decimal",
+        "string"
+      ],
+      "value": null,
+      "result": null
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "named": "Money"
+      },
+      "path": [
+        "some",
+        "decimal"
+      ],
+      "value": "12.5",
+      "result": "12.5"
+    },
+    {
+      "claim": "conversion",
+      "type": {
+        "optional": "duration"
+      },
+      "path": [
+        "string"
+      ],
+      "value": "PT1H30M",
+      "result": "PT1H30M"
+    },
+    {
+      "claim": "pathEquality",
+      "schema": "Billing",
+      "from": {
+        "entity": "Invoice"
+      },
+      "lhs": [
+        "issuedAt",
+        "timestamp",
+        "datetime",
+        "date"
+      ],
+      "rhs": [
+        "issuedAt",
+        "timestamp",
+        "date"
+      ]
+    },
+    {
+      "claim": "pathEquality",
+      "schema": "Billing",
+      "from": {
+        "entity": "Invoice"
+      },
+      "lhs": [
+        "total",
+        "decimal",
+        "Money"
+      ],
+      "rhs": [
+        "total"
+      ]
+    },
+    {
+      "claim": "pathEquality",
+      "schema": "Billing",
+      "from": {
+        "entity": "Invoice"
+      },
+      "lhs": [
+        "status",
+        "phase",
+        "isOpen"
+      ],
+      "rhs": [
+        "status",
+        "active"
+      ]
+    },
+    {
+      "claim": "pathEquality",
+      "schema": "Billing",
+      "from": {
+        "entity": "Invoice"
+      },
+      "lhs": [
+        "total",
+        "decimal",
+        "string"
+      ],
+      "rhs": [
+        "total",
+        "string"
+      ]
+    },
+    {
+      "claim": "pathEquality",
+      "schema": "Billing",
+      "from": {
+        "entity": "Invoice"
+      },
+      "lhs": [
+        "customer",
+        "address",
+        "city",
+        "some"
+      ],
+      "rhs": [
+        "customer",
+        "address",
+        "some",
+        "city"
+      ]
+    },
+    {
+      "claim": "pathEquality",
+      "schema": "Billing",
+      "from": {
+        "entity": "Invoice"
+      },
+      "lhs": [
+        "issuedAt",
+        "some",
+        "timestamp",
+        "date"
+      ],
+      "rhs": [
+        "issuedAt",
+        "timestamp",
+        "date",
+        "some"
+      ]
+    },
+    {
+      "claim": "pathEquality",
+      "schema": "Billing",
+      "from": {
+        "entity": "Invoice"
+      },
+      "lhs": [
+        "total",
+        "some",
+        "decimal",
+        "Money"
+      ],
+      "rhs": [
+        "total",
+        "some"
+      ]
+    },
+    {
+      "claim": "pathEquality",
+      "schema": "Billing",
+      "from": {
+        "entity": "Invoice"
+      },
+      "lhs": [
+        "lines",
+        "decimal",
+        "Money",
+        "decimal"
+      ],
+      "rhs": [
+        "lines",
+        "decimal"
+      ]
+    },
+    {
       "homomorphism": {
         "components": [
           {
@@ -4244,6 +4698,130 @@
     {
       "name": "Money",
       "base": "decimal"
+    },
+    {
+      "values": [
+        "open",
+        "closed"
+      ],
+      "name": "Phase"
+    },
+    {
+      "name": "Instant",
+      "base": "timestamp"
+    },
+    {
+      "name": "PostalAddress",
+      "fields": [
+        {
+          "type": "string",
+          "name": "street"
+        },
+        {
+          "type": "string",
+          "name": "city"
+        },
+        {
+          "type": {
+            "optional": "string"
+          },
+          "name": "zip"
+        }
+      ]
+    },
+    {
+      "to": {
+        "named": "Phase"
+      },
+      "rows": [
+        [
+          "placed",
+          "open"
+        ],
+        [
+          "paid",
+          "open"
+        ],
+        [
+          "shipped",
+          "closed"
+        ],
+        [
+          "cancelled",
+          "closed"
+        ]
+      ],
+      "name": "phase",
+      "from": {
+        "named": "OrderStatus"
+      }
+    },
+    {
+      "to": "bool",
+      "rows": [
+        [
+          "open",
+          "true"
+        ],
+        [
+          "closed",
+          "false"
+        ]
+      ],
+      "name": "isOpen",
+      "from": {
+        "named": "Phase"
+      }
+    },
+    {
+      "to": "bool",
+      "rows": [
+        [
+          "placed",
+          "true"
+        ],
+        [
+          "paid",
+          "true"
+        ],
+        [
+          "shipped",
+          "false"
+        ],
+        [
+          "cancelled",
+          "false"
+        ]
+      ],
+      "name": "active",
+      "from": {
+        "named": "OrderStatus"
+      }
+    },
+    {
+      "to": "bool",
+      "rows": [
+        [
+          "placed",
+          "false"
+        ],
+        [
+          "paid",
+          "true"
+        ],
+        [
+          "shipped",
+          "true"
+        ],
+        [
+          "cancelled",
+          "false"
+        ]
+      ],
+      "name": "settled",
+      "from": {
+        "named": "OrderStatus"
+      }
     }
   ]
 }

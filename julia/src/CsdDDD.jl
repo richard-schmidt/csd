@@ -10,6 +10,10 @@ The Julia side of the DDD library. Catlab and ACSets compute; Lean checks.
 - Finite states are columns per generator, in the order of their schema, as in
   `DDD/Data.lean`. Homomorphism search runs on their acsets.
 - Restriction along a translation follows the image path of each generator.
+- Conversions between value types (`conv`, `apply_lit`) act on literals in normal
+  form as `TypeList.conv?` and `TypeList.applyLit` do in `DDD/ValueCat.lean`:
+  built-ins, coercions between a named type and its base, `string`, tables,
+  fields of records, `some` and lifts to optional types.
 - Everything is read from and written to the exchange format of
   `DDD/Json.lean` (`csd-ddd/1`).
 """
@@ -21,7 +25,8 @@ using JSON3
 export FORMAT, DDDSchema, read_schema, write_schema, Translation, read_translation,
   write_translation, State, write_state, read_state, glue, clashes, qualify, restrict,
   check_state,
-  homomorphism_search, Certificate, add_schema!, add_state!, add_claim!, write_certificate
+  homomorphism_search, Certificate, add_schema!, add_state!, add_claim!, write_certificate,
+  read_type, write_type, read_types, read_lit, conv, apply_lit
 
 const FORMAT = "csd-ddd/1"
 
@@ -374,6 +379,166 @@ function homomorphism_search(S::DDDSchema, X::State, Y::State)
   h = homomorphism(to_acset(S, X), to_acset(S, Y))
   h === nothing && return nothing
   [e => collect(h[Symbol(e)]) for e in entities(S)]
+end
+
+# ---------------------------------------------------------------------------
+# Conversions
+
+"""
+A value type as the exchange format writes it: a built-in by its name (`"int"`),
+`("named", n)`, or `("optional", t)`.
+"""
+read_type(j) = j isa AbstractString ? String(j) :
+  haskey(j, "named") ? ("named", String(j["named"])) : ("optional", read_type(j["optional"]))
+
+write_type(t) = t isa String ? t :
+  t[1] == "named" ? Dict("named" => t[2]) : Dict("optional" => write_type(t[2]))
+
+type_text(t) = t isa String ? t : t[1] == "named" ? t[2] : "optional " * type_text(t[2])
+is_plain(t) = !(t isa Tuple && t[1] == "optional")
+
+"A table between finite types: its name, source, target and rows."
+struct Table
+  name::String
+  source::Any
+  target::Any
+  rows::Vector{Tuple{String,String}}
+end
+
+"""
+The list of value types: the declarations by name (`(:enum, values)`,
+`(:over, base)` or `(:record, fields)`) and the tables.
+"""
+struct TypeList
+  decls::Vector{Pair{String,Any}}
+  tables::Vector{Table}
+end
+
+function read_types(j)
+  decls = Pair{String,Any}[]
+  tables = Table[]
+  for d in j
+    name = String(d["name"])
+    if haskey(d, "from")
+      push!(tables, Table(name, read_type(d["from"]), read_type(d["to"]),
+        [(String(r[1]), String(r[2])) for r in d["rows"]]))
+    elseif haskey(d, "values")
+      push!(decls, name => (:enum, String.(d["values"])))
+    elseif haskey(d, "base")
+      push!(decls, name => (:over, read_type(d["base"])))
+    else
+      push!(decls, name => (:record, [String(f["name"]) => read_type(f["type"]) for f in d["fields"]]))
+    end
+  end
+  TypeList(decls, tables)
+end
+
+declaration(L::TypeList, n) = lookup(L.decls, n)
+base(L::TypeList, n) = (d = declaration(L, n); d !== nothing && d[1] == :over ? d[2] : nothing)
+
+const BUILTIN_CONVERSIONS = Dict(("timestamp", "datetime") => "datetime",
+  ("timestamp", "date") => "date", ("timestamp", "time") => "time",
+  ("datetime", "date") => "date", ("datetime", "time") => "time", ("int", "decimal") => "decimal")
+
+"The coercion named `n` out of `v`: to the base of a named type, or to a named type over `v`."
+function coerce(L::TypeList, v, n)
+  if v isa Tuple && v[1] == "named"
+    b = base(L, v[2])
+    b !== nothing && n == type_text(b) ? b : nothing
+  elseif v isa String
+    b = base(L, n)
+    b !== nothing && b == v ? ("named", n) : nothing
+  else
+    nothing
+  end
+end
+
+table(L::TypeList, v, n) = (i = findfirst(t -> t.name == n && t.source == v, L.tables);
+  i === nothing ? nothing : L.tables[i])
+
+function field(L::TypeList, v, n)
+  v isa Tuple && v[1] == "named" || return nothing
+  d = declaration(L, v[2])
+  d !== nothing && d[1] == :record ? lookup(d[2], n) : nothing
+end
+
+"The target of the conversion named `n` out of the plain type `v`, or `nothing`."
+function plain_conv(L::TypeList, v, n)
+  n == "some" && return ("optional", v)
+  n == "string" && return v == "string" ? nothing : "string"
+  w = get(BUILTIN_CONVERSIONS, (v, n), nothing)
+  w !== nothing && return w
+  w = coerce(L, v, n)
+  w !== nothing && return w
+  t = table(L, v, n)
+  t !== nothing && return t.target
+  field(L, v, n)
+end
+
+"The target of the conversion named `n` out of `v`: at an optional type, a lift."
+function conv(L::TypeList, v, n)
+  if !is_plain(v)
+    u = v[2]
+    is_plain(u) || return nothing
+    w = plain_conv(L, u, n)
+    w !== nothing && is_plain(w) ? ("optional", w) : nothing
+  else
+    plain_conv(L, v, n)
+  end
+end
+
+"""
+A literal as JSON3 reads it: `String`, `Int`, `Bool`, `nothing`, or a record as a
+`Dict` of its fields.
+"""
+read_lit(x::AbstractDict) = Dict{String,Any}(String(k) => read_lit(v) for (k, v) in x)
+read_lit(x::AbstractString) = String(x)
+read_lit(x) = x
+
+"A literal in normal form as text, as `Lit.str`: records with their fields sorted."
+lit_text(x::AbstractString) = x
+lit_text(x::Bool) = x ? "true" : "false"
+lit_text(x::Integer) = string(x)
+lit_text(::Nothing) = "null"
+lit_text(x::AbstractDict) = "{" * join(["$k: $(lit_text(x[k]))" for k in sort(collect(keys(x)))], ", ") * "}"
+
+"The conversion named `n` out of the plain type `v`, on a literal in normal form."
+function plain_conv_lit(L::TypeList, v, n, x)
+  n == "some" && return x
+  n == "string" && return lit_text(x)
+  if haskey(BUILTIN_CONVERSIONS, (v, n))
+    v == "int" && return string(x)
+    v == "timestamp" && n == "datetime" && return x[1:end-1]
+    (n == "date") && return first(x, 10)
+    v == "timestamp" && n == "time" && return x[12:end-1]
+    v == "datetime" && n == "time" && return x[12:end]
+  end
+  coerce(L, v, n) !== nothing && return x
+  t = table(L, v, n)
+  if t !== nothing
+    key = x isa Bool ? lit_text(x) : x
+    i = findfirst(r -> r[1] == key, t.rows)
+    i === nothing && error("the table $n has no row for $(lit_text(x))")
+    y = t.rows[i][2]
+    return t.target == "bool" ? y == "true" : y
+  end
+  x isa AbstractDict && haskey(x, n) && return x[n]
+  error("there is no conversion $n out of $(type_text(v)) for $(lit_text(x))")
+end
+
+"The conversion named `n` out of `v`, on a literal in normal form; a lift keeps `nothing`."
+conv_lit(L::TypeList, v, n, x) = !is_plain(v) ? (x === nothing ? nothing :
+  plain_conv_lit(L, v[2], n, x)) : plain_conv_lit(L, v, n, x)
+
+"A path of conversions out of `v`, applied to a literal in normal form."
+function apply_lit(L::TypeList, v, path, x)
+  for n in path
+    w = conv(L, v, n)
+    w === nothing && error("there is no conversion $n out of $(type_text(v))")
+    x = conv_lit(L, v, n, x)
+    v = w
+  end
+  x
 end
 
 # ---------------------------------------------------------------------------

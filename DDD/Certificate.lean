@@ -1,4 +1,5 @@
 import DDD.Compose
+import DDD.ConvNF
 import DDD.Json
 
 /-!
@@ -31,6 +32,12 @@ claim that passes its check holds (`Certificate.checkClaim_sound`).
   translation; its state is then isomorphic to `Translation.restrictState`.
 - `homomorphism`: a homomorphism of finite states that is a morphism of their
   states.
+- `pathEquality`: two paths out of an object of a schema present the same
+  morphism of the category with conversions (`Schema.VPathEq`), checked by
+  `Schema.pathEqV`.
+- `conversion`: a path of conversions out of a value type, applied to a literal
+  in normal form (`TypeList.applyLit`), gives a literal; the Julia side computes
+  it on its own.
 
 Presentations that list the same things in another order present isomorphic
 categories (`Schema.isoOfPerm`).
@@ -124,6 +131,8 @@ inductive Claim where
   | declared (schema : String)
   | restriction (source target : String) (T : Translation) (state result : String)
   | homomorphism (source target : String) (h : FinHom)
+  | pathEquality (schema : String) (src : Ob) (lhs rhs : List String)
+  | conversion (type : ValueType) (path : List String) (value result : Lit)
 
 /-- A certificate: the list of value types, named schemas, named finite states with
 the name of their schema, and claims. -/
@@ -185,6 +194,12 @@ def checkClaim : Claim → Bool
       | some S => S.checkWellFormed && X.check S && Y.check S && h.check S X Y
       | none => false
     | _, _ => false
+  | .pathEquality s o l r => match c.schema? s with
+    | some S => S.checkWellFormed && decide (S.IsOb o) && S.pathEqV c.valueTypes o l r
+    | none => false
+  | .conversion v l x y => match c.valueTypes.convTgt? v l, c.valueTypes.applyLit v l x with
+    | some _, .ok z => z == y && (c.valueTypes.normalize v x).toOption == some x
+    | _, _ => false
 
 /-- The meaning of a claim. -/
 def Holds : Claim → Prop
@@ -216,6 +231,10 @@ def Holds : Claim → Prop
       (hX : X.check S = true) (hY : Y.check S = true),
       c.state? x = some (s, X) ∧ c.state? y = some (s, Y) ∧ c.schema? s = some S ∧
       Nonempty (X.toState hX ⟶ Y.toState hY)
+  | .pathEquality s o l r => ∃ (S : Schema) (_ : S.WellFormed) (ho : S.IsOb o),
+      c.schema? s = some S ∧ S.VPathEq c.valueTypes ⟨o, ho⟩ l r
+  | .conversion v l x y => (c.valueTypes.convTgt? v l).isSome ∧
+      c.valueTypes.normalize v x = .ok x ∧ c.valueTypes.applyLit v l x = .ok y
 
 /-- A claim that passes its check holds. -/
 theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl := by
@@ -362,6 +381,28 @@ theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl 
     obtain ⟨⟨⟨wS, hX⟩, hY⟩, hc⟩ := h
     exact ⟨sx, S, X, Y, hX, hY, hx, hy, hs,
       ⟨FinHom.toHom ((Schema.checkWellFormed_iff S).mp wS) hX hY hc⟩⟩
+  | pathEquality s o l r =>
+    simp only [checkClaim] at h
+    cases hs : c.schema? s with
+    | none => simp [hs] at h
+    | some S =>
+      simp only [hs, Bool.and_eq_true, decide_eq_true_eq] at h
+      obtain ⟨⟨wS, ho⟩, hp⟩ := h
+      have hw := (Schema.checkWellFormed_iff S).mp wS
+      exact ⟨S, hw, ho, hs, Schema.pathEqV_sound hw ⟨o, ho⟩ hp⟩
+  | conversion v l x y =>
+    simp only [checkClaim] at h
+    split at h
+    · rename_i w z hw hz
+      simp only [Bool.and_eq_true, beq_iff_eq] at h
+      obtain ⟨rfl, hx⟩ := h
+      refine ⟨by simp [hw], ?_, hz⟩
+      cases hn : c.valueTypes.normalize v x with
+      | error => simp [hn, Except.toOption] at hx
+      | ok x' =>
+        simp only [hn, Except.toOption, Option.some.injEq] at hx
+        rw [hx]
+    · exact absurd h (by simp)
 
 /-- The check of a certificate: every claim passes. -/
 def check : Bool := c.claims.all c.checkClaim
@@ -388,6 +429,11 @@ def Claim.describe : Claim → String
   | .declared s => s!"the value types of {s} are declared"
   | .restriction s t _ x y => s!"{y} is the restriction of {x} along {s} → {t}"
   | .homomorphism x y _ => s!"a homomorphism {x} → {y}"
+  | .pathEquality s o l r =>
+    s!"in {s}, the paths {String.intercalate "." l} and {String.intercalate "." r} out of \
+      {match o with | .entity e => e | .value v => v.text} are equal"
+  | .conversion v l x y =>
+    s!"{String.intercalate "." l} out of {v.text} sends {x.render} to {y.render}"
 
 def Claim.fromJson (j : Json) : Except String Claim := do
   match ← j.getObjValAs? String "claim" with
@@ -426,6 +472,22 @@ def Claim.fromJson (j : Json) : Except String Claim := do
     let y ← j.getObjValAs? String "to"
     let h ← FinHom.fromJson (← j.getObjVal? "homomorphism")
     pure (.homomorphism x y h)
+  | "pathEquality" => do
+    let s ← j.getObjValAs? String "schema"
+    let src ← j.getObjVal? "from"
+    let o ← match src.getObjVal? "entity", src.getObjVal? "value" with
+      | .ok e, _ => Ob.entity <$> e.getStr?
+      | _, .ok v => Ob.value <$> ValueType.fromJson v
+      | _, _ => throw "from takes an entity or a value type"
+    let l ← j.getObjValAs? (List String) "lhs"
+    let r ← j.getObjValAs? (List String) "rhs"
+    pure (.pathEquality s o l r)
+  | "conversion" => do
+    let v ← ValueType.fromJson (← j.getObjVal? "type")
+    let l ← j.getObjValAs? (List String) "path"
+    let x ← Lit.fromJson (← j.getObjVal? "value")
+    let y ← Lit.fromJson (← j.getObjVal? "result")
+    pure (.conversion v l x y)
   | other => throw s!"unknown claim {other}"
 
 def Certificate.fromJson (j : Json) : Except String Certificate := do

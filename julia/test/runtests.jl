@@ -46,6 +46,24 @@ end
   @test ("BusinessCustomer", "customer") in sales.subtypes
 end
 
+@testset "conversions" begin
+  L = read_types(ws["map"]["valueTypes"])
+  instant, status = ("named", "Instant"), ("named", "OrderStatus")
+  @test conv(L, instant, "timestamp") == "timestamp"
+  @test conv(L, instant, "date") === nothing
+  @test conv(L, ("optional", ("named", "Money")), "decimal") == ("optional", "decimal")
+  @test apply_lit(L, instant, ["timestamp", "date"], "2026-11-04T08:30:00Z") == "2026-11-04"
+  @test apply_lit(L, instant, ["timestamp", "time"], "2026-11-04T08:30:00Z") == "08:30:00"
+  @test apply_lit(L, status, ["phase", "isOpen"], "shipped") == false
+  @test apply_lit(L, status, ["active", "string"], "paid") == "true"
+  @test apply_lit(L, ("optional", ("named", "Money")), ["decimal", "string"], nothing) === nothing
+  addr = Dict{String,Any}("street" => "Bahnhofstrasse 1", "city" => "Bern", "zip" => nothing)
+  @test apply_lit(L, ("named", "PostalAddress"), ["city"], addr) == "Bern"
+  @test apply_lit(L, ("named", "PostalAddress"), ["string"], addr) ==
+    "{city: Bern, street: Bahnhofstrasse 1, zip: null}"
+  @test_throws ErrorException apply_lit(L, "int", ["date"], 3)
+end
+
 @testset "states" begin
   cert = JSON3.read(read(joinpath(@__DIR__, "..", "out", "certificate.json"), String))
   for x in cert["states"]

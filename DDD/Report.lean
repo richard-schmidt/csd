@@ -22,7 +22,11 @@ decided by `Certificate.checkClaim` alone, which is sound
   of its type in normal form, with the reason;
 - gluing, restriction, homomorphism: the parts of the check that fail, with
   the problems of the schemas and translations involved and the names that two
-  schemas share outside a kernel.
+  schemas share outside a kernel;
+- path equality: the problems of the schema, a path that does not exist, two
+  paths that do not end at the same object, and normal forms that differ;
+- conversion: a path of conversions that does not exist, a literal that is not
+  in normal form, and the result of `TypeList.applyLit` when it differs or fails.
 
 A failing claim with no explanation reports that its check fails.
 
@@ -168,6 +172,10 @@ def Claim.refFields : Claim → List (String × Json)
   | .restriction s t _ x y => [("claim", .str "restriction"), ("source", .str s),
       ("target", .str t), ("state", .str x), ("result", .str y)]
   | .homomorphism x y _ => [("claim", .str "homomorphism"), ("from", .str x), ("to", .str y)]
+  | .pathEquality s o l r => [("claim", .str "pathEquality"), ("schema", .str s),
+      ("from", o.toJson), ("lhs", Lean.toJson l), ("rhs", Lean.toJson r)]
+  | .conversion v l x _ => [("claim", .str "conversion"), ("type", Lean.toJson v),
+      ("path", Lean.toJson l), ("value", Lean.toJson x)]
 
 namespace Certificate
 
@@ -273,6 +281,28 @@ def explain : Claim → List Json
       | none => [unknown "schema" sx]
     | _, _ => (if (c.state? x).isNone then [unknown "state" x] else []) ++
       (if (c.state? y).isNone then [unknown "state" y] else [])
+  | .pathEquality s o l r => match c.schema? s with
+    | some S =>
+      let L := c.valueTypes
+      c.schemaProblems s ++ failing [
+        (decide (S.IsOb o), "unknownObject", s!"{o.text} is not an object of {s}"),
+        ((S.vtgt? L o l).isSome, "noPath", s!"there is no path {pathText l} out of {o.text}"),
+        ((S.vtgt? L o r).isSome, "noPath", s!"there is no path {pathText r} out of {o.text}"),
+        (S.vtgt? L o l == S.vtgt? L o r, "notParallel",
+          s!"the paths {pathText l} and {pathText r} out of {o.text} end at different objects"),
+        (S.pathEqV L o l r, "pathsDiffer",
+          s!"the paths {pathText l} and {pathText r} out of {o.text} have different normal forms")]
+    | none => [unknown "schema" s]
+  | .conversion v l x y =>
+    let L := c.valueTypes
+    failing [((L.convTgt? v l).isSome, "noConversion",
+        s!"there is no path of conversions {pathText l} out of {v.text}"),
+      ((L.normalize v x).toOption == some x, "notNormal",
+        s!"{x.render} is not a value of {v.text} in normal form")] ++
+    match L.applyLit v l x with
+    | .ok z => failing [(z == y, "conversionResult",
+        s!"{pathText l} sends {x.render} to {z.render}, not to {y.render}")]
+    | .error e => [problemJson "conversionFails" [] e]
 
 /-- Whether a claim holds, and its problems when it fails: those of `explain`, or
 the failure of its check when `explain` finds none. -/

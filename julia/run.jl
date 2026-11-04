@@ -216,6 +216,24 @@ for s in get(ws, "samples", [])
   add_claim!(cert, "state"; state="X$name")
 end
 
+# Conversions of literals in normal form, computed here and checked by Lean with
+# TypeList.applyLit.
+types = read_types(get(map, "valueTypes", []))
+for x in get(ws, "conversions", [])
+  v = read_type(x["type"])
+  path = String.(x["path"])
+  value = read_lit(x["value"])
+  add_claim!(cert, "conversion"; type=write_type(v), path=path, value=value,
+    result=apply_lit(types, v, path, value))
+end
+
+# Equal paths with conversions, passed on as claims; Lean checks them with
+# Schema.pathEqV.
+for q in get(ws, "pathEqualities", [])
+  add_claim!(cert, "pathEquality"; schema=String(q["schema"]), from=read_lit(q["from"]),
+    lhs=String.(q["lhs"]), rhs=String.(q["rhs"]))
+end
+
 # Homomorphism search: XS into XS2.
 h = homomorphism_search(schemas["Shipping"], XS, XS2)
 h === nothing && error("no homomorphism XS → XS2")
