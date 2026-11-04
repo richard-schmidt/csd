@@ -37,6 +37,15 @@ end
   end
 end
 
+@testset "keys" begin
+  ctx = Dict(String(c["name"]) => read_schema(c["schema"]) for c in ws["map"]["contexts"])
+  G = glue(ctx["Customers"], ctx["Orders"], ctx["Shipping"])
+  @test G.keys == ctx["Orders"].keys
+  @test ("OrderLine", ["order", "product"]) in G.keys
+  sales = read_schema(only(x for x in ws["samples"] if x["name"] == "Sales")["schema"])
+  @test ("BusinessCustomer", "customer") in sales.subtypes
+end
+
 @testset "states" begin
   cert = JSON3.read(read(joinpath(@__DIR__, "..", "out", "certificate.json"), String))
   for x in cert["states"]

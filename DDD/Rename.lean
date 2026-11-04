@@ -62,6 +62,10 @@ def qualify (S : Schema) : Schema where
     ⟨qualifyEnt keep p A.root,
       A.members.map fun m => ⟨qualifyEnt keep p m.entity, qualifyGen keep p m.entity m.owner⟩⟩
   valueObjects := S.valueObjects.map (qualifyEnt keep p)
+  keys := S.keys.map fun k =>
+    ⟨qualifyEnt keep p k.entity, k.fields.map (qualifyGen keep p k.entity)⟩
+  subtypes := S.subtypes.map fun s =>
+    ⟨qualifyEnt keep p s.entity, qualifyGen keep p s.entity s.ref⟩
 
 end Schema
 

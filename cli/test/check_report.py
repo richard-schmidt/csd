@@ -18,8 +18,9 @@ ROOT = os.path.dirname(os.path.dirname(HERE))
 
 SCHEMA_KINDS = ["duplicateEntity", "duplicateGenerator", "referenceTarget", "referenceSource",
                 "attributeSource", "equationNotParallel", "equationSource", "aggregateEntity",
-                "aggregateOverlap", "missingOwner", "aggregateBoundary", "valueObjectAttributes",
-                "valueObjectEntity"]
+                "aggregateOverlap", "missingOwner", "ownerCycle", "aggregateBoundary",
+                "valueObjectFields", "valueObjectEntity", "keyEntity", "keyEmpty", "keyField",
+                "subtypeEntity", "subtypeReference"]
 
 EXPECTED_CONTEXTS = [("OrdersPL", True, []), ("Payments", True, []), ("Broken", False, SCHEMA_KINDS),
                      ("Untyped", False, ["undeclaredValueType", "nestedOptional"])]

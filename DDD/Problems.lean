@@ -40,6 +40,9 @@ def Ob.text : Ob → String
 
 def Equation.text (q : Equation) : String := s!"{q.src}: {pathText q.lhs} = {pathText q.rhs}"
 
+/-- The fields of a key as text: `{a, b}`. -/
+def keyText (fs : List String) : String := "{" ++ ", ".intercalate fs ++ "}"
+
 /-- Where a path ends, as text. -/
 def endText : Option Ob → String
   | some o => s!"ends at {o.text}"
@@ -71,15 +74,28 @@ inductive Problem where
   /-- The entity type `e` belongs to two aggregates, or twice to one. -/
   | aggregateOverlap (e : String)
   /-- The member `m` of the aggregate with root `root` has no ownership reference
-  to the root. -/
+  to an entity type of the aggregate. -/
   | missingOwner (root : String) (m : Member)
+  /-- Following the ownership references from the member `m` of the aggregate with
+  root `root` does not reach the root. -/
+  | ownerCycle (root : String) (m : Member)
   /-- The reference `r` targets a member of the aggregate with root `root` from
   outside the aggregate. -/
   | boundary (r : Ref) (root : String)
   /-- The value object `e` is not a declared entity type. -/
   | valueObjectEntity (e : String)
-  /-- The value object `e` has no attribute. -/
-  | valueObjectAttrs (e : String)
+  /-- The value object `e` has no field. -/
+  | valueObjectFields (e : String)
+  /-- The key `k` is on an entity type that is not declared. -/
+  | keyEntity (k : Key)
+  /-- A key of the entity type `e` has no field. -/
+  | keyEmpty (e : String)
+  /-- The key `k` names `n`, which is not a generator out of its entity type. -/
+  | keyField (k : Key) (n : String)
+  /-- The subtype `e` is not a declared entity type. -/
+  | subtypeEntity (e : String)
+  /-- The subtype `s` has no is-a reference of its name. -/
+  | subtypeRef (s : IsA)
 deriving DecidableEq, Repr
 
 variable (S : Schema)
@@ -119,11 +135,14 @@ def aggregateProblems : List Problem :=
 def overlapProblems : List Problem :=
   (dups (S.aggregates.flatMap Aggregate.entities)).map .aggregateOverlap
 
-/-- Members without their ownership reference. -/
+/-- Members without an ownership reference to an entity type of their aggregate,
+and members from which the ownership references do not reach the root. -/
 def ownerProblems : List Problem :=
-  S.aggregates.flatMap fun A =>
-    (A.members.filter fun m => (⟨m.owner, m.entity, A.root⟩ : Ref) ∉ S.refs).map
-      (.missingOwner A.root)
+  S.aggregates.flatMap fun A => A.members.filterMap fun m =>
+    if A.entities.any fun t => decide ((⟨m.owner, m.entity, t⟩ : Ref) ∈ S.refs) then
+      if S.ownerIter A A.members.length m.entity = some A.root then none
+      else some (.ownerCycle A.root m)
+    else some (.missingOwner A.root m)
 
 /-- References from outside an aggregate to a member of it. -/
 def boundaryProblems : List Problem :=
@@ -131,18 +150,35 @@ def boundaryProblems : List Problem :=
     (S.aggregates.filter fun A =>
       r.tgt ∈ A.members.map (·.entity) ∧ r.src ∉ A.entities).map fun A => .boundary r A.root
 
-/-- Value objects that are not declared, or have no attribute. -/
+/-- Value objects that are not declared, or have no field. -/
 def valueObjectProblems : List Problem :=
   S.valueObjects.filterMap fun e =>
     if e ∈ S.entities then
-      if S.attrs.any (·.src == e) then none else some (.valueObjectAttrs e)
+      if S.outNames e ≠ [] then none else some (.valueObjectFields e)
     else some (.valueObjectEntity e)
+
+/-- Keys on undeclared entity types, keys without fields, and fields of keys that
+are not generators out of their entity type. -/
+def keyProblems : List Problem :=
+  S.keys.flatMap fun k =>
+    if k.entity ∈ S.entities then
+      if k.fields = [] then [.keyEmpty k.entity]
+      else (k.fields.filter fun n => n ∉ S.outNames k.entity).map (.keyField k)
+    else [.keyEntity k]
+
+/-- Subtypes that are not declared, or have no is-a reference of their name. -/
+def subtypeProblems : List Problem :=
+  S.subtypes.filterMap fun s =>
+    if s.entity ∈ S.entities then
+      if S.refs.any fun r => r.src == s.entity && r.name == s.ref then none
+      else some (.subtypeRef s)
+    else some (.subtypeEntity s.entity)
 
 /-- The failures of the conditions of `WellFormed`, in their order. -/
 def problems : List Problem :=
   S.entityProblems ++ S.generatorProblems ++ S.refProblems ++ S.attrProblems ++
     S.eqnProblems ++ S.aggregateProblems ++ S.overlapProblems ++ S.ownerProblems ++
-    S.boundaryProblems ++ S.valueObjectProblems
+    S.boundaryProblems ++ S.valueObjectProblems ++ S.keyProblems ++ S.subtypeProblems
 
 theorem entityProblems_eq_nil : S.entityProblems = [] ↔ decide S.entities.Nodup = true := by
   simp [entityProblems, dups_eq_nil_iff]
@@ -179,8 +215,14 @@ theorem overlapProblems_eq_nil : S.overlapProblems = [] ↔
 
 theorem ownerProblems_eq_nil : S.ownerProblems = [] ↔
     (S.aggregates.all fun A => A.members.all fun m =>
-      decide (⟨m.owner, m.entity, A.root⟩ ∈ S.refs)) = true := by
-  simp [ownerProblems]
+      (A.entities.any fun t => decide ((⟨m.owner, m.entity, t⟩ : Ref) ∈ S.refs)) &&
+        decide (S.ownerIter A A.members.length m.entity = some A.root)) = true := by
+  simp only [ownerProblems, List.flatMap_eq_nil_iff, List.filterMap_eq_nil_iff,
+    List.all_eq_true, Bool.and_eq_true]
+  refine forall₂_congr fun A _ => forall₂_congr fun m _ => ?_
+  by_cases ho : (A.entities.any fun t => decide ((⟨m.owner, m.entity, t⟩ : Ref) ∈ S.refs)) = true
+    <;> by_cases ht : S.ownerIter A A.members.length m.entity = some A.root <;>
+    simp only [ho, ht, if_true, if_false] <;> simp_all
 
 theorem boundaryProblems_eq_nil : S.boundaryProblems = [] ↔
     (S.refs.all fun r => S.aggregates.all fun A =>
@@ -192,19 +234,38 @@ theorem boundaryProblems_eq_nil : S.boundaryProblems = [] ↔
     by_cases hs : r.src ∈ A.entities <;> simp only [hm, hs] <;> simp
 
 theorem valueObjectProblems_eq_nil : S.valueObjectProblems = [] ↔
-    (S.valueObjects.all fun e => decide (e ∈ S.entities) && S.attrs.any fun a => a.src == e) =
+    (S.valueObjects.all fun e => decide (e ∈ S.entities) && decide (S.outNames e ≠ [])) =
       true := by
   simp only [valueObjectProblems, List.filterMap_eq_nil_iff, List.all_eq_true]
   refine forall₂_congr fun e _ => ?_
-  by_cases hs : e ∈ S.entities <;> by_cases ha : (S.attrs.any fun a => a.src == e) = true <;>
+  by_cases hs : e ∈ S.entities <;> by_cases ha : S.outNames e ≠ [] <;>
     simp only [hs, ha, if_true, if_false] <;> simp_all
+
+theorem keyProblems_eq_nil : S.keyProblems = [] ↔
+    (S.keys.all fun k => decide (k.entity ∈ S.entities) &&
+      (decide (k.fields ≠ []) && k.fields.all fun n => decide (n ∈ S.outNames k.entity))) =
+      true := by
+  simp only [keyProblems, List.flatMap_eq_nil_iff, List.all_eq_true]
+  refine forall₂_congr fun k _ => ?_
+  by_cases hs : k.entity ∈ S.entities <;> by_cases hf : k.fields = [] <;>
+    simp [hs, hf, List.filter_eq_nil_iff]
+
+theorem subtypeProblems_eq_nil : S.subtypeProblems = [] ↔
+    (S.subtypes.all fun s => decide (s.entity ∈ S.entities) &&
+      S.refs.any fun r => r.src == s.entity && r.name == s.ref) = true := by
+  simp only [subtypeProblems, List.filterMap_eq_nil_iff, List.all_eq_true]
+  refine forall₂_congr fun s _ => ?_
+  by_cases hs : s.entity ∈ S.entities <;>
+    by_cases hr : (S.refs.any fun r => r.src == s.entity && r.name == s.ref) = true <;>
+    simp only [hs, hr, if_true, if_false] <;> simp_all
 
 /-- A schema has no problem exactly when it passes the well-formedness check. -/
 theorem problems_eq_nil_iff : S.problems = [] ↔ S.checkWellFormed = true := by
   simp only [problems, checkWellFormed, List.append_eq_nil_iff, Bool.and_eq_true,
     entityProblems_eq_nil, generatorProblems_eq_nil, refProblems_eq_nil, attrProblems_eq_nil,
     eqnProblems_eq_nil, aggregateProblems_eq_nil, overlapProblems_eq_nil, ownerProblems_eq_nil,
-    boundaryProblems_eq_nil, valueObjectProblems_eq_nil]
+    boundaryProblems_eq_nil, valueObjectProblems_eq_nil, keyProblems_eq_nil,
+    subtypeProblems_eq_nil, and_assoc]
 
 theorem problems_eq_nil_iff_wellFormed : S.problems = [] ↔ S.WellFormed :=
   S.problems_eq_nil_iff.trans S.checkWellFormed_iff
@@ -231,12 +292,23 @@ def describe : Problem → String
   | .aggregateOverlap e => s!"{e} belongs to two aggregates, or twice to one"
   | .missingOwner root m =>
     s!"the member {m.entity} of the aggregate of {root} has no reference \
-      {m.entity}.{m.owner} to {root}"
+      {m.entity}.{m.owner} to {root} or to another member of the aggregate"
+  | .ownerCycle root m =>
+    s!"following the ownership references from {m.entity} does not reach {root}, the root \
+      of its aggregate"
   | .boundary r root =>
     s!"the reference {r.src}.{r.name} targets {r.tgt}, a member of the aggregate of {root}, \
       from outside it; references from outside an aggregate target its root"
   | .valueObjectEntity e => s!"the value object {e} is not a declared entity type"
-  | .valueObjectAttrs e => s!"the value object {e} has no attribute"
+  | .valueObjectFields e => s!"the value object {e} has no field"
+  | .keyEntity k => s!"a key is declared on {k.entity}, which is not a declared entity type"
+  | .keyEmpty e => s!"a key of {e} has no field"
+  | .keyField k n =>
+    s!"the key {keyText k.fields} of {k.entity} names {n}, which is not a reference or an \
+      attribute of {k.entity}"
+  | .subtypeEntity e => s!"the subtype {e} is not a declared entity type"
+  | .subtypeRef s =>
+    s!"the subtype {s.entity} has no reference {s.entity}.{s.ref} to its supertype"
 
 def kind : Problem → String
   | .duplicateEntity .. => "duplicateEntity"
@@ -249,9 +321,15 @@ def kind : Problem → String
   | .aggregateEntity .. => "aggregateEntity"
   | .aggregateOverlap .. => "aggregateOverlap"
   | .missingOwner .. => "missingOwner"
+  | .ownerCycle .. => "ownerCycle"
   | .boundary .. => "aggregateBoundary"
   | .valueObjectEntity .. => "valueObjectEntity"
-  | .valueObjectAttrs .. => "valueObjectAttributes"
+  | .valueObjectFields .. => "valueObjectFields"
+  | .keyEntity .. => "keyEntity"
+  | .keyEmpty .. => "keyEmpty"
+  | .keyField .. => "keyField"
+  | .subtypeEntity .. => "subtypeEntity"
+  | .subtypeRef .. => "subtypeReference"
 
 end Problem
 

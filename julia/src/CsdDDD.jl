@@ -4,9 +4,9 @@
 The Julia side of the DDD library. Catlab and ACSets compute; Lean checks.
 
 - Schemas are acsets on a schema of schemas (entity types, references,
-  attributes, with their names), together with equations, aggregates and value
-  objects. Gluing two schemas along a kernel is a pushout of acsets and the
-  union of the equations.
+  attributes, with their names), together with equations, aggregates, value
+  objects, keys and subtypes. Gluing two schemas along a kernel is a pushout of
+  acsets and the union of the equations, keys and subtypes.
 - Finite states are columns per generator, in the order of their schema, as in
   `DDD/Data.lean`. Homomorphism search runs on their acsets.
 - Restriction along a translation follows the image path of each generator.
@@ -56,12 +56,17 @@ struct Aggregate
   members::Vector{Tuple{String,String}}   # (entity, owner reference)
 end
 
-"A schema: its acset of generators, and its equations, aggregates and value objects."
+"""
+A schema: its acset of generators, and its equations, aggregates, value objects,
+keys (entity type, field names) and subtypes (entity type, is-a reference).
+"""
 struct DDDSchema
   graph::SchemaAcset
   eqns::Vector{Equation}
   aggregates::Vector{Aggregate}
   valueObjects::Vector{String}
+  keys::Vector{Tuple{String,Vector{String}}}
+  subtypes::Vector{Tuple{String,String}}
 end
 
 entities(S::DDDSchema) = collect(S.graph[:entity_name])
@@ -111,7 +116,9 @@ function read_schema(j)
   aggs = [Aggregate(String(A["root"]),
       [(String(m["entity"]), String(m["owner"])) for m in getlist(A, "members")])
     for A in getlist(j, "aggregates")]
-  DDDSchema(G, eqns, aggs, String.(getlist(j, "valueObjects")))
+  ks = [(String(k["entity"]), String.(k["fields"])) for k in getlist(j, "keys")]
+  sts = [(String(x["entity"]), String(x["reference"])) for x in getlist(j, "subtypes")]
+  DDDSchema(G, eqns, aggs, String.(getlist(j, "valueObjects")), ks, sts)
 end
 
 function write_schema(S::DDDSchema)
@@ -124,7 +131,9 @@ function write_schema(S::DDDSchema)
     "aggregates" => [Dict("root" => A.root,
       "members" => [Dict("entity" => e, "owner" => o) for (e, o) in A.members])
       for A in S.aggregates],
-    "valueObjects" => S.valueObjects)
+    "valueObjects" => S.valueObjects,
+    "keys" => [Dict("entity" => e, "fields" => fs) for (e, fs) in S.keys],
+    "subtypes" => [Dict("entity" => e, "reference" => r) for (e, r) in S.subtypes])
 end
 
 # ---------------------------------------------------------------------------
@@ -156,14 +165,15 @@ end
     glue(K, L, R)
 
 `L` and `R` glued along the kernel `K`: the pushout of their acsets along the
-inclusions of `K`, the equations of both, and the merged aggregates and value
-objects.
+inclusions of `K`, the equations of both, and the merged aggregates, value
+objects, keys and subtypes, as `Schema.glue` in Lean merges them.
 """
 function glue(K::DDDSchema, L::DDDSchema, R::DDDSchema)
   P = pushout(inclusion(K, L), inclusion(K, R))
   G = ob(P)
-  vos = vcat(L.valueObjects, [v for v in R.valueObjects if !(v in L.valueObjects)])
-  DDDSchema(G, vcat(L.eqns, R.eqns), merge_aggregates(L.aggregates, R.aggregates), vos)
+  both(a, b) = vcat(a, [x for x in b if !(x in a)])
+  DDDSchema(G, vcat(L.eqns, R.eqns), merge_aggregates(L.aggregates, R.aggregates),
+    both(L.valueObjects, R.valueObjects), both(L.keys, R.keys), both(L.subtypes, R.subtypes))
 end
 
 """
@@ -206,8 +216,10 @@ function qualify(S::DDDSchema, ctx, names)
   end
   eqns = [Equation(q.src, rename_path(q.src, q.lhs), rename_path(q.src, q.rhs)) for q in S.eqns]
   aggs = [Aggregate(A.root, [(m, newname(m, o)) for (m, o) in A.members]) for A in S.aggregates]
+  ks = [(e, [newname(e, n) for n in fs]) for (e, fs) in S.keys]
+  sts = [(e, newname(e, r)) for (e, r) in S.subtypes]
   T = Translation(Tuple{String,String}[], [(e, n, [newname(e, n)]) for (e, n) in names])
-  (DDDSchema(G, eqns, aggs, S.valueObjects), T)
+  (DDDSchema(G, eqns, aggs, S.valueObjects, ks, sts), T)
 end
 
 # ---------------------------------------------------------------------------

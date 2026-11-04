@@ -75,13 +75,20 @@ def fields : Problem → List (String × Json)
     [("equation", q.toJson), ("lhsEnd", endJson l), ("rhsEnd", endJson r)]
   | .aggregateEntity root e => [("aggregate", .str root), ("entity", .str e)]
   | .aggregateOverlap e => [("entity", .str e)]
-  | .missingOwner root m =>
+  | .missingOwner root m | .ownerCycle root m =>
     [("aggregate", .str root), ("entity", .str m.entity),
       ("generator", .str s!"{m.entity}.{m.owner}")]
   | .boundary r root =>
     [("generator", .str s!"{r.src}.{r.name}"), ("source", .str r.src), ("target", .str r.tgt),
       ("aggregate", .str root)]
-  | .valueObjectEntity e | .valueObjectAttrs e => [("entity", .str e)]
+  | .valueObjectEntity e | .valueObjectFields e => [("entity", .str e)]
+  | .keyEntity k => [("entity", .str k.entity), ("key", Lean.toJson k.fields)]
+  | .keyEmpty e => [("entity", .str e)]
+  | .keyField k n =>
+    [("entity", .str k.entity), ("key", Lean.toJson k.fields),
+      ("generator", .str s!"{k.entity}.{n}")]
+  | .subtypeEntity e => [("entity", .str e)]
+  | .subtypeRef s => [("entity", .str s.entity), ("generator", .str s!"{s.entity}.{s.ref}")]
 
 /-- A problem of the schema named `schema`. -/
 def toJson (schema : String) (p : Problem) : Json :=
@@ -204,8 +211,8 @@ def explain : Claim → List Json
           [("name", .str n), ("left", .str l), ("right", .str r), ("kernel", .str k)]
           s!"{l} and {r} both have {n}, which is not in the kernel {k}") ++
         failing [(glued.checkSameUpToOrder G, "gluedDiffers",
-          s!"{g} does not list the same entity types, generators, equations, aggregates and \
-            value objects as the gluing of {l} and {r}")] ++
+          s!"{g} does not list the same entity types, generators, equations, aggregates, \
+            value objects, keys and subtypes as the gluing of {l} and {r}")] ++
         inclusionProblems l g L G ++ inclusionProblems r g R G ++
         match ff with
         | none => []
@@ -222,9 +229,13 @@ def explain : Claim → List Json
   | .state x => match c.state? x with
     | some (s, X) => match c.schema? s with
       | some S => c.schemaProblems s ++ failing [
-          (X.check S, "stateCheck", s!"{x} does not pass the check of {s}"),
-          (X.checkValueObjects S, "valueObject",
-            s!"two entities of a value object of {x} have the same attributes")] ++
+          (X.check S, "stateCheck", s!"{x} does not pass the check of {s}")] ++
+          (if X.check S then (X.keyViolations S).map fun (k, i, j) => problemJson "key"
+            [("state", .str x), ("entity", .str k.entity), ("key", Lean.toJson k.fields),
+              ("entities", Lean.toJson [i, j])]
+            s!"the entities {i} and {j} of {k.entity} in {x} agree on the key \
+              {keyText k.fields}"
+          else []) ++
           (X.litProblems c.valueTypes).map (LitProblem.toJson x)
       | none => [unknown "schema" s]
     | none => [unknown "state" x]

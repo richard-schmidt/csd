@@ -72,6 +72,8 @@ def aggregateBase : Schema where
   attrs := S.aggAttrs A
   aggregates := [A]
   valueObjects := S.valueObjects.filter fun e => e ∈ A.entities
+  keys := S.keys.filter fun k => k.entity ∈ A.entities
+  subtypes := S.subtypes.filter fun s => s.entity ∈ A.entities
 
 /-- The equation `q` is internal to `A`: it starts in `A`, and its two sides are
 paths of the aggregate schema of `A`. -/
@@ -161,9 +163,16 @@ theorem entities_of_mem (hS : S.WellFormed) (hA : A ∈ S.allAggregates) :
     exact (List.mem_filter.mp he).1
 
 theorem owner_of_mem (hS : S.WellFormed) (hA : A ∈ S.allAggregates) :
-    ∀ m ∈ A.members, (⟨m.owner, m.entity, A.root⟩ : Ref) ∈ S.refs := by
+    ∀ m ∈ A.members, ∃ t ∈ A.entities, (⟨m.owner, m.entity, t⟩ : Ref) ∈ S.refs := by
   rcases mem_allAggregates.mp hA with h | ⟨e, -, rfl⟩
   · exact hS.agg_owner A h
+  · intro m hm
+    exact absurd hm List.not_mem_nil
+
+theorem tree_of_mem (hS : S.WellFormed) (hA : A ∈ S.allAggregates) :
+    ∀ m ∈ A.members, S.ownerIter A A.members.length m.entity = some A.root := by
+  rcases mem_allAggregates.mp hA with h | ⟨e, -, rfl⟩
+  · exact hS.agg_tree A h
   · intro m hm
     exact absurd hm List.not_mem_nil
 
@@ -279,6 +288,39 @@ theorem outNames_aggregate_sublist (e : String) :
   List.Sublist.append ((List.filter_sublist.filter _).map _)
     ((List.filter_sublist.filter _).map _)
 
+/-- Out of an entity type of `A`, the aggregate schema has the generator names of
+`S`. -/
+theorem outNames_aggregate {e : String} (he : e ∈ A.entities) :
+    (S.aggregateSchema A).outNames e = S.outNames e := by
+  simp only [outNames, aggregateSchema_refs, aggregateSchema_attrs, aggRefs, aggAttrs,
+    List.filter_filter]
+  congr 2
+  · apply List.filter_congr
+    intro x _
+    by_cases h : x.src = e <;> simp [h, he]
+  · apply List.filter_congr
+    intro x _
+    by_cases h : x.src = e <;> simp [h, he]
+
+/-- The aggregate schema has the ownership references of `S`. -/
+theorem ownerStep_aggregate (e : String) :
+    (S.aggregateSchema A).ownerStep A e = S.ownerStep A e := by
+  unfold ownerStep
+  cases h : A.members.find? (·.entity == e) with
+  | none => rfl
+  | some m =>
+    simp only [Option.bind_some]
+    rw [ref?_aggregate (List.mem_cons_of_mem _ (List.mem_map_of_mem
+      (List.mem_of_find?_eq_some h)))]
+
+theorem ownerIter_aggregate : ∀ (k : Nat) (e : String),
+    (S.aggregateSchema A).ownerIter A k e = S.ownerIter A k e
+  | 0, _ => rfl
+  | k + 1, e => by
+    have ih : (S.aggregateSchema A).ownerIter A k = S.ownerIter A k :=
+      funext (ownerIter_aggregate k)
+    simp only [ownerIter, ownerStep_aggregate, ih]
+
 /-- The aggregate schema of an aggregate of a well-formed schema is well-formed. -/
 theorem aggregateSchema_wellFormed (hS : S.WellFormed) (hA : A ∈ S.allAggregates) :
     (S.aggregateSchema A).WellFormed where
@@ -329,8 +371,13 @@ theorem aggregateSchema_wellFormed (hS : S.WellFormed) (hA : A ∈ S.allAggregat
     simpa [aggregateSchema, aggregateBase] using nodup_entities_of_mem hS hA
   agg_owner A' hA' m hm := by
     obtain rfl : A' = A := List.mem_singleton.mp hA'
+    obtain ⟨t, ht, hr⟩ := owner_of_mem hS hA m hm
     simp only [aggregateSchema_refs, aggRefs, List.mem_filter, decide_eq_true_eq]
-    exact ⟨owner_of_mem hS hA m hm, List.mem_cons_of_mem _ (List.mem_map_of_mem hm)⟩
+    exact ⟨t, ht, hr, List.mem_cons_of_mem _ (List.mem_map_of_mem hm)⟩
+  agg_tree A' hA' m hm := by
+    obtain rfl : A' = A := List.mem_singleton.mp hA'
+    rw [ownerIter_aggregate]
+    exact tree_of_mem hS hA m hm
   agg_boundary r hr A' hA' _ := by
     obtain rfl : A' = A := List.mem_singleton.mp hA'
     simp only [aggregateSchema_refs, aggRefs, List.mem_filter, decide_eq_true_eq] at hr
@@ -338,10 +385,27 @@ theorem aggregateSchema_wellFormed (hS : S.WellFormed) (hA : A ∈ S.allAggregat
   vo_entities e he := by
     simp only [aggregateSchema, aggregateBase, List.mem_filter, decide_eq_true_eq] at he
     exact List.mem_append_left _ he.2
-  vo_attrs e he := by
+  vo_fields e he := by
     simp only [aggregateSchema, aggregateBase, List.mem_filter, decide_eq_true_eq] at he
-    obtain ⟨a, ha, hae⟩ := hS.vo_attrs e he.1
-    exact ⟨a, List.mem_filter.mpr ⟨ha, decide_eq_true (hae ▸ he.2)⟩, hae⟩
+    rw [outNames_aggregate he.2]
+    exact hS.vo_fields e he.1
+  key_entities k hk := by
+    simp only [aggregateSchema, aggregateBase, List.mem_filter, decide_eq_true_eq] at hk
+    exact List.mem_append_left _ hk.2
+  key_nonempty k hk := by
+    simp only [aggregateSchema, aggregateBase, List.mem_filter, decide_eq_true_eq] at hk
+    exact hS.key_nonempty k hk.1
+  key_fields k hk n hn := by
+    simp only [aggregateSchema, aggregateBase, List.mem_filter, decide_eq_true_eq] at hk
+    rw [outNames_aggregate hk.2]
+    exact hS.key_fields k hk.1 n hn
+  isa_entities s hs := by
+    simp only [aggregateSchema, aggregateBase, List.mem_filter, decide_eq_true_eq] at hs
+    exact List.mem_append_left _ hs.2
+  isa_ref s hs := by
+    simp only [aggregateSchema, aggregateBase, List.mem_filter, decide_eq_true_eq] at hs
+    obtain ⟨r, hr, hrs, hrn⟩ := hS.isa_ref s hs.1
+    exact ⟨r, List.mem_filter.mpr ⟨hr, decide_eq_true (hrs ▸ hs.2)⟩, hrs, hrn⟩
 
 /-! ## The internal schema -/
 
@@ -364,6 +428,8 @@ theorem mem_internalEqns_or_cross {q : Equation} (hq : q ∈ S.eqns) :
 
 theorem internalSchema_wellFormed (hS : S.WellFormed) : S.internalSchema.WellFormed :=
   { hS with
+    agg_tree := fun A hA m hm =>
+      (ownerIter_of_refs S.internalSchema (S' := S) rfl A _ _).trans (hS.agg_tree A hA m hm)
     eqn_src := fun q hq => hS.eqn_src q (mem_internalEqns.mp hq).1
     eqn_parallel := fun q hq => by
       obtain ⟨o, hl, hr⟩ := hS.eqn_parallel q (mem_internalEqns.mp hq).1

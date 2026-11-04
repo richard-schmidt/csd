@@ -65,6 +65,8 @@ def glue (B₁ B₂ : Schema) : Schema where
   eqns := B₁.eqns ++ B₂.eqns
   aggregates := mergeAggregates B₁.aggregates B₂.aggregates
   valueObjects := B₁.valueObjects ++ B₂.valueObjects.filter fun e => e ∉ B₁.valueObjects
+  keys := B₁.keys ++ B₂.keys.filter fun k => k ∉ B₁.keys
+  subtypes := B₁.subtypes ++ B₂.subtypes.filter fun s => s ∉ B₁.subtypes
 
 variable {B₁ B₂ : Schema}
 

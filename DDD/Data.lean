@@ -18,9 +18,12 @@ generator.
   type `v` the values `Elem.val v k`.
 - `FinState.eval_lift`: following the names of a path through the columns is
   applying the state to the path.
-- Value objects: `checkValueObjects` is sound for `Schema.State.ValueObjects`,
-  the condition that two entities of a value object with equal attribute values
-  are equal (`toState_valueObjects`).
+- Keys: `checkKeys` is sound for `Schema.State.Keys`, the condition that two
+  entities that agree on the fields of a key are equal (`toState_keys`). The keys
+  are those of `Schema.allKeys`: declared keys, value objects, identified by all
+  their fields (`checkValueObjects`, `toState_valueObjects`), and subtypes, whose
+  is-a reference is then injective (`Schema.State.Keys.isA_injective`).
+  `keyViolations` lists the pairs of entities that agree on a key.
 - Homomorphisms: `FinHom` gives, for each entity type, the image of each entity.
   `FinHom.check` asks that it commute with every generator; a homomorphism that
   passes is a morphism of states (`FinHom.toHom`).
@@ -342,75 +345,106 @@ theorem functor_map_genMor (hX : X.check S = true) {a b : S.Obj} (n : String)
     (h : S.step? a.1 n = some b.1) (x : X.Carrier a) :
     (X.functor hX).map (S.genMor n h) x = stepIn hX h x := rfl
 
-/-! ## Value objects -/
+/-! ## Keys -/
 
 variable (S X) in
-/-- Two entities of a value object with equal attribute values are equal. -/
+/-- The entities `i` and `j` of the entity type `e` agree on the fields `fs`. -/
+def agree (e : String) (fs : List String) (i j : Nat) : Bool :=
+  fs.all fun n => decide (X.step S (.ent e i) n = X.step S (.ent e j) n)
+
+variable (S X) in
+/-- Two distinct entities of the entity type of `k` do not agree on its fields. -/
+def checkKey (k : Key) : Bool :=
+  (List.range (X.size k.entity)).all fun i => (List.range (X.size k.entity)).all fun j =>
+    i == j || !X.agree S k.entity k.fields i j
+
+variable (S X) in
+/-- `X` satisfies every key of `S`: the declared keys, the value objects and the
+subtypes. -/
+def checkKeys : Bool := S.allKeys.all (X.checkKey S)
+
+variable (S X) in
+/-- `X` satisfies the key of all fields of each value object. -/
 def checkValueObjects : Bool :=
-  S.valueObjects.all fun e => (List.range (X.size e)).all fun i =>
-    (List.range (X.size e)).all fun j => i == j || !(S.attrs.all fun a =>
-      a.src != e || decide ((X.attrCol a.src a.name).bind (·[i]?) =
-        (X.attrCol a.src a.name).bind (·[j]?)))
+  S.valueObjects.all fun e => X.checkKey S ⟨e, S.outNames e⟩
+
+variable (S X) in
+/-- The pairs of distinct entities that agree on a key of `S`, with the key, the
+first entity before the second. -/
+def keyViolations : List (Key × Nat × Nat) :=
+  S.allKeys.flatMap fun k => (List.range (X.size k.entity)).flatMap fun i =>
+    ((List.range (X.size k.entity)).filter fun j => i < j && X.agree S k.entity k.fields i j).map
+      fun j => (k, i, j)
 
 end FinState
 
-/-- An attribute is a generator out of its source entity type. -/
-theorem Schema.step?_attr {S : Schema} (hS : S.WellFormed) {a : Attr} (ha : a ∈ S.attrs)
-    {e : String} (hae : a.src = e) : S.step? (.entity e) a.name = some (.value a.tgt) :=
-  hae ▸ Schema.step?_of_mem_attrs hS ha
+/-- The key condition on a state: two entities of `e` that agree on every field in
+`fs` are equal. A field that is not a generator out of `e` imposes nothing. -/
+def Schema.State.KeyHolds {S : Schema} (Y : S.State K) (e : String) (he : e ∈ S.entities)
+    (fs : List String) : Prop :=
+  ∀ x y : Y.F.obj (S.obj ⟨.entity e, he⟩),
+    (∀ n ∈ fs, ∀ (b : S.Obj) (h : S.step? (.entity e) n = some b.1),
+      Y.F.map (S.genMor (a := ⟨.entity e, he⟩) n h) x =
+        Y.F.map (S.genMor (a := ⟨.entity e, he⟩) n h) y) → x = y
 
-/-- The value-object condition on a state: two entities of a value object whose
-attributes have equal values are equal. -/
-def Schema.State.ValueObjects {S : Schema} (hS : S.WellFormed) (Y : S.State K) : Prop :=
-  ∀ e (he : e ∈ S.entities), e ∈ S.valueObjects → ∀ x y : Y.F.obj (S.obj ⟨.entity e, he⟩),
-    (∀ a (ha : a ∈ S.attrs) (hae : a.src = e),
-      Y.values a.tgt (Y.F.map (S.genMor (a := ⟨.entity e, he⟩) (b := ⟨.value a.tgt, trivial⟩)
-        a.name (Schema.step?_attr hS ha hae)) x) =
-      Y.values a.tgt (Y.F.map (S.genMor (a := ⟨.entity e, he⟩) (b := ⟨.value a.tgt, trivial⟩)
-        a.name (Schema.step?_attr hS ha hae)) y)) → x = y
+/-- A state satisfies the keys of its schema: the declared keys, the key of all
+fields of each value object, and the is-a reference of each subtype. -/
+def Schema.State.Keys {S : Schema} (Y : S.State K) : Prop :=
+  ∀ k ∈ S.allKeys, ∀ he : k.entity ∈ S.entities, Y.KeyHolds k.entity he k.fields
+
+/-- The value-object condition on a state: two entities of a value object that agree
+on all its fields, attributes and references, are equal. -/
+def Schema.State.ValueObjects {S : Schema} (Y : S.State K) : Prop :=
+  ∀ e ∈ S.valueObjects, ∀ he : e ∈ S.entities, Y.KeyHolds e he (S.outNames e)
+
+/-- Value-object identity is the key of all fields. -/
+theorem Schema.State.Keys.valueObjects {S : Schema} {Y : S.State K} (h : Y.Keys) :
+    Y.ValueObjects := fun e he he' =>
+  h ⟨e, S.outNames e⟩ (List.mem_append_left _ (List.mem_append_right _
+    (List.mem_map_of_mem he))) he'
+
+/-- The is-a reference of a subtype is injective: a subtype is a subobject of its
+supertype. -/
+theorem Schema.State.Keys.isA_injective {S : Schema} (hS : S.WellFormed) {Y : S.State K}
+    (h : Y.Keys) {s : IsA} (hs : s ∈ S.subtypes) {r : Ref} (hr : r ∈ S.refs)
+    (hrs : r.src = s.entity) (hrn : r.name = s.ref) :
+    Function.Injective (Y.F.map (S.genMor (a := ⟨.entity r.src, hS.ref_src r hr⟩)
+      (b := ⟨.entity r.tgt, hS.ref_tgt r hr⟩) r.name (Schema.step?_of_mem_refs hS hr))) := by
+  obtain ⟨e, n⟩ := s
+  simp only at hrs hrn
+  subst hrs hrn
+  intro x y hxy
+  refine h ⟨r.src, [r.name]⟩ (List.mem_append_right _ (List.mem_map_of_mem hs))
+    (hS.ref_src r hr) x y fun n' hn' b hb => ?_
+  obtain rfl : n' = r.name := List.mem_singleton.mp hn'
+  obtain ⟨b, hbo⟩ := b
+  obtain rfl : b = .entity r.tgt :=
+    Option.some.inj (hb.symm.trans (Schema.step?_of_mem_refs hS hr))
+  exact hxy
 
 namespace FinState
 
 variable {X : FinState K} {S : Schema}
 
-/-- The step along an attribute from entity `i` reads the column of the attribute. -/
-theorem step_attr (hS : S.WellFormed) {a : Attr} (ha : a ∈ S.attrs) (i : Nat) :
-    X.step S (.ent a.src i) a.name =
-      ((X.attrCol a.src a.name).bind (·[i]?)).map fun x => .val x.1 x.2 := by
-  have hs := Schema.step?_of_mem_attrs hS ha
-  simp only [Schema.step?] at hs
-  cases hr : S.ref? a.src a.name with
-  | some r => simp [hr] at hs
+/-- A name that is no generator out of `e` gives no step. -/
+theorem step_none {e n : String} (h : S.step? (.entity e) n = none) (i : Nat) :
+    X.step S (.ent e i) n = none := by
+  simp only [Schema.step?] at h
+  cases hr : S.ref? e n with
+  | some r => simp [hr] at h
   | none =>
-    rw [hr] at hs
-    cases hat : S.attr? a.src a.name with
-    | none => simp [hat] at hs
-    | some a' => simp [step, hr, hat]
+    rw [hr] at h
+    cases ha : S.attr? e n with
+    | some a => simp [ha] at h
+    | none => simp [step, hr, ha]
 
 variable [∀ v, DecidableEq (K v)]
 
-/-- The value of an attribute at entity `i` is the entry `i` of its column. -/
-theorem values_attr (hS : S.WellFormed) (hX : X.check S = true) {a : Attr} (ha : a ∈ S.attrs)
-    {e : String} (hae : a.src = e) (he : e ∈ S.entities) {i : Nat} (hi : i < X.size e)
-    {c : List (Σ v, K v)} (hc : X.attrCol a.src a.name = some c) (hi' : i < c.length) :
-    ∃ h : c[i].1 = a.tgt, (X.toState hX).values a.tgt ((X.functor hX).map
-      (S.genMor (a := ⟨.entity e, he⟩) (b := ⟨.value a.tgt, trivial⟩) a.name
-        (Schema.step?_attr hS ha hae)) ⟨.ent e i, ⟨rfl, hi⟩⟩) = cast (congrArg K h) c[i].2 := by
-  subst hae
-  rw [functor_map_genMor]
-  have sz := step_stepIn hX (Schema.step?_attr hS ha rfl)
-    (⟨.ent a.src i, ⟨rfl, hi⟩⟩ : { x : Elem K // X.Has x (.entity a.src) })
-  rw [step_attr hS ha, hc, Option.bind_some, List.getElem?_eq_getElem hi', Option.map_some,
-    Option.some.injEq] at sz
-  generalize stepIn hX (Schema.step?_attr hS ha rfl) _ = z at sz ⊢
-  obtain ⟨z, hz⟩ := z
-  subst sz
-  exact ⟨hz, rfl⟩
-
-/-- The value-object check is sound. -/
-theorem toState_valueObjects (hS : S.WellFormed) (hX : X.check S = true)
-    (hv : X.checkValueObjects S = true) : (X.toState hX).ValueObjects hS := by
-  intro e he hvo x y hxy
+/-- The check of one key is sound. -/
+theorem toState_keyHolds (hS : S.WellFormed) (hX : X.check S = true) {k : Key}
+    (hk : X.checkKey S k = true) (he : k.entity ∈ S.entities) :
+    (X.toState hX).KeyHolds k.entity he k.fields := by
+  intro x y hxy
   obtain ⟨⟨e₁, i⟩ | ⟨_, _⟩, hx⟩ := x
   swap
   · exact hx.elim
@@ -419,35 +453,37 @@ theorem toState_valueObjects (hS : S.WellFormed) (hX : X.check S = true)
   · exact hy.elim
   obtain ⟨h₁, hi⟩ := hx
   obtain ⟨h₂, hj⟩ := hy
-  subst e₁ e₂
-  simp only [checkValueObjects, List.all_eq_true, List.mem_range, Bool.or_eq_true, beq_iff_eq,
-    Bool.not_eq_true'] at hv
-  rcases hv e hvo i hi j hj with rfl | hne
+  subst h₁ h₂
+  simp only [checkKey, List.all_eq_true, List.mem_range, Bool.or_eq_true, beq_iff_eq,
+    Bool.not_eq_true'] at hk
+  rcases hk i hi j hj with rfl | hne
   · rfl
   exfalso
-  have hall : (S.attrs.all fun a => a.src != e ||
-      decide ((X.attrCol a.src a.name).bind (·[i]?) =
-        (X.attrCol a.src a.name).bind (·[j]?))) = true := by
-    simp only [List.all_eq_true, Bool.or_eq_true, bne_iff_ne, ne_eq, decide_eq_true_eq]
-    intro a ha
-    by_cases hae : a.src = e
-    · right
-      obtain ⟨c, hc, hlen, -⟩ := check_attr hX ha
-      have hi' : i < c.length := by rw [hlen, hae]; exact hi
-      have hj' : j < c.length := by rw [hlen, hae]; exact hj
-      obtain ⟨h₁, v₁⟩ := values_attr hS hX ha hae he hi hc hi'
-      obtain ⟨h₂, v₂⟩ := values_attr hS hX ha hae he hj hc hj'
-      have hxa := v₁.symm.trans ((hxy a ha hae).trans v₂)
-      rw [hc, Option.bind_some, Option.bind_some, List.getElem?_eq_getElem hi',
-        List.getElem?_eq_getElem hj']
-      congr 1
-      exact Sigma.ext (h₁.trans h₂.symm)
-        (((cast_heq _ _).symm.trans (heq_of_eq hxa)).trans (cast_heq _ _))
-    · left
-      exact hae
+  have hall : X.agree S k.entity k.fields i j = true := by
+    simp only [agree, List.all_eq_true, decide_eq_true_eq]
+    intro n hn
+    cases hs : S.step? (.entity k.entity) n with
+    | none => rw [step_none hs, step_none hs]
+    | some o =>
+      have hxy' := hxy n hn ⟨o, Schema.isOb_of_step? hS hs⟩ hs
+      have sx := step_stepIn hX hs (⟨.ent k.entity i, ⟨rfl, hi⟩⟩ :
+        { x : Elem K // X.Has x (.entity k.entity) })
+      have sy := step_stepIn hX hs (⟨.ent k.entity j, ⟨rfl, hj⟩⟩ :
+        { x : Elem K // X.Has x (.entity k.entity) })
+      rw [sx, sy]
+      exact congrArg (fun z => some z.1) hxy'
   rw [hall] at hne
   exact absurd hne (by simp)
 
+/-- The key check is sound. -/
+theorem toState_keys (hS : S.WellFormed) (hX : X.check S = true)
+    (hk : X.checkKeys S = true) : (X.toState hX).Keys := fun k hk' he =>
+  toState_keyHolds hS hX (List.all_eq_true.mp hk k hk') he
+
+/-- The value-object check is sound. -/
+theorem toState_valueObjects (hS : S.WellFormed) (hX : X.check S = true)
+    (hv : X.checkValueObjects S = true) : (X.toState hX).ValueObjects := fun e he he' =>
+  toState_keyHolds (k := ⟨e, S.outNames e⟩) hS hX (List.all_eq_true.mp hv e he) he'
 
 /-! ## Homomorphisms -/
 

@@ -25,12 +25,14 @@ open DDD Lean
 
 /-- A schema that breaks every condition of `WellFormed`. -/
 def broken : Schema where
-  entities := ["A", "B", "A"]
-  refs := [⟨"b", "A", "B"⟩, ⟨"b", "A", "C"⟩, ⟨"x", "Z", "B"⟩]
+  entities := ["A", "B", "A", "E", "G"]
+  refs := [⟨"b", "A", "B"⟩, ⟨"b", "A", "C"⟩, ⟨"x", "Z", "B"⟩, ⟨"f", "G", "G"⟩]
   attrs := [⟨"name", "B", .string⟩, ⟨"v", "Y", .int⟩]
   eqns := [⟨"A", ["b", "name"], ["b"]⟩, ⟨"Q", [], []⟩]
-  aggregates := [⟨"A", [⟨"B", "a"⟩]⟩, ⟨"B", []⟩, ⟨"W", []⟩]
-  valueObjects := ["A", "V"]
+  aggregates := [⟨"A", [⟨"B", "a"⟩]⟩, ⟨"B", []⟩, ⟨"W", []⟩, ⟨"E", [⟨"G", "f"⟩]⟩]
+  valueObjects := ["E", "V"]
+  keys := [⟨"Q", ["x"]⟩, ⟨"B", []⟩, ⟨"B", ["name", "nope"]⟩]
+  subtypes := [⟨"S", "s"⟩, ⟨"B", "up"⟩]
 
 example : broken.problems = [
     .duplicateEntity "A",
@@ -43,9 +45,15 @@ example : broken.problems = [
     .aggregateEntity "W" "W",
     .aggregateOverlap "B",
     .missingOwner "A" ⟨"B", "a"⟩,
+    .ownerCycle "E" ⟨"G", "f"⟩,
     .boundary ⟨"x", "Z", "B"⟩ "A",
-    .valueObjectAttrs "A",
-    .valueObjectEntity "V"] := by decide
+    .valueObjectFields "E",
+    .valueObjectEntity "V",
+    .keyEntity ⟨"Q", ["x"]⟩,
+    .keyEmpty "B",
+    .keyField ⟨"B", ["name", "nope"]⟩ "nope",
+    .subtypeEntity "S",
+    .subtypeRef ⟨"B", "up"⟩] := by decide
 
 /-- Orders with a customer's address inside the customer aggregate: the billing and
 shipping addresses of an order reach into it. -/
@@ -130,8 +138,9 @@ def summary (entries : Json) : List (String × Bool × List String) :=
   [("OrdersPL", true, []), ("Payments", true, []),
    ("Broken", false, ["duplicateEntity", "duplicateGenerator", "referenceTarget",
      "referenceSource", "attributeSource", "equationNotParallel", "equationSource",
-     "aggregateEntity", "aggregateOverlap", "missingOwner", "aggregateBoundary",
-     "valueObjectAttributes", "valueObjectEntity"]),
+     "aggregateEntity", "aggregateOverlap", "missingOwner", "ownerCycle", "aggregateBoundary",
+     "valueObjectFields", "valueObjectEntity", "keyEntity", "keyEmpty", "keyField",
+     "subtypeEntity", "subtypeReference"]),
    ("Untyped", false, ["undeclaredValueType", "nestedOptional"])]
 
 #guard summary (Json.arr #[(brokenMap.report.getObjValD "valueTypes").setObjVal! "name" ""]) ==

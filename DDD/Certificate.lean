@@ -22,10 +22,11 @@ claim that passes its check holds (`Certificate.checkClaim_sound`).
 - `declared`: the list of value types admits the value type of every attribute of
   a schema.
 - `state`: a finite state is a state of its schema, its values are literals of
-  the declared types in normal form, and it satisfies the value-object
-  condition. The reader puts the literals of each state in normal form
-  (`FinState.normalize`), so a literal written in another form passes, and one
-  that is not a value of its type fails.
+  the declared types in normal form, and it satisfies the keys of its schema:
+  declared keys, value objects and subtypes (`Schema.State.Keys`). The reader
+  puts the literals of each state in normal form (`FinState.normalize`), so a
+  literal written in another form passes, and one that is not a value of its
+  type fails.
 - `restriction`: a finite state is the restriction of another along a
   translation; its state is then isomorphic to `Translation.restrictState`.
 - `homomorphism`: a homomorphism of finite states that is a morphism of their
@@ -43,12 +44,13 @@ open CategoryTheory Lean
 
 namespace Schema
 
-/-- `S` and `S'` list the same entity types, references, attributes, equations
-and value objects, possibly in another order, and the same aggregates, with
-members possibly in another order. -/
+/-- `S` and `S'` list the same entity types, references, attributes, equations,
+value objects, keys and subtypes, possibly in another order, and the same
+aggregates, with members possibly in another order. -/
 def checkSameUpToOrder (S S' : Schema) : Bool :=
   S.entities.isPerm S'.entities && S.refs.isPerm S'.refs && S.attrs.isPerm S'.attrs &&
   S.eqns.isPerm S'.eqns && S.valueObjects.isPerm S'.valueObjects &&
+  S.keys.isPerm S'.keys && S.subtypes.isPerm S'.subtypes &&
   S.aggregates.length == S'.aggregates.length &&
   S.aggregates.all fun A => S'.aggregates.any fun A' =>
     A'.root == A.root && A.members.isPerm A'.members
@@ -58,8 +60,8 @@ variable {S S' : Schema}
 theorem perm_of_checkSameUpToOrder (h : S.checkSameUpToOrder S' = true) :
     S.entities.Perm S'.entities ∧ S.refs.Perm S'.refs ∧ S.attrs.Perm S'.attrs ∧
       S.eqns.Perm S'.eqns := by
-  simp only [checkSameUpToOrder, Bool.and_eq_true, List.isPerm_iff] at h
-  exact ⟨h.1.1.1.1.1.1, h.1.1.1.1.1.2, h.1.1.1.1.2, h.1.1.1.2⟩
+  simp only [checkSameUpToOrder, Bool.and_eq_true, List.isPerm_iff, and_assoc] at h
+  exact ⟨h.1, h.2.1, h.2.2.1, h.2.2.2.1⟩
 
 /-- The empty translation from `S` to a schema that lists the same entity types,
 generators and equations is valid. -/
@@ -166,7 +168,7 @@ def checkClaim : Claim → Bool
   | .state x => match c.state? x with
     | some (s, X) => match c.schema? s with
       | some S => S.checkWellFormed && X.check S && X.litsFit c.valueTypes &&
-        X.checkValueObjects S
+        X.checkKeys S
       | none => false
     | none => false
   | .valueTypes => c.valueTypes.checkSound
@@ -199,9 +201,9 @@ def Holds : Claim → Prop
         (Translation.functor hG hl).Full ∧ (Translation.functor hG hl).Faithful) ∧
       (ff.map (·.2) = some true →
         (Translation.functor hG hr).Full ∧ (Translation.functor hG hr).Faithful)
-  | .state x => ∃ (s : String) (S : Schema) (X : FinState LitK) (hS : S.WellFormed)
+  | .state x => ∃ (s : String) (S : Schema) (X : FinState LitK) (_ : S.WellFormed)
       (hX : X.check S = true),
-      c.state? x = some (s, X) ∧ c.schema? s = some S ∧ (X.toState hX).ValueObjects hS
+      c.state? x = some (s, X) ∧ c.schema? s = some S ∧ (X.toState hX).Keys
   | .valueTypes => c.valueTypes.Sound
   | .declared s =>
     ∃ S, c.schema? s = some S ∧ ∀ a ∈ S.attrs, c.valueTypes.admits a.tgt = true
@@ -307,7 +309,7 @@ theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl 
     simp only [hx, hs, Bool.and_eq_true] at h
     obtain ⟨⟨⟨wS, hX⟩, -⟩, hv⟩ := h
     have wS' := (Schema.checkWellFormed_iff S).mp wS
-    exact ⟨s, S, X, wS', hX, hx, hs, FinState.toState_valueObjects wS' hX hv⟩
+    exact ⟨s, S, X, wS', hX, hx, hs, FinState.toState_keys wS' hX hv⟩
   | valueTypes =>
     simp only [checkClaim] at h
     exact (TypeList.checkSound_iff _).mp h

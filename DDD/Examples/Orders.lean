@@ -17,6 +17,9 @@ Two equations:
 Aggregates: an order with its lines, each owning reference `order` pointing to
 the root; customers, addresses and products on their own.
 
+Keys: an order has one line per product (`{order, product}`), and a product is
+identified by its SKU (`{sku}`).
+
 The published language of Orders (`published`): customers, addresses and orders,
 with the first equation. It contains roots only (`published_rootsOnly`); order
 lines belong to the order aggregate, so a published language with them fails the
@@ -51,6 +54,7 @@ def schema : Schema where
   aggregates := [⟨"Customer", []⟩, ⟨"Address", []⟩, ⟨"Order", [⟨"OrderLine", "order"⟩]⟩,
     ⟨"Product", []⟩]
   valueObjects := ["Address"]
+  keys := [⟨"OrderLine", ["order", "product"]⟩, ⟨"Product", ["sku"]⟩]
 
 theorem wellFormed : schema.WellFormed := by decide
 

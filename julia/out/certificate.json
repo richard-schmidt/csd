@@ -1078,12 +1078,240 @@
           }
         ]
       }
+    },
+    {
+      "name": "XSales",
+      "schema": "Sales",
+      "state": {
+        "references": [
+          {
+            "name": "Address.country",
+            "column": [
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "name": "Address.customer",
+            "column": [
+              0,
+              1,
+              2
+            ]
+          },
+          {
+            "name": "BusinessCustomer.customer",
+            "column": [
+              2
+            ]
+          },
+          {
+            "name": "Order.customer",
+            "column": [
+              0,
+              2
+            ]
+          },
+          {
+            "name": "OrderLine.order",
+            "column": [
+              0,
+              0,
+              1
+            ]
+          },
+          {
+            "name": "OrderLine.product",
+            "column": [
+              0,
+              1,
+              0
+            ]
+          },
+          {
+            "name": "LineDiscount.line",
+            "column": [
+              2
+            ]
+          },
+          {
+            "name": "OrderCoupon.order",
+            "column": [
+              0
+            ]
+          },
+          {
+            "name": "OrderCoupon.coupon",
+            "column": [
+              0
+            ]
+          }
+        ],
+        "entities": [
+          {
+            "type": "Country",
+            "count": 2
+          },
+          {
+            "type": "Customer",
+            "count": 3
+          },
+          {
+            "type": "Address",
+            "count": 3
+          },
+          {
+            "type": "BusinessCustomer",
+            "count": 1
+          },
+          {
+            "type": "Product",
+            "count": 2
+          },
+          {
+            "type": "Order",
+            "count": 2
+          },
+          {
+            "type": "OrderLine",
+            "count": 3
+          },
+          {
+            "type": "LineDiscount",
+            "count": 1
+          },
+          {
+            "type": "Coupon",
+            "count": 1
+          },
+          {
+            "type": "OrderCoupon",
+            "count": 1
+          }
+        ],
+        "attributes": [
+          {
+            "name": "Country.code",
+            "column": [
+              "CH",
+              "DE"
+            ]
+          },
+          {
+            "name": "Customer.name",
+            "column": [
+              "Ada",
+              "Grace",
+              "Acme"
+            ]
+          },
+          {
+            "name": "Address.street",
+            "column": [
+              "Bahnhofstrasse 1",
+              "Bahnhofstrasse 1",
+              "Hauptstrasse 5"
+            ]
+          },
+          {
+            "name": "Address.city",
+            "column": [
+              "Bern",
+              "Bern",
+              "Berlin"
+            ]
+          },
+          {
+            "name": "BusinessCustomer.vatNumber",
+            "column": [
+              "DE123456789"
+            ]
+          },
+          {
+            "name": "Product.sku",
+            "column": [
+              "P-1",
+              "P-2"
+            ]
+          },
+          {
+            "name": "Product.name",
+            "column": [
+              "Kettle",
+              "Mug"
+            ]
+          },
+          {
+            "name": "Order.number",
+            "column": [
+              "O-1",
+              "O-2"
+            ]
+          },
+          {
+            "name": "Order.placedOn",
+            "column": [
+              "2026-11-02",
+              "2026-11-03"
+            ]
+          },
+          {
+            "name": "OrderLine.quantity",
+            "column": [
+              1,
+              2,
+              5
+            ]
+          },
+          {
+            "name": "LineDiscount.percent",
+            "column": [
+              "10"
+            ]
+          },
+          {
+            "name": "Coupon.code",
+            "column": [
+              "WELCOME"
+            ]
+          }
+        ]
+      }
     }
   ],
   "schemas": [
     {
       "name": "CatalogPL",
       "schema": {
+        "valueObjects": [],
+        "subtypes": [],
+        "references": [
+          {
+            "target": "Product",
+            "name": "Variant.product"
+          }
+        ],
+        "keys": [],
+        "equations": [],
+        "entities": [
+          "Product",
+          "Variant"
+        ],
+        "attributes": [
+          {
+            "type": "string",
+            "name": "Product.name"
+          },
+          {
+            "type": "string",
+            "name": "Variant.sku"
+          },
+          {
+            "type": "decimal",
+            "name": "Variant.price"
+          }
+        ],
         "aggregates": [
           {
             "root": "Product",
@@ -1093,95 +1321,35 @@
             "root": "Variant",
             "members": []
           }
-        ],
-        "valueObjects": [],
-        "references": [
-          {
-            "name": "Variant.product",
-            "target": "Product"
-          }
-        ],
-        "attributes": [
-          {
-            "name": "Product.name",
-            "type": "string"
-          },
-          {
-            "name": "Variant.sku",
-            "type": "string"
-          },
-          {
-            "name": "Variant.price",
-            "type": "decimal"
-          }
-        ],
-        "equations": [],
-        "entities": [
-          "Product",
-          "Variant"
         ]
       }
     },
     {
       "name": "OrdersPL",
       "schema": {
-        "aggregates": [
-          {
-            "root": "Customer",
-            "members": []
-          },
-          {
-            "root": "Address",
-            "members": []
-          },
-          {
-            "root": "Order",
-            "members": []
-          }
-        ],
         "valueObjects": [
           "Address"
         ],
+        "subtypes": [],
         "references": [
           {
-            "name": "Customer.address",
-            "target": "Address"
+            "target": "Address",
+            "name": "Customer.address"
           },
           {
-            "name": "Order.customer",
-            "target": "Customer"
+            "target": "Customer",
+            "name": "Order.customer"
           },
           {
-            "name": "Order.billTo",
-            "target": "Address"
+            "target": "Address",
+            "name": "Order.billTo"
           },
           {
-            "name": "Order.shipTo",
-            "target": "Address"
+            "target": "Address",
+            "name": "Order.shipTo"
           }
         ],
-        "attributes": [
-          {
-            "name": "Customer.name",
-            "type": "string"
-          },
-          {
-            "name": "Address.street",
-            "type": "string"
-          },
-          {
-            "name": "Address.city",
-            "type": "string"
-          },
-          {
-            "name": "Order.id",
-            "type": "uuid"
-          },
-          {
-            "name": "Order.placedOn",
-            "type": "date"
-          }
-        ],
+        "keys": [],
         "equations": [
           {
             "source": "Order",
@@ -1198,12 +1366,78 @@
           "Customer",
           "Address",
           "Order"
+        ],
+        "attributes": [
+          {
+            "type": "string",
+            "name": "Customer.name"
+          },
+          {
+            "type": "string",
+            "name": "Address.street"
+          },
+          {
+            "type": "string",
+            "name": "Address.city"
+          },
+          {
+            "type": "uuid",
+            "name": "Order.id"
+          },
+          {
+            "type": "date",
+            "name": "Order.placedOn"
+          }
+        ],
+        "aggregates": [
+          {
+            "root": "Customer",
+            "members": []
+          },
+          {
+            "root": "Address",
+            "members": []
+          },
+          {
+            "root": "Order",
+            "members": []
+          }
         ]
       }
     },
     {
       "name": "Customers",
       "schema": {
+        "valueObjects": [
+          "Address"
+        ],
+        "subtypes": [],
+        "references": [
+          {
+            "target": "Address",
+            "name": "Customer.address"
+          }
+        ],
+        "keys": [],
+        "equations": [],
+        "entities": [
+          "Customer",
+          "Address"
+        ],
+        "attributes": [
+          {
+            "type": "string",
+            "name": "Customer.name"
+          },
+          {
+            "type": "string",
+            "name": "Address.street"
+          },
+          {
+            "type": "string",
+            "name": "Address.city"
+          }
+        ],
         "aggregates": [
           {
             "root": "Customer",
@@ -1213,40 +1447,66 @@
             "root": "Address",
             "members": []
           }
-        ],
-        "valueObjects": [
-          "Address"
-        ],
-        "references": [
-          {
-            "name": "Customer.address",
-            "target": "Address"
-          }
-        ],
-        "attributes": [
-          {
-            "name": "Customer.name",
-            "type": "string"
-          },
-          {
-            "name": "Address.street",
-            "type": "string"
-          },
-          {
-            "name": "Address.city",
-            "type": "string"
-          }
-        ],
-        "equations": [],
-        "entities": [
-          "Customer",
-          "Address"
         ]
       }
     },
     {
       "name": "Catalog",
       "schema": {
+        "valueObjects": [],
+        "subtypes": [],
+        "references": [
+          {
+            "target": "Category",
+            "name": "Category.parent"
+          },
+          {
+            "target": "Category",
+            "name": "Product.category"
+          },
+          {
+            "target": "Product",
+            "name": "Variant.product"
+          },
+          {
+            "target": "Product",
+            "name": "Image.product"
+          }
+        ],
+        "keys": [],
+        "equations": [],
+        "entities": [
+          "Category",
+          "Product",
+          "Variant",
+          "Image"
+        ],
+        "attributes": [
+          {
+            "type": "string",
+            "name": "Category.name"
+          },
+          {
+            "type": "string",
+            "name": "Product.name"
+          },
+          {
+            "type": "string",
+            "name": "Variant.sku"
+          },
+          {
+            "type": "decimal",
+            "name": "Variant.price"
+          },
+          {
+            "type": "string",
+            "name": "Image.url"
+          },
+          {
+            "type": "bool",
+            "name": "Image.primary"
+          }
+        ],
         "aggregates": [
           {
             "root": "Category",
@@ -1265,166 +1525,55 @@
             "root": "Variant",
             "members": []
           }
-        ],
-        "valueObjects": [],
-        "references": [
-          {
-            "name": "Category.parent",
-            "target": "Category"
-          },
-          {
-            "name": "Product.category",
-            "target": "Category"
-          },
-          {
-            "name": "Variant.product",
-            "target": "Product"
-          },
-          {
-            "name": "Image.product",
-            "target": "Product"
-          }
-        ],
-        "attributes": [
-          {
-            "name": "Category.name",
-            "type": "string"
-          },
-          {
-            "name": "Product.name",
-            "type": "string"
-          },
-          {
-            "name": "Variant.sku",
-            "type": "string"
-          },
-          {
-            "name": "Variant.price",
-            "type": "decimal"
-          },
-          {
-            "name": "Image.url",
-            "type": "string"
-          },
-          {
-            "name": "Image.primary",
-            "type": "bool"
-          }
-        ],
-        "equations": [],
-        "entities": [
-          "Category",
-          "Product",
-          "Variant",
-          "Image"
         ]
       }
     },
     {
       "name": "Orders",
       "schema": {
-        "aggregates": [
-          {
-            "root": "Customer",
-            "members": []
-          },
-          {
-            "root": "Address",
-            "members": []
-          },
-          {
-            "root": "Order",
-            "members": [
-              {
-                "owner": "order",
-                "entity": "OrderLine"
-              }
-            ]
-          },
-          {
-            "root": "Product",
-            "members": []
-          }
-        ],
         "valueObjects": [
           "Address"
         ],
+        "subtypes": [],
         "references": [
           {
-            "name": "Customer.address",
-            "target": "Address"
+            "target": "Address",
+            "name": "Customer.address"
           },
           {
-            "name": "Order.customer",
-            "target": "Customer"
+            "target": "Customer",
+            "name": "Order.customer"
           },
           {
-            "name": "Order.billTo",
-            "target": "Address"
+            "target": "Address",
+            "name": "Order.billTo"
           },
           {
-            "name": "Order.shipTo",
-            "target": "Address"
+            "target": "Address",
+            "name": "Order.shipTo"
           },
           {
-            "name": "OrderLine.order",
-            "target": "Order"
+            "target": "Order",
+            "name": "OrderLine.order"
           },
           {
-            "name": "OrderLine.product",
-            "target": "Product"
+            "target": "Product",
+            "name": "OrderLine.product"
           }
         ],
-        "attributes": [
+        "keys": [
           {
-            "name": "Customer.name",
-            "type": "string"
+            "entity": "OrderLine",
+            "fields": [
+              "order",
+              "product"
+            ]
           },
           {
-            "name": "Address.street",
-            "type": "string"
-          },
-          {
-            "name": "Address.city",
-            "type": "string"
-          },
-          {
-            "name": "Order.id",
-            "type": "uuid"
-          },
-          {
-            "name": "Order.placedOn",
-            "type": "date"
-          },
-          {
-            "name": "Order.status",
-            "type": {
-              "named": "OrderStatus"
-            }
-          },
-          {
-            "name": "OrderLine.quantity",
-            "type": "int"
-          },
-          {
-            "name": "OrderLine.unitPrice",
-            "type": "decimal"
-          },
-          {
-            "name": "OrderLine.sku",
-            "type": "string"
-          },
-          {
-            "name": "Product.sku",
-            "type": "string"
-          },
-          {
-            "name": "Product.name",
-            "type": "string"
-          },
-          {
-            "name": "Product.listPrice",
-            "type": "decimal"
+            "entity": "Product",
+            "fields": [
+              "sku"
+            ]
           }
         ],
         "equations": [
@@ -1455,12 +1604,198 @@
           "Order",
           "OrderLine",
           "Product"
+        ],
+        "attributes": [
+          {
+            "type": "string",
+            "name": "Customer.name"
+          },
+          {
+            "type": "string",
+            "name": "Address.street"
+          },
+          {
+            "type": "string",
+            "name": "Address.city"
+          },
+          {
+            "type": "uuid",
+            "name": "Order.id"
+          },
+          {
+            "type": "date",
+            "name": "Order.placedOn"
+          },
+          {
+            "type": {
+              "named": "OrderStatus"
+            },
+            "name": "Order.status"
+          },
+          {
+            "type": "int",
+            "name": "OrderLine.quantity"
+          },
+          {
+            "type": "decimal",
+            "name": "OrderLine.unitPrice"
+          },
+          {
+            "type": "string",
+            "name": "OrderLine.sku"
+          },
+          {
+            "type": "string",
+            "name": "Product.sku"
+          },
+          {
+            "type": "string",
+            "name": "Product.name"
+          },
+          {
+            "type": "decimal",
+            "name": "Product.listPrice"
+          }
+        ],
+        "aggregates": [
+          {
+            "root": "Customer",
+            "members": []
+          },
+          {
+            "root": "Address",
+            "members": []
+          },
+          {
+            "root": "Order",
+            "members": [
+              {
+                "owner": "order",
+                "entity": "OrderLine"
+              }
+            ]
+          },
+          {
+            "root": "Product",
+            "members": []
+          }
         ]
       }
     },
     {
       "name": "Payments",
       "schema": {
+        "valueObjects": [
+          "Address"
+        ],
+        "subtypes": [],
+        "references": [
+          {
+            "target": "Address",
+            "name": "Payer.address"
+          },
+          {
+            "target": "Payer",
+            "name": "Invoice.payer"
+          },
+          {
+            "target": "Address",
+            "name": "Invoice.shipTo"
+          },
+          {
+            "target": "Invoice",
+            "name": "InvoiceLine.invoice"
+          },
+          {
+            "target": "Invoice",
+            "name": "Payment.invoice"
+          },
+          {
+            "target": "Payment",
+            "name": "Refund.payment"
+          },
+          {
+            "target": "Invoice",
+            "name": "Refund.invoice"
+          }
+        ],
+        "keys": [],
+        "equations": [
+          {
+            "source": "Refund",
+            "rhs": [
+              "payment",
+              "invoice"
+            ],
+            "lhs": [
+              "invoice"
+            ]
+          }
+        ],
+        "entities": [
+          "Payer",
+          "Address",
+          "Invoice",
+          "InvoiceLine",
+          "Payment",
+          "Refund"
+        ],
+        "attributes": [
+          {
+            "type": "string",
+            "name": "Payer.name"
+          },
+          {
+            "type": "string",
+            "name": "Address.street"
+          },
+          {
+            "type": "string",
+            "name": "Address.city"
+          },
+          {
+            "type": "uuid",
+            "name": "Invoice.orderId"
+          },
+          {
+            "type": "date",
+            "name": "Invoice.orderedOn"
+          },
+          {
+            "type": "int",
+            "name": "InvoiceLine.quantity"
+          },
+          {
+            "type": "decimal",
+            "name": "InvoiceLine.unitPrice"
+          },
+          {
+            "type": "string",
+            "name": "InvoiceLine.description"
+          },
+          {
+            "type": "decimal",
+            "name": "Payment.amount"
+          },
+          {
+            "type": "date",
+            "name": "Payment.paidOn"
+          },
+          {
+            "type": {
+              "named": "PaymentMethod"
+            },
+            "name": "Payment.method"
+          },
+          {
+            "type": "decimal",
+            "name": "Refund.amount"
+          },
+          {
+            "type": "date",
+            "name": "Refund.issuedOn"
+          }
+        ],
         "aggregates": [
           {
             "root": "Payer",
@@ -1488,121 +1823,97 @@
               }
             ]
           }
-        ],
-        "valueObjects": [
-          "Address"
-        ],
-        "references": [
-          {
-            "name": "Payer.address",
-            "target": "Address"
-          },
-          {
-            "name": "Invoice.payer",
-            "target": "Payer"
-          },
-          {
-            "name": "Invoice.shipTo",
-            "target": "Address"
-          },
-          {
-            "name": "InvoiceLine.invoice",
-            "target": "Invoice"
-          },
-          {
-            "name": "Payment.invoice",
-            "target": "Invoice"
-          },
-          {
-            "name": "Refund.payment",
-            "target": "Payment"
-          },
-          {
-            "name": "Refund.invoice",
-            "target": "Invoice"
-          }
-        ],
-        "attributes": [
-          {
-            "name": "Payer.name",
-            "type": "string"
-          },
-          {
-            "name": "Address.street",
-            "type": "string"
-          },
-          {
-            "name": "Address.city",
-            "type": "string"
-          },
-          {
-            "name": "Invoice.orderId",
-            "type": "uuid"
-          },
-          {
-            "name": "Invoice.orderedOn",
-            "type": "date"
-          },
-          {
-            "name": "InvoiceLine.quantity",
-            "type": "int"
-          },
-          {
-            "name": "InvoiceLine.unitPrice",
-            "type": "decimal"
-          },
-          {
-            "name": "InvoiceLine.description",
-            "type": "string"
-          },
-          {
-            "name": "Payment.amount",
-            "type": "decimal"
-          },
-          {
-            "name": "Payment.paidOn",
-            "type": "date"
-          },
-          {
-            "name": "Payment.method",
-            "type": {
-              "named": "PaymentMethod"
-            }
-          },
-          {
-            "name": "Refund.amount",
-            "type": "decimal"
-          },
-          {
-            "name": "Refund.issuedOn",
-            "type": "date"
-          }
-        ],
-        "equations": [
-          {
-            "source": "Refund",
-            "rhs": [
-              "payment",
-              "invoice"
-            ],
-            "lhs": [
-              "invoice"
-            ]
-          }
-        ],
-        "entities": [
-          "Payer",
-          "Address",
-          "Invoice",
-          "InvoiceLine",
-          "Payment",
-          "Refund"
         ]
       }
     },
     {
       "name": "Shipping",
       "schema": {
+        "valueObjects": [
+          "Address"
+        ],
+        "subtypes": [],
+        "references": [
+          {
+            "target": "Address",
+            "name": "Customer.address"
+          },
+          {
+            "target": "Customer",
+            "name": "Shipment.customer"
+          },
+          {
+            "target": "Address",
+            "name": "Shipment.destination"
+          },
+          {
+            "target": "Carrier",
+            "name": "Shipment.carrier"
+          },
+          {
+            "target": "Shipment",
+            "name": "Item.shipment"
+          }
+        ],
+        "keys": [],
+        "equations": [],
+        "entities": [
+          "Customer",
+          "Address",
+          "Shipment",
+          "Item",
+          "Carrier"
+        ],
+        "attributes": [
+          {
+            "type": "string",
+            "name": "Customer.name"
+          },
+          {
+            "type": "string",
+            "name": "Address.street"
+          },
+          {
+            "type": "string",
+            "name": "Address.city"
+          },
+          {
+            "type": "uuid",
+            "name": "Shipment.orderId"
+          },
+          {
+            "type": "date",
+            "name": "Shipment.shippedOn"
+          },
+          {
+            "type": "string",
+            "name": "Shipment.trackingCode"
+          },
+          {
+            "type": "bool",
+            "name": "Shipment.signatureRequired"
+          },
+          {
+            "type": "int",
+            "name": "Item.quantity"
+          },
+          {
+            "type": "decimal",
+            "name": "Item.declaredValue"
+          },
+          {
+            "type": "string",
+            "name": "Item.sku"
+          },
+          {
+            "type": "string",
+            "name": "Item.description"
+          },
+          {
+            "type": "string",
+            "name": "Carrier.name"
+          }
+        ],
         "aggregates": [
           {
             "root": "Customer",
@@ -1625,89 +1936,6 @@
             "root": "Carrier",
             "members": []
           }
-        ],
-        "valueObjects": [
-          "Address"
-        ],
-        "references": [
-          {
-            "name": "Customer.address",
-            "target": "Address"
-          },
-          {
-            "name": "Shipment.customer",
-            "target": "Customer"
-          },
-          {
-            "name": "Shipment.destination",
-            "target": "Address"
-          },
-          {
-            "name": "Shipment.carrier",
-            "target": "Carrier"
-          },
-          {
-            "name": "Item.shipment",
-            "target": "Shipment"
-          }
-        ],
-        "attributes": [
-          {
-            "name": "Customer.name",
-            "type": "string"
-          },
-          {
-            "name": "Address.street",
-            "type": "string"
-          },
-          {
-            "name": "Address.city",
-            "type": "string"
-          },
-          {
-            "name": "Shipment.orderId",
-            "type": "uuid"
-          },
-          {
-            "name": "Shipment.shippedOn",
-            "type": "date"
-          },
-          {
-            "name": "Shipment.trackingCode",
-            "type": "string"
-          },
-          {
-            "name": "Shipment.signatureRequired",
-            "type": "bool"
-          },
-          {
-            "name": "Item.quantity",
-            "type": "int"
-          },
-          {
-            "name": "Item.declaredValue",
-            "type": "decimal"
-          },
-          {
-            "name": "Item.sku",
-            "type": "string"
-          },
-          {
-            "name": "Item.description",
-            "type": "string"
-          },
-          {
-            "name": "Carrier.name",
-            "type": "string"
-          }
-        ],
-        "equations": [],
-        "entities": [
-          "Customer",
-          "Address",
-          "Shipment",
-          "Item",
-          "Carrier"
         ]
       }
     },
@@ -1914,7 +2142,23 @@
           "Shipment",
           "Item",
           "Carrier"
-        ]
+        ],
+        "keys": [
+          {
+            "entity": "OrderLine",
+            "fields": [
+              "order",
+              "product"
+            ]
+          },
+          {
+            "entity": "Product",
+            "fields": [
+              "sku"
+            ]
+          }
+        ],
+        "subtypes": []
       }
     },
     {
@@ -1961,7 +2205,9 @@
         "entities": [
           "Customer",
           "Address"
-        ]
+        ],
+        "keys": [],
+        "subtypes": []
       }
     },
     {
@@ -2103,7 +2349,23 @@
           "Order",
           "OrderLine",
           "Product"
-        ]
+        ],
+        "keys": [
+          {
+            "entity": "OrderLine",
+            "fields": [
+              "order",
+              "product"
+            ]
+          },
+          {
+            "entity": "Product",
+            "fields": [
+              "sku"
+            ]
+          }
+        ],
+        "subtypes": []
       }
     },
     {
@@ -2228,7 +2490,9 @@
           "Shipment",
           "Item",
           "Carrier"
-        ]
+        ],
+        "keys": [],
+        "subtypes": []
       }
     },
     {
@@ -2447,7 +2711,23 @@
           "Shipment",
           "Item",
           "Carrier"
-        ]
+        ],
+        "keys": [
+          {
+            "entity": "OrderLine",
+            "fields": [
+              "order",
+              "product"
+            ]
+          },
+          {
+            "entity": "Product",
+            "fields": [
+              "sku"
+            ]
+          }
+        ],
+        "subtypes": []
       }
     },
     {
@@ -2490,7 +2770,9 @@
         "entities": [
           "Customer",
           "Address"
-        ]
+        ],
+        "keys": [],
+        "subtypes": []
       }
     },
     {
@@ -2632,7 +2914,23 @@
           "Order",
           "OrderLine",
           "Product"
-        ]
+        ],
+        "keys": [
+          {
+            "entity": "OrderLine",
+            "fields": [
+              "order",
+              "product"
+            ]
+          },
+          {
+            "entity": "Product",
+            "fields": [
+              "sku"
+            ]
+          }
+        ],
+        "subtypes": []
       }
     },
     {
@@ -2747,7 +3045,9 @@
           "Shipment",
           "Item",
           "Carrier"
-        ]
+        ],
+        "keys": [],
+        "subtypes": []
       }
     },
     {
@@ -2889,7 +3189,23 @@
           "Order",
           "OrderLine",
           "Product"
-        ]
+        ],
+        "keys": [
+          {
+            "entity": "OrderLine",
+            "fields": [
+              "order",
+              "product"
+            ]
+          },
+          {
+            "entity": "Product",
+            "fields": [
+              "sku"
+            ]
+          }
+        ],
+        "subtypes": []
       }
     },
     {
@@ -3004,7 +3320,9 @@
           "Shipment",
           "Item",
           "Carrier"
-        ]
+        ],
+        "keys": [],
+        "subtypes": []
       }
     },
     {
@@ -3218,14 +3536,32 @@
           "Shipment",
           "Item",
           "Carrier"
-        ]
+        ],
+        "keys": [
+          {
+            "entity": "OrderLine",
+            "fields": [
+              "order",
+              "product"
+            ]
+          },
+          {
+            "entity": "Product",
+            "fields": [
+              "sku"
+            ]
+          }
+        ],
+        "subtypes": []
       }
     },
     {
       "name": "Deliveries",
       "schema": {
         "valueObjects": [],
+        "subtypes": [],
         "references": [],
+        "keys": [],
         "equations": [],
         "entities": [
           "Delivery"
@@ -3273,6 +3609,194 @@
           }
         ],
         "aggregates": []
+      }
+    },
+    {
+      "name": "Sales",
+      "schema": {
+        "valueObjects": [
+          "Address"
+        ],
+        "subtypes": [
+          {
+            "reference": "customer",
+            "entity": "BusinessCustomer"
+          }
+        ],
+        "references": [
+          {
+            "target": "Country",
+            "name": "Address.country"
+          },
+          {
+            "target": "Customer",
+            "name": "Address.customer"
+          },
+          {
+            "target": "Customer",
+            "name": "BusinessCustomer.customer"
+          },
+          {
+            "target": "Customer",
+            "name": "Order.customer"
+          },
+          {
+            "target": "Order",
+            "name": "OrderLine.order"
+          },
+          {
+            "target": "Product",
+            "name": "OrderLine.product"
+          },
+          {
+            "target": "OrderLine",
+            "name": "LineDiscount.line"
+          },
+          {
+            "target": "Order",
+            "name": "OrderCoupon.order"
+          },
+          {
+            "target": "Coupon",
+            "name": "OrderCoupon.coupon"
+          }
+        ],
+        "keys": [
+          {
+            "fields": [
+              "code"
+            ],
+            "entity": "Country"
+          },
+          {
+            "fields": [
+              "sku"
+            ],
+            "entity": "Product"
+          },
+          {
+            "fields": [
+              "number"
+            ],
+            "entity": "Order"
+          },
+          {
+            "fields": [
+              "order",
+              "product"
+            ],
+            "entity": "OrderLine"
+          },
+          {
+            "fields": [
+              "line"
+            ],
+            "entity": "LineDiscount"
+          },
+          {
+            "fields": [
+              "order"
+            ],
+            "entity": "OrderCoupon"
+          },
+          {
+            "fields": [
+              "code"
+            ],
+            "entity": "Coupon"
+          }
+        ],
+        "equations": [],
+        "entities": [
+          "Country",
+          "Customer",
+          "Address",
+          "BusinessCustomer",
+          "Product",
+          "Order",
+          "OrderLine",
+          "LineDiscount",
+          "Coupon",
+          "OrderCoupon"
+        ],
+        "attributes": [
+          {
+            "type": "string",
+            "name": "Country.code"
+          },
+          {
+            "type": "string",
+            "name": "Customer.name"
+          },
+          {
+            "type": "string",
+            "name": "Address.street"
+          },
+          {
+            "type": "string",
+            "name": "Address.city"
+          },
+          {
+            "type": "string",
+            "name": "BusinessCustomer.vatNumber"
+          },
+          {
+            "type": "string",
+            "name": "Product.sku"
+          },
+          {
+            "type": "string",
+            "name": "Product.name"
+          },
+          {
+            "type": "string",
+            "name": "Order.number"
+          },
+          {
+            "type": "date",
+            "name": "Order.placedOn"
+          },
+          {
+            "type": "int",
+            "name": "OrderLine.quantity"
+          },
+          {
+            "type": "decimal",
+            "name": "LineDiscount.percent"
+          },
+          {
+            "type": "string",
+            "name": "Coupon.code"
+          }
+        ],
+        "aggregates": [
+          {
+            "root": "Customer",
+            "members": [
+              {
+                "owner": "customer",
+                "entity": "Address"
+              }
+            ]
+          },
+          {
+            "root": "Order",
+            "members": [
+              {
+                "owner": "order",
+                "entity": "OrderLine"
+              },
+              {
+                "owner": "line",
+                "entity": "LineDiscount"
+              },
+              {
+                "owner": "order",
+                "entity": "OrderCoupon"
+              }
+            ]
+          }
+        ]
       }
     }
   ],
@@ -3635,6 +4159,18 @@
     {
       "claim": "state",
       "state": "XDeliveries"
+    },
+    {
+      "claim": "wellFormed",
+      "schema": "Sales"
+    },
+    {
+      "claim": "declared",
+      "schema": "Sales"
+    },
+    {
+      "claim": "state",
+      "state": "XSales"
     },
     {
       "homomorphism": {

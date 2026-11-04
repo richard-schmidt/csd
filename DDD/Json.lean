@@ -17,7 +17,9 @@ format identifier `formatVersion`.
   first dot, so entity type names contain no dot.
 - A schema: `entities`, `references` (`name`, `target`), `attributes` (`name`,
   `type`), `equations` (`source`, `lhs`, `rhs`), `aggregates` (`root`, `members`
-  with `entity` and `owner`), `valueObjects`. Lists keep their order.
+  with `entity` and `owner`), `valueObjects`, `keys` (`entity`, `fields`, the
+  names of generators out of the entity type) and `subtypes` (`entity`,
+  `reference`, the name of the is-a reference). Lists keep their order.
 - A translation: `entities` (`source`, `target`) and `generators` (`name`, `path`).
 - A context map (`MapDoc`): `valueTypes`, `contexts` (`name`, `schema`,
   `kernel`), `arrows` (`name`, `source`, `target`, `translation`), and
@@ -134,7 +136,11 @@ def Schema.toJson (S : Schema) : Json := Json.mkObj [
   ("aggregates", Json.arr (S.aggregates.map fun A =>
     Json.mkObj [("root", .str A.root), ("members", Json.arr (A.members.map fun m =>
       Json.mkObj [("entity", .str m.entity), ("owner", .str m.owner)]).toArray)]).toArray),
-  ("valueObjects", Lean.toJson S.valueObjects)]
+  ("valueObjects", Lean.toJson S.valueObjects),
+  ("keys", Json.arr (S.keys.map fun k =>
+    Json.mkObj [("entity", .str k.entity), ("fields", Lean.toJson k.fields)]).toArray),
+  ("subtypes", Json.arr (S.subtypes.map fun s =>
+    Json.mkObj [("entity", .str s.entity), ("reference", .str s.ref)]).toArray)]
 
 /-- An optional list field: absent means empty. -/
 def getList (j : Json) (key : String) : Except String (List Json) :=
@@ -165,7 +171,15 @@ def Schema.fromJson (j : Json) : Except String Schema := do
     let root ← A.getObjValAs? String "root"
     pure ({ root, members } : Aggregate)
   let valueObjects ← (← getList j "valueObjects").mapM fun v => v.getStr?
-  pure { entities, refs, attrs, eqns, aggregates, valueObjects }
+  let keys ← (← getList j "keys").mapM fun k => do
+    let entity ← k.getObjValAs? String "entity"
+    let fields ← k.getObjValAs? (List String) "fields"
+    pure ({ entity, fields } : Key)
+  let subtypes ← (← getList j "subtypes").mapM fun s => do
+    let entity ← s.getObjValAs? String "entity"
+    let ref ← s.getObjValAs? String "reference"
+    pure ({ entity, ref } : IsA)
+  pure { entities, refs, attrs, eqns, aggregates, valueObjects, keys, subtypes }
 
 instance : ToJson Schema := ⟨Schema.toJson⟩
 instance : FromJson Schema := ⟨Schema.fromJson⟩

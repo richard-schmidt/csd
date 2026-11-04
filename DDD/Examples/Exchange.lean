@@ -2,6 +2,7 @@ import DDD.Json
 import DDD.Report
 import DDD.Examples.Integration
 import DDD.Examples.Gluing
+import DDD.Examples.Structure
 
 /-!
 # Example: the context map in the exchange format
@@ -16,11 +17,13 @@ outside the kernel (`created_clash`), which the Julia side qualifies with the
 context names before gluing. `cli/CsdExport.lean` writes it to
 `julia/data/workspace.json`.
 
-The map declares its value types (`valueTypes`). The workspace also carries a
-sample, the schema `deliveries` with a value type of each kind and a finite
-state whose literals are written in other forms than their normal forms; the
-Julia side passes it through to its certificate, whose reader puts the
-literals in normal form.
+The map declares its value types (`valueTypes`). The workspace also carries two
+samples: the schema `deliveries` with a value type of each kind and a finite
+state whose literals are written in other forms than their normal forms, and
+the schema `sales` of `Structure.lean` with value objects, keys and a subtype,
+and a state that satisfies its keys. The Julia side passes them through to its
+certificate, whose reader puts the literals in normal form and checks the
+keys.
 
 The round trips through JSON text are tested with `#guard`: schemas,
 translations, the map, and finite states of the Customers kernel and of the
@@ -125,7 +128,9 @@ def workspace : Json := Json.mkObj [
     ("left", ordersCreated.toJson), ("right", shippingCreated.toJson),
     ("qualify", toJson ["Orders", "Shipping"])]]),
   ("samples", Json.arr #[Json.mkObj [("name", .str "Deliveries"),
-    ("schema", deliveries.toJson), ("state", deliveriesState.toJson)]])]
+    ("schema", deliveries.toJson), ("state", deliveriesState.toJson)],
+    Json.mkObj [("name", .str "Sales"), ("schema", Structure.sales.toJson),
+    ("state", Structure.state.toJson)]])]
 
 /-! ## Round trips -/
 
@@ -158,16 +163,28 @@ def customersState : FinState LitK where
 #guard roundTrip Schema.toJson Schema.fromJson deliveries
 #guard roundTrip FinState.toJson (FinState.fromJson deliveries) deliveriesState
 #guard roundTrip TypeList.toJson TypeList.fromJson valueTypes
+#guard roundTrip Schema.toJson Schema.fromJson Structure.sales
+#guard roundTrip Schema.toJson Schema.fromJson Structure.broken
+#guard roundTrip FinState.toJson (FinState.fromJson Structure.sales) Structure.state
 
-/-- The sample as the Julia side passes it on: its schema, its state, and the
-claims about them, with the list of value types of the map. -/
+/-- The samples as the Julia side passes them on: their schemas, their states, and
+the claims about them, with the list of value types of the map. -/
 def sampleCertificate : Certificate where
   valueTypes := valueTypes
-  schemas := [("Deliveries", deliveries)]
-  states := [("XD", "Deliveries", deliveriesState.normalize valueTypes)]
-  claims := [.valueTypes, .wellFormed "Deliveries", .declared "Deliveries", .state "XD"]
+  schemas := [("Deliveries", deliveries), ("Sales", Structure.sales)]
+  states := [("XDeliveries", "Deliveries", deliveriesState.normalize valueTypes),
+    ("XSales", "Sales", Structure.state.normalize valueTypes)]
+  claims := [.valueTypes, .wellFormed "Deliveries", .declared "Deliveries",
+    .state "XDeliveries", .wellFormed "Sales", .declared "Sales", .state "XSales"]
 
 #guard sampleCertificate.check
+
+-- A state that breaks a key fails its claim, and the report names the two
+-- entities.
+#guard !({ sampleCertificate with
+    states := [("XSales", "Sales", Structure.twoLines)] }).checkClaim (.state "XSales")
+#guard ((({ sampleCertificate with states := [("XSales", "Sales", Structure.twoLines)] } :
+    Certificate).explain (.state "XSales")).map (·.getObjValD "kind")) == [.str "key"]
 
 /-- The sample's schema as a context of a map document, with the list of value
 types. -/

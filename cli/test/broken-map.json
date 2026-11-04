@@ -8,11 +8,13 @@
  "contexts":
  [{"schema":
    {"valueObjects": ["Address"],
+    "subtypes": [],
     "references":
     [{"target": "Address", "name": "Customer.address"},
      {"target": "Customer", "name": "Order.customer"},
      {"target": "Address", "name": "Order.billTo"},
      {"target": "Address", "name": "Order.shipTo"}],
+    "keys": [],
     "equations":
     [{"source": "Order", "rhs": ["customer", "address"], "lhs": ["billTo"]}],
     "entities": ["Customer", "Address", "Order"],
@@ -30,6 +32,7 @@
    "kernel": false},
   {"schema":
    {"valueObjects": ["Address"],
+    "subtypes": [],
     "references":
     [{"target": "Address", "name": "Payer.address"},
      {"target": "Payer", "name": "Invoice.payer"},
@@ -38,6 +41,7 @@
      {"target": "Invoice", "name": "Payment.invoice"},
      {"target": "Payment", "name": "Refund.payment"},
      {"target": "Invoice", "name": "Refund.invoice"}],
+    "keys": [],
     "equations":
     [{"source": "Refund", "rhs": ["payment", "invoice"], "lhs": ["invoice"]}],
     "entities":
@@ -66,26 +70,36 @@
    "name": "Payments",
    "kernel": false},
   {"schema":
-   {"valueObjects": ["A", "V"],
+   {"valueObjects": ["E", "V"],
+    "subtypes":
+    [{"reference": "s", "entity": "S"}, {"reference": "up", "entity": "B"}],
     "references":
     [{"target": "B", "name": "A.b"},
      {"target": "C", "name": "A.b"},
-     {"target": "B", "name": "Z.x"}],
+     {"target": "B", "name": "Z.x"},
+     {"target": "G", "name": "G.f"}],
+    "keys":
+    [{"fields": ["x"], "entity": "Q"},
+     {"fields": [], "entity": "B"},
+     {"fields": ["name", "nope"], "entity": "B"}],
     "equations":
     [{"source": "A", "rhs": ["b"], "lhs": ["b", "name"]},
      {"source": "Q", "rhs": [], "lhs": []}],
-    "entities": ["A", "B", "A"],
+    "entities": ["A", "B", "A", "E", "G"],
     "attributes":
     [{"type": "string", "name": "B.name"}, {"type": "int", "name": "Y.v"}],
     "aggregates":
     [{"root": "A", "members": [{"owner": "a", "entity": "B"}]},
      {"root": "B", "members": []},
-     {"root": "W", "members": []}]},
+     {"root": "W", "members": []},
+     {"root": "E", "members": [{"owner": "f", "entity": "G"}]}]},
    "name": "Broken",
    "kernel": false},
   {"schema":
    {"valueObjects": [],
+    "subtypes": [],
     "references": [],
+    "keys": [],
     "equations": [],
     "entities": ["Tag"],
     "attributes":
