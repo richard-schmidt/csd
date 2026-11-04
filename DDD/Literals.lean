@@ -5,15 +5,21 @@ import Mathlib.Data.List.Dedup
 # Literals and the list of value types
 
 The exchange format writes the values of finite states as literals (`Lit`): JSON
-integers, strings, booleans and `null`. A model declares its project-defined
-value types in one list (`TypeList`), shared by all its contexts: an enumeration
-with its values, or a named type over a built-in.
+integers, strings, booleans, `null`, and objects for records. A model declares
+its project-defined value types in one list (`TypeList`), shared by all its
+contexts: an enumeration with its values, a named type over a built-in, or a
+record with its fields; and its tables, conversions between finite value types
+given by their rows.
 
 - `TypeList.Sound`: each name declared once and different from the names of the
   built-ins, each enumeration with at least one value and no value twice, each
-  base a built-in. `checkSound` decides it (`checkSound_iff`), and
-  `TypeList.problems` lists its failures, none exactly when it holds
-  (`problems_eq_nil_iff`).
+  base a built-in, each record with at least one field, no field twice, no field
+  named `some` or `string`, and fields of admitted types that are not records;
+  each table named once, by a name that no type and no built-in has, between
+  finite types (`bool` and the enumerations), with one row for each value of its
+  source and a value of its target in each row. `checkSound` decides it
+  (`checkSound_iff`), and `TypeList.problems` lists its failures, none exactly
+  when it holds (`problems_eq_nil_iff`).
 - `TypeList.admits`: the value types an attribute can have: the built-ins, the
   declared names, and `optional v` for an admitted `v` that is not itself
   optional. `undeclared?` and `ValueType.nested` say why a type is not
@@ -39,7 +45,9 @@ with its values, or a named type over a built-in.
   - `int`, `string`, `bool`: JSON integers, strings and booleans as they are;
   - a declared enumeration: one of its values, as written; a named type over a
     built-in: the normal form of the built-in;
-  - `optional v`: `null`, or a literal of `v`.
+  - `optional v`: `null`, or a literal of `v`;
+  - a record: an object with exactly its fields, each in the normal form of its
+    type, sorted by name, as JSON objects list their keys.
 
 Two literals of a type in normal form are equal exactly when they denote the
 same value. The normalizers belong to the reader of the exchange format, as the
@@ -97,43 +105,103 @@ def builtinNames : List String :=
 
 /-- A literal value: the values of finite states in the exchange format. Decimals,
 dates, times, UUIDs and the values of named types are written as text; `null` is
-the absent value of an optional type. -/
+the absent value of an optional type; a record is its fields with their values. -/
 inductive Lit where
   | int (i : Int)
   | text (s : String)
   | bool (b : Bool)
   | null
-deriving DecidableEq, Repr
+  | record (fields : List (String × Lit))
+deriving Repr
 
+mutual
+/-- Equality of literals is decidable. -/
+def Lit.decEq : (a b : Lit) → Decidable (a = b)
+  | .int x, .int y =>
+    if h : x = y then isTrue (h ▸ rfl) else isFalse fun e => by cases e; exact h rfl
+  | .text x, .text y =>
+    if h : x = y then isTrue (h ▸ rfl) else isFalse fun e => by cases e; exact h rfl
+  | .bool x, .bool y =>
+    if h : x = y then isTrue (h ▸ rfl) else isFalse fun e => by cases e; exact h rfl
+  | .null, .null => isTrue rfl
+  | .record xs, .record ys => match Lit.decEqFields xs ys with
+    | isTrue h => isTrue (h ▸ rfl)
+    | isFalse h => isFalse fun e => by cases e; exact h rfl
+  | .int _, .text _ | .int _, .bool _ | .int _, .null | .int _, .record _
+  | .text _, .int _ | .text _, .bool _ | .text _, .null | .text _, .record _
+  | .bool _, .int _ | .bool _, .text _ | .bool _, .null | .bool _, .record _
+  | .null, .int _ | .null, .text _ | .null, .bool _ | .null, .record _
+  | .record _, .int _ | .record _, .text _ | .record _, .bool _ | .record _, .null =>
+    isFalse fun e => by cases e
+/-- Equality of the fields of record literals is decidable. -/
+def Lit.decEqFields : (a b : List (String × Lit)) → Decidable (a = b)
+  | [], [] => isTrue rfl
+  | (n, x) :: xs, (m, y) :: ys =>
+    if hn : n = m then
+      match Lit.decEq x y, Lit.decEqFields xs ys with
+      | isTrue h₁, isTrue h₂ => isTrue (by subst hn h₁ h₂; rfl)
+      | isFalse h₁, _ => isFalse fun e => by cases e; exact h₁ rfl
+      | _, isFalse h₂ => isFalse fun e => by cases e; exact h₂ rfl
+    else isFalse fun e => by cases e; exact hn rfl
+  | [], _ :: _ | _ :: _, [] => isFalse fun e => by cases e
+end
+
+instance : DecidableEq Lit := Lit.decEq
+
+mutual
 /-- A literal as text, for messages. -/
 def Lit.render : Lit → String
   | .int i => toString i
   | .text s => s
   | .bool b => toString b
   | .null => "null"
+  | .record fs => "{" ++ Lit.renderFields fs ++ "}"
+/-- The fields of a record literal as text. -/
+def Lit.renderFields : List (String × Lit) → String
+  | [] => ""
+  | [(n, l)] => n ++ ": " ++ Lit.render l
+  | (n, l) :: rest => n ++ ": " ++ Lit.render l ++ ", " ++ Lit.renderFields rest
+end
 
 /-! ## The list of value types -/
 
 /-- The declaration of a project-defined value type: an enumeration with its
-values, or a named type over a built-in. -/
+values, a named type over a built-in, or a record with its fields and their
+types. -/
 inductive TypeDecl where
   | enum (values : List String)
   | over (base : ValueType)
+  | record (fields : List (String × ValueType))
 deriving DecidableEq, Repr
 
+/-- The names a field of a record cannot have: they name the conversions out of
+every type. -/
+def reservedNames : List String := ["some", "string"]
+
 /-- A declaration is sound: an enumeration has a value and no value twice, a base
-is a built-in. -/
+is a built-in, a record has a field, no field twice and no field with a reserved
+name. -/
 def TypeDecl.Sound : TypeDecl → Prop
   | .enum vs => vs ≠ [] ∧ vs.Nodup
   | .over b => b.isBuiltin = true
+  | .record fs => fs ≠ [] ∧ (fs.map (·.1)).Nodup ∧ ∀ f ∈ fs, f.1 ∉ reservedNames
 
-instance : (d : TypeDecl) → Decidable d.Sound
-  | .enum vs => inferInstanceAs (Decidable (vs ≠ [] ∧ vs.Nodup))
-  | .over b => inferInstanceAs (Decidable (b.isBuiltin = true))
+instance (d : TypeDecl) : Decidable d.Sound := by
+  cases d <;> unfold TypeDecl.Sound <;> infer_instance
 
-/-- The project-defined value types of a model, by name. -/
+/-- A table: a conversion named `name` from the finite type `source` to the finite
+type `target`, given by its rows, each a value of the source and its image. -/
+structure Table where
+  name : String
+  source : ValueType
+  target : ValueType
+  rows : List (String × String)
+deriving DecidableEq, Repr
+
+/-- The project-defined value types of a model, by name, and its tables. -/
 structure TypeList where
   decls : List (String × TypeDecl) := []
+  tables : List Table := []
 deriving DecidableEq, Repr
 
 namespace TypeList
@@ -143,25 +211,69 @@ variable (L : TypeList)
 /-- The declaration of the type named `n`. -/
 def lookup (n : String) : Option TypeDecl := L.decls.lookup n
 
-/-- The list is sound: names declared once and different from the built-ins, and
-every declaration sound. -/
+/-- The values of a finite type: `bool` and the declared enumerations. -/
+def values? : ValueType → Option (List String)
+  | .bool => some ["false", "true"]
+  | .named n => match L.lookup n with
+    | some (.enum vs) => some vs
+    | _ => none
+  | _ => none
+
+/-- The type of a field of a record: admitted, and not a record. -/
+def flat : ValueType → Bool
+  | .named n => match L.lookup n with
+    | some (.record _) | none => false
+    | some _ => true
+  | .optional (.optional _) => false
+  | .optional v => flat v
+  | _ => true
+
+/-- A table is sound: its name is not that of a built-in, a declared type or
+`some`; its source and target are finite; its rows give each value of the source
+once, and values of the target. -/
+def TableSound (t : Table) : Prop :=
+  t.name ∉ builtinNames ∧ t.name ∉ L.decls.map (·.1) ∧ t.name ≠ "some" ∧
+  (L.values? t.source).isSome ∧ (L.values? t.target).isSome ∧
+  (t.rows.map (·.1)).Nodup ∧ (∀ r ∈ t.rows, r.1 ∈ (L.values? t.source).getD []) ∧
+  (∀ r ∈ t.rows, r.2 ∈ (L.values? t.target).getD []) ∧
+  ∀ v ∈ (L.values? t.source).getD [], v ∈ t.rows.map (·.1)
+
+instance (t : Table) : Decidable (L.TableSound t) := by unfold TableSound; infer_instance
+
+/-- The list is sound: names declared once and different from the built-ins, every
+declaration sound, the fields of records flat, and every table sound and named
+once. -/
 structure Sound : Prop where
   nodup : (L.decls.map (·.1)).Nodup
   notBuiltin : ∀ d ∈ L.decls, d.1 ∉ builtinNames
   decl : ∀ d ∈ L.decls, d.2.Sound
+  fields : ∀ d ∈ L.decls, ∀ fs, d.2 = .record fs → ∀ f ∈ fs, L.flat f.2 = true
+  tables_nodup : (L.tables.map (·.name)).Nodup
+  table : ∀ t ∈ L.tables, L.TableSound t
+
+/-- The fields of a declaration whose types are not flat. -/
+def declFlat : TypeDecl → Bool
+  | .record fs => fs.all fun f => L.flat f.2
+  | _ => true
 
 /-- The check for `Sound`. -/
 def checkSound : Bool :=
   decide (L.decls.map (·.1)).Nodup &&
-    L.decls.all fun d => decide (d.1 ∉ builtinNames) && decide d.2.Sound
+    (L.decls.all fun d => decide (d.1 ∉ builtinNames) && decide d.2.Sound && L.declFlat d.2) &&
+    decide (L.tables.map (·.name)).Nodup && L.tables.all fun t => decide (L.TableSound t)
+
+theorem declFlat_iff (d : TypeDecl) :
+    L.declFlat d = true ↔ ∀ fs, d = .record fs → ∀ f ∈ fs, L.flat f.2 = true := by
+  cases d <;> simp [declFlat]
 
 theorem checkSound_iff : L.checkSound = true ↔ L.Sound := by
-  simp only [checkSound, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true]
+  simp only [checkSound, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true, declFlat_iff]
   constructor
-  · rintro ⟨h₁, h₂⟩
-    exact ⟨h₁, fun d hd => (h₂ d hd).1, fun d hd => (h₂ d hd).2⟩
-  · rintro ⟨h₁, h₂, h₃⟩
-    exact ⟨h₁, fun d hd => ⟨h₂ d hd, h₃ d hd⟩⟩
+  · rintro ⟨⟨⟨h₁, h₂⟩, h₃⟩, h₄⟩
+    exact ⟨h₁, fun d hd => (h₂ d hd).1.1, fun d hd => (h₂ d hd).1.2, fun d hd => (h₂ d hd).2,
+      h₃, h₄⟩
+  · rintro ⟨h₁, h₂, h₃, h₄, h₅, h₆⟩
+    exact ⟨⟨⟨h₁, fun d hd => ⟨⟨h₂ d hd, h₃ d hd⟩, h₄ d hd⟩⟩, h₅⟩, h₆⟩
 
 /-- A failure of a condition of `Sound`. -/
 inductive Problem where
@@ -175,6 +287,31 @@ inductive Problem where
   | duplicateValue (n v : String)
   /-- The named type `n` is declared over `b`, which is not a built-in. -/
   | baseNotBuiltin (n : String) (b : ValueType)
+  /-- The record `n` has no field. -/
+  | emptyRecord (n : String)
+  /-- The record `n` lists the field `f` more than once. -/
+  | duplicateField (n f : String)
+  /-- The field `f` of the record `n` has a reserved name. -/
+  | reservedField (n f : String)
+  /-- The field `f` of the record `n` has the type `t`, which is not admitted or is a
+  record. -/
+  | fieldType (n f : String) (t : ValueType)
+  /-- The table `t` is declared more than once. -/
+  | duplicateTable (t : String)
+  /-- The table `t` has the name of a built-in, of a declared type, or `some`. -/
+  | tableName (t : String)
+  /-- The source of the table `t` is `v`, which is not finite. -/
+  | tableSource (t : String) (v : ValueType)
+  /-- The target of the table `t` is `v`, which is not finite. -/
+  | tableTarget (t : String) (v : ValueType)
+  /-- The table `t` has more than one row for the value `x`. -/
+  | rowTwice (t x : String)
+  /-- A row of the table `t` maps `x`, which is not a value of its source. -/
+  | rowSource (t x : String)
+  /-- A row of the table `t` maps to `y`, which is not a value of its target. -/
+  | rowTarget (t y : String)
+  /-- The table `t` has no row for the value `x` of its source. -/
+  | rowMissing (t x : String)
 deriving DecidableEq, Repr
 
 /-- The failures of one declaration. -/
@@ -183,26 +320,60 @@ def declProblems (d : String × TypeDecl) : List Problem :=
     match d.2 with
     | .enum vs => (if vs = [] then [.emptyEnum d.1] else []) ++ (dups vs).map (.duplicateValue d.1)
     | .over b => if b.isBuiltin then [] else [.baseNotBuiltin d.1 b]
+    | .record fs => (if fs = [] then [.emptyRecord d.1] else []) ++
+      (dups (fs.map (·.1))).map (.duplicateField d.1) ++
+      (fs.filter fun f => f.1 ∈ reservedNames).map (fun f => .reservedField d.1 f.1) ++
+      (fs.filter fun f => !L.flat f.2).map fun f => .fieldType d.1 f.1 f.2
+
+/-- The failures of one table. -/
+def tableProblems (t : Table) : List Problem :=
+  (if t.name ∉ builtinNames ∧ t.name ∉ L.decls.map (·.1) ∧ t.name ≠ "some" then []
+    else [.tableName t.name]) ++
+  (if (L.values? t.source).isSome then [] else [.tableSource t.name t.source]) ++
+  (if (L.values? t.target).isSome then [] else [.tableTarget t.name t.target]) ++
+  (dups (t.rows.map (·.1))).map (.rowTwice t.name) ++
+  ((t.rows.filter fun r => r.1 ∉ (L.values? t.source).getD []).map
+    fun r => .rowSource t.name r.1) ++
+  ((t.rows.filter fun r => r.2 ∉ (L.values? t.target).getD []).map
+    fun r => .rowTarget t.name r.2) ++
+  ((((L.values? t.source).getD []).filter fun v => v ∉ t.rows.map (·.1)).map
+    (.rowMissing t.name))
 
 /-- The failures of the conditions of `Sound`, in their order. -/
 def problems : List Problem :=
-  (dups (L.decls.map (·.1))).map .duplicateType ++ L.decls.flatMap declProblems
+  (dups (L.decls.map (·.1))).map .duplicateType ++ L.decls.flatMap L.declProblems ++
+    (dups (L.tables.map (·.name))).map .duplicateTable ++ L.tables.flatMap L.tableProblems
 
 theorem declProblems_eq_nil_iff (d : String × TypeDecl) :
-    declProblems d = [] ↔ d.1 ∉ builtinNames ∧ d.2.Sound := by
+    L.declProblems d = [] ↔ (d.1 ∉ builtinNames ∧ d.2.Sound) ∧ L.declFlat d.2 = true := by
   obtain ⟨n, d⟩ := d
   cases d with
-  | enum vs => simp [declProblems, TypeDecl.Sound, dups_eq_nil_iff]
-  | over b => simp [declProblems, TypeDecl.Sound]
+  | enum vs => simp [declProblems, TypeDecl.Sound, dups_eq_nil_iff, declFlat]
+  | over b => simp [declProblems, TypeDecl.Sound, declFlat]
+  | record fs =>
+    simp only [declProblems, TypeDecl.Sound, declFlat, List.append_eq_nil_iff, List.map_eq_nil_iff,
+      dups_eq_nil_iff, List.filter_eq_nil_iff, List.all_eq_true, Bool.not_eq_true',
+      decide_eq_true_eq]
+    by_cases hb : n ∈ builtinNames <;> by_cases he : fs = [] <;> simp [hb, he]
+
+theorem tableProblems_eq_nil_iff (t : Table) : L.tableProblems t = [] ↔ L.TableSound t := by
+  simp only [tableProblems, TableSound, List.append_eq_nil_iff, List.map_eq_nil_iff,
+    dups_eq_nil_iff, List.filter_eq_nil_iff, decide_eq_true_eq, not_not]
+  by_cases hn : t.name ∉ builtinNames ∧ t.name ∉ L.decls.map (·.1) ∧ t.name ≠ "some" <;>
+    by_cases hs : (L.values? t.source).isSome <;> by_cases ht : (L.values? t.target).isSome <;>
+    simp only [hn, hs, ht, if_true, if_false, reduceCtorEq, false_and, and_false, true_and,
+      and_true, not_false_eq_true] <;> simp_all [and_assoc]
+  all_goals tauto
 
 theorem problems_eq_nil_iff : L.problems = [] ↔ L.Sound := by
   simp only [problems, List.append_eq_nil_iff, List.map_eq_nil_iff, dups_eq_nil_iff,
-    List.flatMap_eq_nil_iff, declProblems_eq_nil_iff]
+    List.flatMap_eq_nil_iff, declProblems_eq_nil_iff, tableProblems_eq_nil_iff, declFlat_iff]
   constructor
-  · rintro ⟨h₁, h₂⟩
-    exact ⟨h₁, fun d hd => (h₂ d hd).1, fun d hd => (h₂ d hd).2⟩
-  · rintro ⟨h₁, h₂, h₃⟩
-    exact ⟨h₁, fun d hd => ⟨h₂ d hd, h₃ d hd⟩⟩
+  · rintro ⟨⟨⟨h₁, h₂⟩, h₃⟩, h₄⟩
+    exact ⟨h₁, fun d hd => (h₂ d hd).1.1, fun d hd => (h₂ d hd).1.2, fun d hd => (h₂ d hd).2,
+      h₃, h₄⟩
+  · rintro ⟨h₁, h₂, h₃, h₄, h₅, h₆⟩
+    exact ⟨⟨⟨h₁, fun d hd => ⟨⟨h₂ d hd, h₃ d hd⟩, h₄ d hd⟩⟩, h₅⟩, h₆⟩
 
 namespace Problem
 
@@ -213,6 +384,22 @@ def describe : Problem → String
   | .duplicateValue n v => s!"the enumeration {n} lists {v} more than once"
   | .baseNotBuiltin n b =>
     s!"the value type {n} is declared over {b.text}; a named type is declared over a built-in"
+  | .emptyRecord n => s!"the record {n} has no field"
+  | .duplicateField n f => s!"the record {n} lists the field {f} more than once"
+  | .reservedField n f => s!"the record {n} has a field named {f}, the name of a conversion"
+  | .fieldType n f t =>
+    s!"the field {f} of the record {n} has the type {t.text}, which is not declared or is a \
+      record; fields of records are not records"
+  | .duplicateTable t => s!"the table {t} is declared more than once"
+  | .tableName t => s!"the table {t} has the name of a value type or of a built-in conversion"
+  | .tableSource t v =>
+    s!"the table {t} converts from {v.text}, which is not bool or an enumeration"
+  | .tableTarget t v =>
+    s!"the table {t} converts to {v.text}, which is not bool or an enumeration"
+  | .rowTwice t x => s!"the table {t} has more than one row for {x}"
+  | .rowSource t x => s!"the table {t} has a row for {x}, which is not a value of its source"
+  | .rowTarget t y => s!"the table {t} maps a value to {y}, which is not a value of its target"
+  | .rowMissing t x => s!"the table {t} has no row for {x}"
 
 def kind : Problem → String
   | .duplicateType .. => "duplicateValueType"
@@ -220,6 +407,18 @@ def kind : Problem → String
   | .emptyEnum .. => "emptyEnumeration"
   | .duplicateValue .. => "duplicateEnumerationValue"
   | .baseNotBuiltin .. => "baseNotBuiltin"
+  | .emptyRecord .. => "emptyRecord"
+  | .duplicateField .. => "duplicateField"
+  | .reservedField .. => "reservedField"
+  | .fieldType .. => "fieldType"
+  | .duplicateTable .. => "duplicateTable"
+  | .tableName .. => "tableName"
+  | .tableSource .. => "tableSource"
+  | .tableTarget .. => "tableTarget"
+  | .rowTwice .. => "rowTwice"
+  | .rowSource .. => "rowSource"
+  | .rowTarget .. => "rowTarget"
+  | .rowMissing .. => "rowMissing"
 
 end Problem
 
@@ -521,8 +720,9 @@ def normalizeBuiltin : ValueType → Lit → Except String Lit
   | v, .null => throw s!"the value is missing, and {v.text} is not optional"
   | v, l => throw s!"{l.render} is not a value of {v.text}"
 
-/-- The normal form of a literal of a value type, given the list of value types. -/
-def TypeList.normalize (L : TypeList) : ValueType → Lit → Except String Lit
+/-- The normal form of a literal of a value type that is not a record, given the
+list of value types. -/
+def TypeList.normalizeFlat (L : TypeList) : ValueType → Lit → Except String Lit
   | .named n, l => match L.lookup n with
     | none => throw s!"the value type {n} is not declared"
     | some (.enum vs) => match l with
@@ -534,6 +734,35 @@ def TypeList.normalize (L : TypeList) : ValueType → Lit → Except String Lit
     | some (.over b) =>
       if b.isBuiltin then normalizeBuiltin b l
       else throw s!"the value type {n} is declared over {b.text}, which is not a built-in"
+    | some (.record _) => throw s!"the record {n} is the type of a field; fields are not records"
+  | .optional (.optional _), _ => throw "a value type is optional at most once"
+  | .optional _, .null => pure .null
+  | .optional v, l => L.normalizeFlat v l
+  | v, l => normalizeBuiltin v l
+
+/-- The normal form of the fields `xs` of a literal of the record `n` with the fields
+`fs`: each declared field once, in normal form, sorted by name. -/
+def TypeList.normalizeFields (L : TypeList) (n : String) (fs : List (String × ValueType))
+    (xs : List (String × Lit)) : Except String Lit := do
+  if let some f := (dups (xs.map (·.1))).head? then
+    throw s!"the field {f} of {n} is given more than once"
+  if let some x := xs.find? fun x => !fs.any (·.1 == x.1) then
+    throw s!"{x.1} is not a field of {n}"
+  let out ← fs.mapM fun (f, t) => match xs.lookup f with
+    | some l => match L.normalizeFlat t l with
+      | .ok v => pure (f, v)
+      | .error e => throw s!"the field {f} of {n}: {e}"
+    | none => throw s!"the field {f} of {n} is missing"
+  pure (.record (out.mergeSort fun a b => compare a.1 b.1 != .gt))
+
+/-- The normal form of a literal of a value type, given the list of value types. -/
+def TypeList.normalize (L : TypeList) : ValueType → Lit → Except String Lit
+  | .named n, l => match L.lookup n with
+    | some (.record fs) => match l with
+      | .record xs => L.normalizeFields n fs xs
+      | .null => throw s!"the value is missing, and {n} is not optional"
+      | l => throw s!"{l.render} is not a record {n}"
+    | _ => L.normalizeFlat (.named n) l
   | .optional (.optional _), _ => throw "a value type is optional at most once"
   | .optional _, .null => pure .null
   | .optional v, l => L.normalize v l

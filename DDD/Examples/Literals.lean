@@ -111,4 +111,40 @@ def refused (v : ValueType) (l : Lit) : Bool :=
 #guard refused .string .null
 #guard refused (.optional (.optional .int)) .null
 
+/-! ## Records and tables -/
+
+/-- A record, two enumerations and a table between them. -/
+def withRecords : TypeList where
+  decls := [("Status", .enum ["placed", "paid"]), ("Phase", .enum ["open", "closed"]),
+    ("Address", .record [("street", .string), ("city", .string), ("zip", .optional .string)])]
+  tables := [⟨"phase", .named "Status", .named "Phase", [("placed", "open"), ("paid", "closed")]⟩,
+    ⟨"isPaid", .named "Status", .bool, [("placed", "false"), ("paid", "true")]⟩]
+
+#guard withRecords.checkSound
+#guard withRecords.values? .bool == some ["false", "true"]
+#guard withRecords.values? (.named "Address") == none
+
+-- A record literal: fields sorted by name, each in normal form, an absent optional
+-- field written as null.
+#guard (withRecords.normalize (.named "Address") (.record [("street", .text "Main 1"),
+    ("zip", .null), ("city", .text "Bern")])).toOption ==
+  some (.record [("city", .text "Bern"), ("street", .text "Main 1"), ("zip", .null)])
+#guard (withRecords.normalize (.named "Address") (.record [("street", .text "Main 1")])).toOption ==
+  none
+#guard (withRecords.normalize (.named "Address") (.record [("street", .text "x"),
+    ("city", .text "y"), ("zip", .null), ("country", .text "CH")])).toOption == none
+#guard (withRecords.normalize (.optional (.named "Address")) .null).toOption == some .null
+
+/-- A list whose records and tables break each condition once. -/
+def brokenRecords : TypeList where
+  decls := [("R", .record []), ("S", .record [("a", .int), ("a", .int), ("some", .int)]),
+    ("T", .record [("r", .named "S"), ("u", .named "Undeclared")])]
+  tables := [⟨"int", .int, .bool, []⟩, ⟨"t", .bool, .bool, [("true", "false"), ("true", "maybe")]⟩]
+
+#guard brokenRecords.problems ==
+  [.emptyRecord "R", .duplicateField "S" "a", .reservedField "S" "some",
+    .fieldType "T" "r" (.named "S"), .fieldType "T" "u" (.named "Undeclared"),
+    .tableName "int", .tableSource "int" .int,
+    .rowTwice "t" "true", .rowTarget "t" "maybe", .rowMissing "t" "false"]
+
 end DDD.Examples.Literals

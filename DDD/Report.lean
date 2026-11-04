@@ -120,9 +120,15 @@ end Translation.Problem
 /-- A problem of the list of value types. -/
 def TypeList.Problem.toJson (p : TypeList.Problem) : Json :=
   problemJson p.kind (match p with
-    | .duplicateType n | .builtinName n | .emptyEnum n => [("type", .str n)]
+    | .duplicateType n | .builtinName n | .emptyEnum n | .emptyRecord n => [("type", .str n)]
     | .duplicateValue n v => [("type", .str n), ("value", .str v)]
-    | .baseNotBuiltin n b => [("type", .str n), ("base", Lean.toJson b)]) p.describe
+    | .baseNotBuiltin n b => [("type", .str n), ("base", Lean.toJson b)]
+    | .duplicateField n f | .reservedField n f => [("type", .str n), ("field", .str f)]
+    | .fieldType n f t => [("type", .str n), ("field", .str f), ("fieldType", Lean.toJson t)]
+    | .duplicateTable t | .tableName t => [("table", .str t)]
+    | .tableSource t v | .tableTarget t v => [("table", .str t), ("type", Lean.toJson v)]
+    | .rowTwice t x | .rowSource t x | .rowTarget t x | .rowMissing t x =>
+      [("table", .str t), ("value", .str x)]) p.describe
 
 /-- A value type of an attribute of the schema named `schema` that the list does not
 admit. -/

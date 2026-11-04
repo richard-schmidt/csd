@@ -12,7 +12,9 @@ format identifier `formatVersion`.
   `"datetime"`, `"timestamp"`, `"time"`, `"duration"`, `{"named": n}` and
   `{"optional": t}`.
 - The list of value types (`TypeList`): `name`, with `values` for an
-  enumeration or `base` for a named type over a built-in.
+  enumeration, `base` for a named type over a built-in, or `fields` (`name`,
+  `type`) for a record; a table is an entry with `from`, `to` and `rows`, pairs
+  of a value of the source and its image. Tables follow the types.
 - Generators are named `Entity.name`; the entity type is the part before the
   first dot, so entity type names contain no dot.
 - A schema: `entities`, `references` (`name`, `target`), `attributes` (`name`,
@@ -81,35 +83,63 @@ partial def ValueType.fromJson : Json → Except String ValueType
 instance : ToJson ValueType := ⟨ValueType.toJson⟩
 instance : FromJson ValueType := ⟨ValueType.fromJson⟩
 
-instance : ToJson Lit where
-  toJson
-    | .int i => toJson i
-    | .text s => .str s
-    | .bool b => .bool b
-    | .null => .null
+partial def Lit.toJson : Lit → Json
+  | .int i => Lean.toJson i
+  | .text s => .str s
+  | .bool b => .bool b
+  | .null => .null
+  | .record fs => Json.mkObj (fs.map fun f => (f.1, f.2.toJson))
 
-instance : FromJson Lit where
-  fromJson?
-    | .str s => pure (.text s)
-    | .bool b => pure (.bool b)
-    | .null => pure .null
-    | .num n => pure (if n.exponent == 0 then .int n.mantissa else .text (toString n))
-    | j => throw s!"not a literal: {j.compress}"
+partial def Lit.fromJson : Json → Except String Lit
+  | .str s => pure (.text s)
+  | .bool b => pure (.bool b)
+  | .null => pure .null
+  | .num n => pure (if n.exponent == 0 then .int n.mantissa else .text (toString n))
+  | .obj kvs => .record <$> (kvs.foldl (fun acc k v => acc ++ [(k, v)]) []).mapM fun f => do
+      pure (f.1, ← Lit.fromJson f.2)
+  | j => throw s!"not a literal: {j.compress}"
 
-def TypeList.toJson (L : TypeList) : Json := Json.arr (L.decls.map fun d =>
+instance : ToJson Lit := ⟨Lit.toJson⟩
+instance : FromJson Lit := ⟨Lit.fromJson⟩
+
+def TypeList.toJson (L : TypeList) : Json := Json.arr ((L.decls.map fun (d : String × TypeDecl) =>
   match d.2 with
   | .enum vs => Json.mkObj [("name", .str d.1), ("values", Lean.toJson vs)]
-  | .over b => Json.mkObj [("name", .str d.1), ("base", b.toJson)]).toArray
+  | .over b => Json.mkObj [("name", .str d.1), ("base", b.toJson)]
+  | .record fs => Json.mkObj [("name", .str d.1), ("fields", Json.arr
+      (fs.map fun (f : String × ValueType) =>
+        Json.mkObj [("name", .str f.1), ("type", f.2.toJson)]).toArray)]) ++
+  L.tables.map fun (t : Table) => Json.mkObj [("name", .str t.name), ("from", t.source.toJson),
+    ("to", t.target.toJson),
+    ("rows", Json.arr (t.rows.map fun (r : String × String) =>
+      Json.arr #[.str r.1, .str r.2]).toArray)]).toArray
 
 def TypeList.fromJson (j : Json) : Except String TypeList := do
   let a ← j.getArr?
-  let decls ← a.toList.mapM fun d => do
+  let mut decls : List (String × TypeDecl) := []
+  let mut tables : List Table := []
+  for d in a.toList do
     let name ← d.getObjValAs? String "name"
-    match d.getObjValAs? (List String) "values", d.getObjVal? "base" with
-    | .ok vs, _ => pure (name, TypeDecl.enum vs)
-    | _, .ok b => pure (name, TypeDecl.over (← ValueType.fromJson b))
-    | _, _ => throw s!"the value type {name} has neither values nor a base"
-  pure { decls }
+    if let .ok src := d.getObjVal? "from" then
+      let rows ← (← d.getObjValAs? (List Json) "rows").mapM fun r => do
+        match ← r.getArr? with
+        | #[x, y] => pure (← x.getStr?, ← y.getStr?)
+        | _ => throw s!"a row of the table {name} is not a pair"
+      let source ← ValueType.fromJson src
+      let target ← ValueType.fromJson (← d.getObjVal? "to")
+      tables := tables ++ [({ name, source, target, rows } : Table)]
+    else
+      let decl ← match d.getObjValAs? (List String) "values", d.getObjVal? "base",
+          d.getObjValAs? (List Json) "fields" with
+        | .ok vs, _, _ => pure (TypeDecl.enum vs)
+        | _, .ok b, _ => pure (TypeDecl.over (← ValueType.fromJson b))
+        | _, _, .ok fs => TypeDecl.record <$> fs.mapM fun f => do
+            let fname ← f.getObjValAs? String "name"
+            let ftype ← ValueType.fromJson (← f.getObjVal? "type")
+            pure (fname, ftype)
+        | _, _, _ => throw s!"the value type {name} has no values, base or fields"
+      decls := decls ++ [(name, decl)]
+  pure { decls, tables }
 
 /-! ## Names -/
 
