@@ -501,6 +501,18 @@ Next step 9, the model editor, is complete: `csd-editor` runs on the A52 since
 2026-11-02, reached over Tailscale, and checks each document with the aarch64
 `csd-check` through glibc-runner (the example map: 13 claims in 0.17 s).
 
+Next step 10, value types, is complete, with no `sorry`: the built-ins
+`datetime`, `timestamp`, `time` and `duration` and the type `optional v`
+(`Values.lean`); one list of value types per document, its soundness with a
+check and its problems, the admitted types, and normal forms of literals
+(`Literals.lean`); the claims `valueTypes` and `declared`, the normalization of
+the literals of certificates on reading, and their problems in reports. A map
+document with each new type, an enumeration and optional attributes passes
+`csd-check` (`Examples/Exchange.lean`); the Julia certificate carries the sample
+of the workspace, whose literals are written in other forms, and its 43 claims
+hold; literals that do not parse are problems (`Examples/Literals.lean`). The
+editor edits the list of value types and the new types (csd-editor 09af7b5).
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.

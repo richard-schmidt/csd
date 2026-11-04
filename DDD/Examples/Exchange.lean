@@ -1,5 +1,5 @@
 import DDD.Json
-import DDD.Certificate
+import DDD.Report
 import DDD.Examples.Integration
 import DDD.Examples.Gluing
 
@@ -168,6 +168,16 @@ def sampleCertificate : Certificate where
   claims := [.valueTypes, .wellFormed "Deliveries", .declared "Deliveries", .state "XD"]
 
 #guard sampleCertificate.check
+
+/-- The sample's schema as a context of a map document, with the list of value
+types. -/
+def sampleMap : MapDoc where
+  valueTypes := valueTypes
+  contexts := [("Deliveries", deliveries, false)]
+  arrows := []
+
+#guard sampleMap.report.getObjValD "failed" == (0 : Nat)
+#guard ({ sampleMap with valueTypes := {} } : MapDoc).report.getObjValD "failed" == (1 : Nat)
 
 -- The state as written fails the check of literals: its literals are not in
 -- normal form.
