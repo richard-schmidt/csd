@@ -110,16 +110,55 @@ intended scale is tens of entity types per context.
 The value types are fixed for all contexts (`DDD/Values.lean`): the built-ins
 `int`, `decimal`, `string`, `date`, `uuid`, `bool`, `datetime`, `timestamp`,
 `time` and `duration`, `named n` for a project-defined type such as the
-enumeration `OrderStatus`, and `optional v`. Schemas refer to value types only.
-There are no operations on values and no composite values, and translations
-leave value types unchanged, so a translation cannot convert a value.
+enumeration `OrderStatus`, and `optional v`. Schemas refer to value types only,
+and translations leave value types unchanged.
 
 A model declares its project-defined types in one list shared by its contexts
-(`DDD/Literals.lean`): enumerations with their values, and named types over a
-built-in. Each value type has one normal form per value in the exchange format
-(timestamps in UTC with `Z`, decimals without trailing zeros, durations in
-days, hours, minutes and seconds), and the readers put literals in normal form,
-so that equality of literals is equality of values.
+(`DDD/Literals.lean`): enumerations with their values, named types over a
+built-in, records with their fields, and tables between finite types. Each
+value type has one normal form per value in the exchange format (timestamps in
+UTC with `Z`, decimals without trailing zeros, durations in days, hours, minutes
+and seconds, records as JSON objects with sorted fields), and the readers put
+literals in normal form, so that equality of literals is equality of values.
+
+### Conversions
+
+The value types form a category whose arrows are conversions
+(`DDD/ValueCat.lean`). A conversion has a name, which determines it at its
+source: a table; a coercion between a named type and its base, in either
+direction; a built-in (`timestamp → datetime`, `timestamp → date`,
+`timestamp → time` in UTC, `datetime → date`, `datetime → time`,
+`int → decimal`); `string`, the normal form as text; `some : v → optional v`; the
+lift of a conversion to the optional types, which keeps an absent value absent;
+and a field of a record. Users write no functions, so equality of conversions
+stays decidable. The equations are a fixed list (`TypeList.Basic`):
+
+| Equation | Out of |
+|---|---|
+| a coercion followed by its inverse is the identity | a named type, a base |
+| two paths of tables computing the same function are equal; the empty path is the identity table | a finite type |
+| `some, c = c, some` | a plain type |
+| `datetime, date = date` and `datetime, time = time` | `timestamp` |
+| a coercion followed by `string` is `string` | a named type, a base |
+| each of these, lifted | an optional type |
+
+A schema with conversions, `S.vcat L`, presents the category with the
+generators of `S` and the conversions out of its value types, and the equations
+of both. It contains `S.cat` (`vinc`) and the category of value types `L.cat`
+(`vvals`), and a valid translation extends to it as the identity on value types
+(`Translation.vfunctor`).
+
+An interpretation is a functor `I : L.cat ⥤ Type` (`DDD/VStates.lean`); it
+satisfies the equations by construction. `Interp.RecordsAreProducts` asks that
+it send each record to the product of its fields. A state with conversions is a
+functor out of `S.vcat L` with an isomorphism between its restriction to
+`L.cat` and `I`. In a well-formed schema, restriction to `S.cat` is an
+equivalence between these states and the attributed states with values in
+`I.K` (`VState.equivalence`), since a state has one choice for each conversion
+of a value: the one of `I` through its bijections (`State.vext`). The results of
+section 9 carry over through the equivalence: limits and colimits, `Δ_T` and
+`Σ_T` with its condition (`Translation.vsigmaStateAdjunction`,
+`isRightAdjoint_vrestrict_iff`), and data gluing (`Gluing.vstateEquiv`).
 
 The interpretation `K : ValueType → Type` is a parameter of the state layer, one
 for an integration, shared by all its contexts. General theorems hold for every
@@ -252,6 +291,17 @@ adds nothing ends the computation.*
 are sound in every well-formed schema; freeness and acyclicity are needed only
 for completeness. `pathEq` tries both, and is the checker that the translation
 and gluing checks receive.
+
+With conversions (`DDD/ConvNF.lean`), `pathEqV` splits a path at the first
+value type it reaches. The part in `S` goes to `pathEq`; the conversions go to
+a normal form computed by rewriting with the equations of `Basic` from left to
+right, one name at a time, on a stack: a coercion followed by its inverse is
+removed, `datetime` followed by `date` or `time` becomes `date` or `time`, a
+coercion before `string` is removed, a run of tables is one block compared by
+the function it computes, and `some` moves to the end, past the lifts. Every
+rule is an instance of an equation and checks that both sides end at the same
+type, so equal normal forms give equal morphisms (`pathEqV_sound`); the
+converse is not proved.
 
 A schema with both cycles and equations has no decision procedure in the
 library; it would need a rewriting system supplied as a certificate. Catalog has
@@ -792,7 +842,11 @@ passes its check holds (`checkClaim_sound`):
   that satisfies the keys of its schema;
 - a finite state is the restriction of another along a translation, so that its
   state is isomorphic to `restrictState`;
-- a homomorphism of finite states that is a morphism of their states.
+- a homomorphism of finite states that is a morphism of their states;
+- two paths out of an object of a schema present the same morphism of the
+  category with conversions, checked by `pathEqV`;
+- a path of conversions sends a literal in normal form to a literal, checked by
+  `TypeList.applyLit`; the Julia side computes the result on its own.
 
 `csd-check` (`cli/CsdCheck.lean`) runs these checks and reports each claim. It is
 built as an executable, the program compiled to native code together with the
@@ -871,7 +925,11 @@ from Orders failing the check; the qualified `createdAt` scenario; sample states
 of Orders, Shipping, the glued schema, Payments and the kernel; the restrictions
 of data gluing (the glued state restricts to the states of Orders and Shipping,
 which restrict to the same kernel state) and of the anti-corruption layer from
-OrdersPL into Payments; and a homomorphism between two Shipping states. All 32
+OrdersPL into Payments; and a homomorphism between two Shipping states. The
+workspace also carries three samples, each a schema and a state passed through
+(Deliveries, Sales and Billing, the last with a record value), the conversions
+of `Examples/Conversions.lean`, whose results `apply_lit` computes as
+`TypeList.applyLit` does, and its path equalities, passed on as claims. All 70
 claims pass `csd-check`.
 
 CI checks that the exported workspace and broken map equal the committed
@@ -1132,6 +1190,7 @@ are outside the library.*
 | Module | Defines and proves |
 |---|---|
 | `Values.lean` | `ValueType` |
+| `Literals.lean` | literals, `TypeList` with records and tables, `Sound`, `problems_eq_nil_iff`, `normalize` |
 | `Schema.lean` | the presentation, keys and subtypes, `ownerIter`, `allKeys`, `WellFormed`, `checkWellFormed_iff`, `RootsOnly` |
 | `Semantics.lean` | `Schema.cat`, `PathEq`, the correspondence of deep and quiver paths |
 | `PathEq.lean` | `pathEqFree`, `Acyclic`, `Rewrite`, `classOf`, `pathEqAcyclic`, their iff lemmas |
@@ -1151,6 +1210,10 @@ are outside the library.*
 | `StateLimits.lean` | profiles, the terminal and initial states, `limitCone`, `colimitCocone`, connected limits and colimits pointwise, colimits pointwise at entity types |
 | `StateSigma.lean` | `AttrBijective`, `sigmaState`, `sigmaStateAdjunction`, `isRightAdjoint_restrictStateFunctor_iff`, `not_attrBijective` |
 | `Data.lean` | `FinState`, `check`, `toState`, keys (`checkKeys`, `State.Keys`, `toState_keys`), `FinHom`, `restrict`, `restrictIso` |
+| `ValueCat.lean` | `conv?`, `Basic`, `applyLit`, `Schema.vcat`, `TypeList.cat`, `vinc`, `vvals`, `VPathEq`, `Translation.vfunctor` |
+| `VStates.lean` | `Interp`, `RecordsAreProducts`, `VState`, `State.vext`, `VState.equivalence`, limits and colimits, `vsigmaStateAdjunction`, `isRightAdjoint_vrestrict_iff`, `Gluing.vstateEquiv` |
+| `ConvNF.lean` | `TypeList.nf`, `convEq_sound`, `Schema.pathEqV`, `pathEqV_sound` |
+| `VData.lean` | `FinState.evalV`, `evalV_vmor` |
 | `Json.lean` | the exchange format `csd-ddd/1` |
 | `Certificate.lean` | `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`, claims, `checkClaim_sound` |
 | `Problems.lean` | `Schema.problems`, `problems_eq_nil_iff`, `Translation.problems`, their sentences |
@@ -1165,7 +1228,9 @@ are outside the library.*
 | `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
 | `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, a qualified second ordering context, machines in series, aggregate machines and the report of the context, events of the example map |
 | `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along OrdersPL → Orders or CatalogPL → Orders |
-| `Examples/Exchange.lean` | the example map as a workspace document with two samples, round trips, the `createdAt` clash |
+| `Examples/Literals.lean` | literals in normal form, records, tables, and lists that break each condition |
+| `Examples/Conversions.lean` | each kind of conversion, a record, path equalities by `pathEqV` and by theorem, conversions of literals, a certificate |
+| `Examples/Exchange.lean` | the example map as a workspace document with three samples, conversions and path equalities, round trips, the `createdAt` clash |
 | `Examples/Problems.lean` | the problems of broken schemas and translations, the report of `brokenMap` |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
@@ -1241,7 +1306,8 @@ the same thing in both columns.
 The correspondence leaves out part of each side:
 
 - Value types. A model has its own attribute types, with operations between
-  them. Here the value types are shared by all contexts and have no operations
+  them. Here the value types are shared by all contexts, their operations are
+  the conversions of a fixed list of kinds with a fixed list of equations
   (section 2), and translations fix them. Instances differ in the same way:
   Carlson and Patterson (*Presheaves on lax double functors; or, Instances of
   models of double theories*, Applied Categorical Structures 34, 2026) define

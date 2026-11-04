@@ -798,7 +798,7 @@ def aggregates():
 # 17. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1180, 546,
+    f = Fig("modules", 1180, 562,
             "Imports between the modules of the DDD library: a chain from value types to "
             "certificates and reports, context maps, states and open systems beside it, and the "
             "examples on top.")
@@ -840,6 +840,14 @@ def modules():
     f.node("AggregateMachine", 894, 250, "AggregateMachine", w=148, h=30)
     f.arrow("Aggregates", "AggregateMachine", "", "acl")
     f.arrow("OpenMachine", "AggregateMachine", "", "acl")
+    f.node("ValueCat", 90, 192, "ValueCat", w=92, h=30)
+    f.node("ConvNF", 90, 250, "ConvNF", w=84, h=30)
+    f.node("VStates", 225, 192, "VStates", w=88, h=30)
+    f.node("VData", 225, 250, "VData", w=80, h=30)
+    f.poly([(475, 72), (475, 100), (90, 100), (90, 175)], "acl")
+    f.arrow("ValueCat", "ConvNF", "", "acl")
+    f.arrow("ValueCat", "VStates", "", "acl")
+    f.arrow("VStates", "VData", "", "acl")
     dy = 50
     f.region(20, 235 + dy, 1140, 220, "EXAMPLES")
     f.raw(f'<rect class="rg plain" x="38" y="{266 + dy}" width="358" height="44" rx="6"/>', "back")
@@ -872,6 +880,8 @@ def modules():
     f.arrow("xMerge", "xOpen", "", "muted")
     f.node("xProblems", 1105, 365 + dy, "Problems", w=90, h=30)
     f.node("xStructure", 1105, 288 + dy, "Structure", w=90, h=30)
+    f.node("xConversions", 885, 415 + dy, "Conversions", w=108, h=30)
+    f.arrow("xConversions", "xExchange", "", "muted")
     f.poly([(1154, 55), (1170, 55), (1170, 365 + dy), (1150, 365 + dy)], "muted")
     f.poly([(1170, 288 + dy), (1150, 288 + dy)], "muted")
     f.text(1160, 518, "arrows point from a module to the modules that import it; Certificate "
@@ -879,7 +889,10 @@ def modules():
            "Translation,", "note", "end")
     f.text(1160, 534, "OpenMachine imports Data and Production.Wiring, Aggregates imports Union "
            "and States, the example Open imports Rename and AggregateMachine, the example "
-           "Problems imports Integration, Exchange imports Structure", "note", "end")
+           "Problems imports Integration, Exchange imports Structure,", "note", "end")
+    f.text(1160, 550, "ValueCat imports Literals, ConvNF imports PathEq, VStates imports "
+           "StateSigma, VData imports Data, Certificate imports ConvNF, the example "
+           "Conversions imports Report and VData", "note", "end")
     return f
 
 

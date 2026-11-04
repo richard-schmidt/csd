@@ -26,21 +26,45 @@ A set of value types, `ValueType`: the built-ins `int`, `decimal`, `string`,
 zone), `timestamp` (an instant), `time` (a time of day) and `duration` (an exact
 length of time, without months or years); project-defined types `named n`; and
 `optional v`, whose values are absent or a value of `v`. Schemas refer to value
-types only, and translations leave them unchanged. There are no operations on
-values: translations cannot convert values, and there are no composite values.
+types only, and translations leave them unchanged.
 
 A model declares its project-defined types in one list, shared by all its
-contexts (`TypeList`, `Literals.lean`): enumerations with their values, and
-named types over a built-in. A name in the list means the same type in every
-context. The list is sound when names are declared once and differ from the
-built-ins, enumerations have values and none twice, and bases are built-ins;
-it admits the built-ins, its names, and `optional v` for an admitted `v` that
-is not optional.
+contexts (`TypeList`, `Literals.lean`): enumerations with their values, named
+types over a built-in, records with their fields, and tables between finite
+types (enumerations and `bool`), one row for each value of the source. A name
+in the list means the same type in every context. The list is sound when names
+are declared once and differ from the built-ins, enumerations have values and
+none twice, bases are built-ins, records have fields, none twice and none named
+`some` or `string`, of admitted types that are not records, and tables are
+declared once, have a name that is not a built-in, a declared name or `some`,
+finite source and target, and one row for each value of the source, to a value
+of the target; it admits the built-ins, its names, and `optional v` for an
+admitted `v` that is not optional.
+
+The value types form a category whose arrows are conversions
+(`ValueCat.lean`), each named and determined by its name at its source
+(`TypeList.conv?`): the tables; coercions between a named type and its base,
+both ways; the built-ins `timestamp → datetime`, `timestamp → date`,
+`timestamp → time` (in UTC), `datetime → date`, `datetime → time` and
+`int → decimal`; `string`, the normal form as text, out of every other type;
+`some : v → optional v`; the lift of each conversion to the optional types;
+and the fields of a record. Users write no functions. The category is
+presented by these generators and a fixed list of equations
+(`TypeList.Basic`): a coercion followed by its inverse is the identity, a path
+of tables is the table it computes, `some` commutes with the lifts, the date
+and the time of a timestamp go through its date and time or not, a coercion
+followed by `string` is `string`, and each equation holds lifted. No other
+equation is derived. A schema with conversions, `S.vcat L`, adds the
+conversions out of its value types to its generators; it contains `S.cat` and
+the category of value types `L.cat`, and translations extend to it as the
+identity on value types (`Translation.vfunctor`).
 
 Values are written as literals in the exchange format, and each value type has
 one normal form per value: decimals without trailing zeros, timestamps in UTC
 with `Z`, durations in days, hours, minutes and seconds, UUIDs in lower case,
-and so on (`TypeList.normalize`). The readers of certificates and of context map
+records as JSON objects with their fields sorted by name and each in normal
+form, and so on (`TypeList.normalize`). `TypeList.applyLit` applies a path of
+conversions to a literal in normal form. The readers of certificates and of context map
 documents put literals in normal form, so that equality of literals is equality
 of values; a literal that does not parse as its type is a problem. Their
 interpretation
@@ -50,6 +74,25 @@ Per-model checks compare values, so they require decidable equality on every
 `K v` that is equality of values. `Float` does not qualify: its equality is
 IEEE equality, which is not reflexive on NaN. The examples use the
 interpretation in `Examples/Values.lean`.
+
+With conversions, an interpretation is a functor `I : L.cat ⥤ Type`
+(`Interp`, `VStates.lean`): it gives each value type a set `I.K v` and each
+conversion a function, and satisfies the equations. `Interp.RecordsAreProducts`
+is the condition that it sends records to the products of their fields; the
+theorems hold without it. A state with conversions is a functor out of
+`S.vcat L` that agrees with `I` on the value types. In a well-formed schema,
+restriction to `S.cat` is an equivalence between these states and the
+attributed states with values in `I.K` (`VState.equivalence`): a conversion of
+an attribute value is determined by the value. The results on attributed states
+hold for states with conversions through it: limits and colimits, `Δ_T`, `Σ_T`
+and its condition, and data gluing.
+
+Path equality in `S.vcat L` (`ConvNF.lean`) splits a path at the first value
+type: the part in `S` goes to `Schema.pathEq`, and the conversions to a normal
+form computed by rewriting with the equations of `Basic`, left to right
+(`TypeList.nf`). Two paths with the same normal form are equal
+(`pathEqV_sound`); the converse is not proved. Finite states evaluate paths
+with conversions through an interpretation (`FinState.evalV`, `VData.lean`).
 
 ### Schemas
 
@@ -263,6 +306,10 @@ computes; Lean checks.
   list of value types of the map is passed on to the certificate as it is, and
   literals as they are written; Lean puts them in normal form when it reads the
   certificate.
+- Conversions act on literals in normal form as `TypeList.applyLit` does
+  (`conv`, `apply_lit`): the certificate claims the result of each conversion
+  listed in the workspace, and Lean checks it. Equal paths with conversions are
+  passed on as claims; Lean decides them.
 - Catlab is pinned to 0.16.20: the pushout of acsets fails in 0.17.6.
 
 The JSON format is versioned and covered by round-trip tests. Julia output is
@@ -299,13 +346,20 @@ DDD/
                      context
   Data.lean          finite states, keys, homomorphisms and restriction as
                      data
+  ValueCat.lean      conversions, their equations, the category of value
+                     types, schemas with conversions
+  VStates.lean       interpretations, states with conversions, the
+                     equivalence with attributed states and what it carries
+  ConvNF.lean        normal forms of conversions, path equality with
+                     conversions
+  VData.lean         finite states evaluated through conversions
   Json.lean          the exchange format csd-ddd/1
   Certificate.lean   certificates, their checks and soundness
   Problems.lean      the failures of the checks of schemas and translations
   Report.lean        reports of certificates and context map documents
   Examples/          Values, Literals, Catalog, Orders, Payments, Shipping,
-                     Integration, Gluing, Routes, Structure, Exchange, Merge,
-                     Sigma, Open, Problems
+                     Integration, Gluing, Routes, Structure, Conversions,
+                     Exchange, Merge, Sigma, Open, Problems
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check, a native executable (lake exe csd-check), and
                      csd-export, run with lake env lean --run;
@@ -554,6 +608,24 @@ models of Context Mapper (`context-mapper-examples` at 3c28b41) import, and
 aggregate-boundary problems in two models, where an entity type refers to a
 member of another aggregate. The editor's CI imports the examples, and its tests
 cover each rule of the import.
+
+Next step 13, the category of value types, is complete, with no `sorry`: the
+list of value types declares records and tables (`Literals.lean`); conversions,
+their equations and the category with conversions of each schema, which
+contains the schema category and the category of value types, and the
+extension of translations to it (`ValueCat.lean`); interpretations as functors,
+states with conversions and their equivalence with attributed states, through
+which limits and colimits, `Δ_T`, `Σ_T` and its condition, and data gluing hold
+(`VStates.lean`); path equality with conversions by normal forms, proved sound
+(`ConvNF.lean`); the evaluation of finite states through conversions
+(`VData.lean`); and the claims `pathEquality` and `conversion`.
+`Examples/Conversions.lean` uses each kind of conversion and a record, proves two
+path equalities as theorems and checks eight with `pathEqV`, and its certificate
+passes. The Julia side evaluates the conversions of the workspace on literals in
+normal form; its certificate of 70 claims holds. The editor edits records and
+tables (csd-editor 65e95f0). Not proved: that equal morphisms have equal normal
+forms, and that literals in normal form with `TypeList.applyLit` form an
+interpretation.
 
 ## Next steps
 
@@ -1371,3 +1443,35 @@ Next step 12:
 - A Java `Date` becomes `date` and `double` becomes `decimal`, each reported.
 - The editor's CI fetches the examples of Context Mapper at a fixed commit rather
   than copying them into the repository.
+
+Next step 13:
+
+- The category with conversions of a schema is a quotient of the paths on its
+  objects, value types included, by the equations of the schema and the instances
+  of `Basic` at value types; the category of value types is that of the schema
+  without entity types. `Schema.cat` stays as it is, with its results, and
+  `vinc` includes it.
+- States with conversions are not developed again: in a well-formed schema they
+  are equivalent to attributed states, since every conversion of an attribute
+  value is determined by the value. Limits, colimits, `Σ_T` and data gluing carry
+  over through the equivalence.
+- A conversion is named, and its name determines it at its source, in the order
+  `some`, `string`, built-ins, coercions, tables, fields; soundness keeps the
+  names apart (a table is not named after a built-in, a declared type or `some`;
+  a field is not named `some` or `string`). A coercion out of a named type is
+  named after its base (`decimal`), one into a named type after the named type
+  (`Money`). At a named type over `string`, `string` is the coercion to the base.
+- Records: a field has an admitted type that is not a record, optional or not;
+  `string` gives the fields as text, `{city: Bern, street: …, zip: null}`. The
+  lift of a field exists when its type is not optional.
+- Tables: between `bool` and the enumerations, with a row for each value of the
+  source. A named type over `bool` is not finite and has no tables.
+- Path equality rewrites left to right on a stack. A run of tables is compared by
+  the function it computes on the values of its source, so the table equations
+  are decided without listing paths. Only soundness is proved: a claim whose
+  paths are equal but whose normal forms differ fails.
+- `Interp.RecordsAreProducts` is a condition on interpretations, not a field: no
+  theorem needs it.
+- `TypeList.applyLit` is the semantics of conversions on literals that Lean and
+  the Julia side share; the claim `conversion` compares the two. It is not shown
+  to be an interpretation.
