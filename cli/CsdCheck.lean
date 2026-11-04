@@ -7,8 +7,10 @@ import DDD.Report
     lake exe csd-check [--json] file.json
 
 The file is a certificate (`"kind": "certificate"`) or a context map document
-(`"kind": "map"`). The claims of a context map document are that each context is
-well formed and each arrow a valid translation (`DDD.MapDoc.certificate`).
+(`"kind": "map"`). The claims of a context map document are that its list of
+value types is sound, that each context is well formed and declares its value
+types, and that each arrow is a valid translation (`DDD.MapDoc.certificate`).
+The literals of the states of a certificate are read in normal form.
 
 The executable `csd-check` (`lakefile.toml`) is this program compiled to native
 code, with the modules it imports. Each claim is checked by its checker

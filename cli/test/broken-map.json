@@ -1,4 +1,8 @@
-{"routeEquations": [],
+{"valueTypes":
+ [{"values": ["card", "invoice", "transfer"], "name": "PaymentMethod"},
+  {"values": [], "name": "Size"},
+  {"name": "string", "base": "string"}],
+ "routeEquations": [],
  "kind": "map",
  "format": "csd-ddd/1",
  "contexts":
@@ -78,6 +82,17 @@
      {"root": "B", "members": []},
      {"root": "W", "members": []}]},
    "name": "Broken",
+   "kernel": false},
+  {"schema":
+   {"valueObjects": [],
+    "references": [],
+    "equations": [],
+    "entities": ["Tag"],
+    "attributes":
+    [{"type": {"optional": {"named": "Code"}}, "name": "Tag.code"},
+     {"type": {"optional": {"optional": "int"}}, "name": "Tag.weight"}],
+    "aggregates": []},
+   "name": "Untyped",
    "kernel": false}],
  "arrows":
  [{"translation":

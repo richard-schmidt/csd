@@ -151,8 +151,49 @@
     "aggregates":
     [{"root": "Customer", "members": []},
      {"root": "Address", "members": []}]}}],
+ "samples":
+ [{"state":
+   {"references": [],
+    "entities": [{"type": "Delivery", "count": 2}],
+    "attributes":
+    [{"name": "Delivery.id",
+      "column":
+      ["7C9E6679-7425-40DE-944B-E07FC1F90AE7",
+       "9b2f0c431d2e4f5a8b6c3d4e5f6a7b8c"]},
+     {"name": "Delivery.status", "column": ["dispatched", "scheduled"]},
+     {"name": "Delivery.scheduledFor",
+      "column": ["2026-11-04 09:30", "2026-11-05T14:00:00"]},
+     {"name": "Delivery.dispatchedAt",
+      "column": ["2026-11-04T09:10:00+01:00", null]},
+     {"name": "Delivery.window", "column": ["PT90M", "PT2H"]},
+     {"name": "Delivery.opensAt", "column": ["08:00", "08:00:00"]},
+     {"name": "Delivery.fee", "column": ["12.50", 9]},
+     {"name": "Delivery.note", "column": [null, "Leave at the door"]}]},
+   "schema":
+   {"valueObjects": [],
+    "references": [],
+    "equations": [],
+    "entities": ["Delivery"],
+    "attributes":
+    [{"type": "uuid", "name": "Delivery.id"},
+     {"type": {"named": "DeliveryStatus"}, "name": "Delivery.status"},
+     {"type": "datetime", "name": "Delivery.scheduledFor"},
+     {"type": {"optional": "timestamp"}, "name": "Delivery.dispatchedAt"},
+     {"type": "duration", "name": "Delivery.window"},
+     {"type": "time", "name": "Delivery.opensAt"},
+     {"type": {"named": "Money"}, "name": "Delivery.fee"},
+     {"type": {"optional": "string"}, "name": "Delivery.note"}],
+    "aggregates": []},
+   "name": "Deliveries"}],
  "map":
- {"routeEquations": [],
+ {"valueTypes":
+  [{"values": ["placed", "paid", "shipped", "cancelled"],
+    "name": "OrderStatus"},
+   {"values": ["card", "invoice", "transfer"], "name": "PaymentMethod"},
+   {"values": ["scheduled", "dispatched", "delivered"],
+    "name": "DeliveryStatus"},
+   {"name": "Money", "base": "decimal"}],
+  "routeEquations": [],
   "kind": "map",
   "format": "csd-ddd/1",
   "contexts":

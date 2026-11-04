@@ -1,4 +1,5 @@
 import DDD.Json
+import DDD.Certificate
 import DDD.Examples.Integration
 import DDD.Examples.Gluing
 
@@ -15,8 +16,15 @@ outside the kernel (`created_clash`), which the Julia side qualifies with the
 context names before gluing. `cli/CsdExport.lean` writes it to
 `julia/data/workspace.json`.
 
+The map declares its value types (`valueTypes`). The workspace also carries a
+sample, the schema `deliveries` with a value type of each kind and a finite
+state whose literals are written in other forms than their normal forms; the
+Julia side passes it through to its certificate, whose reader puts the
+literals in normal form.
+
 The round trips through JSON text are tested with `#guard`: schemas,
-translations, the map, and a finite state of the Customers kernel.
+translations, the map, and finite states of the Customers kernel and of the
+sample.
 -/
 
 set_option linter.hashCommand false
@@ -48,8 +56,16 @@ def arrows : List (String × String × String × Translation) :=
    ("customers_orders", "Customers", "Orders", translation Arrow.customers_orders),
    ("customers_shipping", "Customers", "Shipping", translation Arrow.customers_shipping)]
 
+/-- The value types of the example map and of the sample. -/
+def valueTypes : TypeList where
+  decls := [("OrderStatus", .enum ["placed", "paid", "shipped", "cancelled"]),
+    ("PaymentMethod", .enum ["card", "invoice", "transfer"]),
+    ("DeliveryStatus", .enum ["scheduled", "dispatched", "delivered"]),
+    ("Money", .over .decimal)]
+
 /-- The context map as data. -/
 def map : MapDoc where
+  valueTypes := valueTypes
   contexts := contexts.map fun c => (contextName c, schema c, kernel c)
   arrows := arrows
 
@@ -67,6 +83,35 @@ theorem created_clash : Schema.gluingClashes customers ordersCreated shippingCre
     ["Customer.createdAt"] := by
   decide
 
+/-- Deliveries, with a value type of each kind. -/
+def deliveries : Schema where
+  entities := ["Delivery"]
+  attrs := [⟨"id", "Delivery", .uuid⟩, ⟨"status", "Delivery", .named "DeliveryStatus"⟩,
+    ⟨"scheduledFor", "Delivery", .datetime⟩,
+    ⟨"dispatchedAt", "Delivery", .optional .timestamp⟩,
+    ⟨"window", "Delivery", .duration⟩, ⟨"opensAt", "Delivery", .time⟩,
+    ⟨"fee", "Delivery", .named "Money"⟩, ⟨"note", "Delivery", .optional .string⟩]
+
+/-- A column of literals of one value type. -/
+def col (v : ValueType) (ls : List Lit) : List (Σ _ : ValueType, Lit) := ls.map fun l => ⟨v, l⟩
+
+/-- Two deliveries, with literals written in other forms than their normal forms. -/
+def deliveriesState : FinState LitK where
+  sizes := [("Delivery", 2)]
+  refs := []
+  attrs := [
+    (("Delivery", "id"), col .uuid
+      [.text "7C9E6679-7425-40DE-944B-E07FC1F90AE7", .text "9b2f0c431d2e4f5a8b6c3d4e5f6a7b8c"]),
+    (("Delivery", "status"), col (.named "DeliveryStatus") [.text "dispatched", .text "scheduled"]),
+    (("Delivery", "scheduledFor"), col .datetime
+      [.text "2026-11-04 09:30", .text "2026-11-05T14:00:00"]),
+    (("Delivery", "dispatchedAt"), col (.optional .timestamp)
+      [.text "2026-11-04T09:10:00+01:00", .null]),
+    (("Delivery", "window"), col .duration [.text "PT90M", .text "PT2H"]),
+    (("Delivery", "opensAt"), col .time [.text "08:00", .text "08:00:00"]),
+    (("Delivery", "fee"), col (.named "Money") [.text "12.50", .int 9]),
+    (("Delivery", "note"), col (.optional .string) [.null, .text "Leave at the door"])]
+
 /-- The document for the Julia side. -/
 def workspace : Json := Json.mkObj [
   ("format", .str formatVersion), ("kind", .str "workspace"),
@@ -78,7 +123,9 @@ def workspace : Json := Json.mkObj [
     ("right", Gluing.shipping₂.toJson), ("fullyFaithful", toJson [false, true])],
     Json.mkObj [("name", .str "createdAt"), ("kernel", customers.toJson),
     ("left", ordersCreated.toJson), ("right", shippingCreated.toJson),
-    ("qualify", toJson ["Orders", "Shipping"])]])]
+    ("qualify", toJson ["Orders", "Shipping"])]]),
+  ("samples", Json.arr #[Json.mkObj [("name", .str "Deliveries"),
+    ("schema", deliveries.toJson), ("state", deliveriesState.toJson)]])]
 
 /-! ## Round trips -/
 
@@ -105,5 +152,31 @@ def customersState : FinState LitK where
 #guard customersState.check customers
 #guard customersState.checkValueObjects customers
 #guard roundTrip FinState.toJson (FinState.fromJson customers) customersState
+
+/-! ## The sample -/
+
+#guard roundTrip Schema.toJson Schema.fromJson deliveries
+#guard roundTrip FinState.toJson (FinState.fromJson deliveries) deliveriesState
+#guard roundTrip TypeList.toJson TypeList.fromJson valueTypes
+
+/-- The sample as the Julia side passes it on: its schema, its state, and the
+claims about them, with the list of value types of the map. -/
+def sampleCertificate : Certificate where
+  valueTypes := valueTypes
+  schemas := [("Deliveries", deliveries)]
+  states := [("XD", "Deliveries", deliveriesState.normalize valueTypes)]
+  claims := [.valueTypes, .wellFormed "Deliveries", .declared "Deliveries", .state "XD"]
+
+#guard sampleCertificate.check
+
+-- The state as written fails the check of literals: its literals are not in
+-- normal form.
+#guard !deliveriesState.litsFit valueTypes
+#guard (deliveriesState.litProblems valueTypes).length == 8
+
+#guard ((deliveriesState.normalize valueTypes).attrCol "Delivery" "dispatchedAt").map
+    (·.map (·.2)) == some [.text "2026-11-04T08:10:00Z", .null]
+#guard ((deliveriesState.normalize valueTypes).attrCol "Delivery" "window").map
+    (·.map (·.2)) == some [.text "PT1H30M", .text "PT2H"]
 
 end DDD.Examples.Exchange

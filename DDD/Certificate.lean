@@ -17,8 +17,15 @@ claim that passes its check holds (`Certificate.checkClaim_sound`).
   inclusions as legs (`Gluing.isPushout_of_perm`). Optionally, the strict
   non-interference check is expected to give the stated results; a result `true`
   proves that the leg is full and faithful.
+- `valueTypes`: the list of value types of the certificate is sound
+  (`TypeList.Sound`).
+- `declared`: the list of value types admits the value type of every attribute of
+  a schema.
 - `state`: a finite state is a state of its schema, its values are literals of
-  the declared types, and it satisfies the value-object condition.
+  the declared types in normal form, and it satisfies the value-object
+  condition. The reader puts the literals of each state in normal form
+  (`FinState.normalize`), so a literal written in another form passes, and one
+  that is not a value of its type fails.
 - `restriction`: a finite state is the restriction of another along a
   translation; its state is then isomorphic to `Translation.restrictState`.
 - `homomorphism`: a homomorphism of finite states that is a morphism of their
@@ -111,13 +118,16 @@ inductive Claim where
   | translation (source target : String) (T : Translation)
   | gluing (kernel left right glued : String) (fullyFaithful : Option (Bool × Bool))
   | state (state : String)
+  | valueTypes
+  | declared (schema : String)
   | restriction (source target : String) (T : Translation) (state result : String)
   | homomorphism (source target : String) (h : FinHom)
 
-/-- A certificate: named schemas, named finite states with the name of their
-schema, and claims. -/
+/-- A certificate: the list of value types, named schemas, named finite states with
+the name of their schema, and claims. -/
 structure Certificate where
   producer : String := ""
+  valueTypes : TypeList := {}
   schemas : List (String × Schema)
   states : List (String × String × FinState LitK)
   claims : List Claim
@@ -155,8 +165,13 @@ def checkClaim : Claim → Bool
     | _, _, _, _ => false
   | .state x => match c.state? x with
     | some (s, X) => match c.schema? s with
-      | some S => S.checkWellFormed && X.check S && X.litsFit && X.checkValueObjects S
+      | some S => S.checkWellFormed && X.check S && X.litsFit c.valueTypes &&
+        X.checkValueObjects S
       | none => false
+    | none => false
+  | .valueTypes => c.valueTypes.checkSound
+  | .declared s => match c.schema? s with
+    | some S => S.attrs.all fun a => c.valueTypes.admits a.tgt
     | none => false
   | .restriction s t T x y => match c.schema? s, c.schema? t, c.state? x, c.state? y with
     | some S, some S', some (sx, X), some (sy, Y) =>
@@ -187,6 +202,9 @@ def Holds : Claim → Prop
   | .state x => ∃ (s : String) (S : Schema) (X : FinState LitK) (hS : S.WellFormed)
       (hX : X.check S = true),
       c.state? x = some (s, X) ∧ c.schema? s = some S ∧ (X.toState hX).ValueObjects hS
+  | .valueTypes => c.valueTypes.Sound
+  | .declared s =>
+    ∃ S, c.schema? s = some S ∧ ∀ a ∈ S.attrs, c.valueTypes.admits a.tgt = true
   | .restriction s t T x y => ∃ (S S' : Schema) (X Y : FinState LitK) (hS' : S'.WellFormed)
       (hT : T.Valid S S') (hX : X.check S' = true) (hY : Y.check S = true),
       c.schema? s = some S ∧ c.schema? t = some S' ∧ c.state? x = some (t, X) ∧
@@ -290,6 +308,16 @@ theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl 
     obtain ⟨⟨⟨wS, hX⟩, -⟩, hv⟩ := h
     have wS' := (Schema.checkWellFormed_iff S).mp wS
     exact ⟨s, S, X, wS', hX, hx, hs, FinState.toState_valueObjects wS' hX hv⟩
+  | valueTypes =>
+    simp only [checkClaim] at h
+    exact (TypeList.checkSound_iff _).mp h
+  | declared s =>
+    simp only [checkClaim] at h
+    cases hs : c.schema? s with
+    | none => simp [hs] at h
+    | some S =>
+      simp only [hs, List.all_eq_true] at h
+      exact ⟨S, hs, h⟩
   | restriction s t T x y =>
     simp only [checkClaim] at h
     cases hs : c.schema? s with
@@ -354,6 +382,8 @@ def Claim.describe : Claim → String
     | none => base
     | some (b₁, b₂) => base ++ s!"; strict non-interference: {l} {b₁}, {r} {b₂}"
   | .state x => s!"{x} is a state of its schema"
+  | .valueTypes => "the list of value types is sound"
+  | .declared s => s!"the value types of {s} are declared"
   | .restriction s t _ x y => s!"{y} is the restriction of {x} along {s} → {t}"
   | .homomorphism x y _ => s!"a homomorphism {x} → {y}"
 
@@ -380,6 +410,8 @@ def Claim.fromJson (j : Json) : Except String Claim := do
       | .error _ => pure none
     pure (.gluing k l r g ff)
   | "state" => .state <$> j.getObjValAs? String "state"
+  | "valueTypes" => pure .valueTypes
+  | "declared" => .declared <$> j.getObjValAs? String "schema"
   | "restriction" => do
     let s ← j.getObjValAs? String "source"
     let t ← j.getObjValAs? String "target"
@@ -400,14 +432,17 @@ def Certificate.fromJson (j : Json) : Except String Certificate := do
   let kind ← j.getObjValAs? String "kind"
   unless kind == "certificate" do throw s!"expected a certificate, found {kind}"
   let producer := (j.getObjValAs? String "producer").toOption.getD ""
+  let valueTypes ← match j.getObjVal? "valueTypes" with
+    | .ok v => TypeList.fromJson v
+    | .error _ => pure {}
   let schemas ← (← getList j "schemas").mapM fun s => do
     pure (← s.getObjValAs? String "name", ← Schema.fromJson (← s.getObjVal? "schema"))
   let states ← (← getList j "states").mapM fun x => do
     let name ← x.getObjValAs? String "name"
     let sname ← x.getObjValAs? String "schema"
     let some S := schemas.lookup sname | throw s!"state {name}: unknown schema {sname}"
-    pure (name, sname, ← FinState.fromJson S (← x.getObjVal? "state"))
+    pure (name, sname, (← FinState.fromJson S (← x.getObjVal? "state")).normalize valueTypes)
   let claims ← (← getList j "claims").mapM Claim.fromJson
-  pure { producer, schemas, states, claims }
+  pure { producer, valueTypes, schemas, states, claims }
 
 end DDD

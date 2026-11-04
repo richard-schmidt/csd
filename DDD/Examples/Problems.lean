@@ -11,8 +11,9 @@ import DDD.Examples.Integration
 - The schemas of the example map have no problem (`Schema.problems_eq_nil_iff_wellFormed`).
 - The failing translation into Payments has one problem, its equation; a
   translation with wrong images has one problem per wrong image.
-- The report of a context map document with a broken context, a failing arrow
-  and an arrow to a missing context (`brokenMap`). `cli/CsdExport.lean` writes
+- The report of a context map document with a broken list of value types, a
+  broken context, a context with undeclared value types, a failing arrow and an
+  arrow to a missing context (`brokenMap`). `cli/CsdExport.lean` writes
   it to `cli/test/broken-map.json`, which CI checks with `csd-check --json`.
 -/
 
@@ -92,11 +93,23 @@ example : (({ entities := [("Customer", "Payer"), ("Order", "Bill")] } : Transla
 
 /-! ## The report of a context map document -/
 
-/-- Three contexts, one of them broken, and three arrows: the valid translation into
-Payments, the failing one, and one to a context the document does not have. -/
+/-- A schema with an undeclared value type and a value type optional twice. -/
+def untyped : Schema where
+  entities := ["Tag"]
+  attrs := [⟨"code", "Tag", .optional (.named "Code")⟩,
+    ⟨"weight", "Tag", .optional (.optional .int)⟩]
+
+example : untyped.problems = [] := by decide
+
+/-- A list of value types with an empty enumeration and a built-in name, four
+contexts, one of them broken and one with undeclared value types, and three
+arrows: the valid translation into Payments, the failing one, and one to a
+context the document does not have. -/
 def brokenMap : MapDoc where
+  valueTypes := { decls := [("PaymentMethod", .enum ["card", "invoice", "transfer"]),
+    ("Size", .enum []), ("string", .over .string)] }
   contexts := [("OrdersPL", Orders.published, false), ("Payments", Payments.schema, false),
-    ("Broken", broken, false)]
+    ("Broken", broken, false), ("Untyped", untyped, false)]
   arrows := [("billing", "OrdersPL", "Payments", Integration.ordersPayments),
     ("billingToShipping", "OrdersPL", "Payments", Integration.ordersPaymentsBillToShipTo),
     ("dangling", "OrdersPL", "Nowhere", {})]
@@ -118,13 +131,17 @@ def summary (entries : Json) : List (String × Bool × List String) :=
    ("Broken", false, ["duplicateEntity", "duplicateGenerator", "referenceTarget",
      "referenceSource", "attributeSource", "equationNotParallel", "equationSource",
      "aggregateEntity", "aggregateOverlap", "missingOwner", "aggregateBoundary",
-     "valueObjectAttributes", "valueObjectEntity"])]
+     "valueObjectAttributes", "valueObjectEntity"]),
+   ("Untyped", false, ["undeclaredValueType", "nestedOptional"])]
+
+#guard summary (Json.arr #[(brokenMap.report.getObjValD "valueTypes").setObjVal! "name" ""]) ==
+  [("", false, ["emptyEnumeration", "builtinTypeName"])]
 
 #guard summary (brokenMap.report.getObjValD "arrows") ==
   [("billing", true, []), ("billingToShipping", false, ["equationImage"]),
    ("dangling", false, ["unknownSchema"])]
 
-#guard brokenMap.report.getObjValD "failed" == (3 : Nat)
+#guard brokenMap.report.getObjValD "failed" == (5 : Nat)
 
 -- The document round-trips through its JSON text.
 #guard match Json.parse brokenMap.toJson.compress >>= MapDoc.ofJson with

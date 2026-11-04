@@ -21,7 +21,9 @@ SCHEMA_KINDS = ["duplicateEntity", "duplicateGenerator", "referenceTarget", "ref
                 "aggregateOverlap", "missingOwner", "aggregateBoundary", "valueObjectAttributes",
                 "valueObjectEntity"]
 
-EXPECTED_CONTEXTS = [("OrdersPL", True, []), ("Payments", True, []), ("Broken", False, SCHEMA_KINDS)]
+EXPECTED_CONTEXTS = [("OrdersPL", True, []), ("Payments", True, []), ("Broken", False, SCHEMA_KINDS),
+                     ("Untyped", False, ["undeclaredValueType", "nestedOptional"])]
+EXPECTED_VALUE_TYPES = (False, ["emptyEnumeration", "builtinTypeName"])
 EXPECTED_ARROWS = [("billing", True, []), ("billingToShipping", False, ["equationImage"]),
                    ("dangling", False, ["unknownSchema"])]
 
@@ -42,13 +44,16 @@ def main(argv):
     report = json.loads(r.stdout)
     if report.get("kind") != "mapReport":
         errors.append(f"broken map: kind {report.get('kind')}, expected mapReport")
-    if report.get("failed") != 3:
-        errors.append(f"broken map: {report.get('failed')} failed, expected 3")
+    if report.get("failed") != 5:
+        errors.append(f"broken map: {report.get('failed')} failed, expected 5")
+    types = report.get("valueTypes", {})
+    if (types.get("ok"), [p["kind"] for p in types.get("problems", [])]) != EXPECTED_VALUE_TYPES:
+        errors.append(f"broken map: value types {types}")
     if summary(report["contexts"]) != EXPECTED_CONTEXTS:
         errors.append(f"broken map: contexts {summary(report['contexts'])}")
     if summary(report["arrows"]) != EXPECTED_ARROWS:
         errors.append(f"broken map: arrows {summary(report['arrows'])}")
-    for entry in report["contexts"] + report["arrows"]:
+    for entry in [dict(types, name="valueTypes")] + report["contexts"] + report["arrows"]:
         for p in entry["problems"]:
             if not p.get("message"):
                 errors.append(f"broken map: a problem of {entry['name']} has no message")

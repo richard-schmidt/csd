@@ -19,6 +19,10 @@ map = ws["map"]
 
 cert = Certificate("csd-julia 0.1, Catlab $(pkgversion(CsdDDD.Catlab))")
 
+# The list of value types of the map, passed on as it is.
+cert.valueTypes = collect(get(map, "valueTypes", []))
+add_claim!(cert, "valueTypes")
+
 # Contexts and arrows of the map.
 schemas = Dict{String,DDDSchema}()
 for c in map["contexts"]
@@ -26,6 +30,7 @@ for c in map["contexts"]
   schemas[String(c["name"])] = S
   add_schema!(cert, String(c["name"]), S)
   add_claim!(cert, "wellFormed"; schema=String(c["name"]))
+  add_claim!(cert, "declared"; schema=String(c["name"]))
 end
 translations = Dict{String,Translation}()
 for a in map["arrows"]
@@ -196,6 +201,20 @@ restriction("Shipping", "Orders+Shipping", empty, "XG", "XS")
 restriction("Customers", "Orders", empty, "XO", "XK")
 restriction("Customers", "Shipping", empty, "XS", "XK")
 restriction("OrdersPL", "Payments", translations["ordersPL_payments"], "XP", "XPL")
+
+# Samples: a schema and a state read from the workspace and passed on, with
+# their literals as written.
+for s in get(ws, "samples", [])
+  name = String(s["name"])
+  S = read_schema(s["schema"])
+  X = read_state(s["state"])
+  check_state(S, X) || error("the sample $name violates an equation")
+  add_schema!(cert, name, S)
+  add_claim!(cert, "wellFormed"; schema=name)
+  add_claim!(cert, "declared"; schema=name)
+  add_state!(cert, "X$name", name, X)
+  add_claim!(cert, "state"; state="X$name")
+end
 
 # Homomorphism search: XS into XS2.
 h = homomorphism_search(schemas["Shipping"], XS, XS2)

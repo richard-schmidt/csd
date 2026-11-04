@@ -106,11 +106,19 @@ intended scale is tens of entity types per context.
 
 ### Value types
 
-The value types are fixed for all contexts (`DDD/Values.lean`): `int`,
-`decimal`, `string`, `date`, `uuid`, `bool`, and `named n` for a project-defined
-type such as the enumeration `OrderStatus`. Schemas refer to value types only.
+The value types are fixed for all contexts (`DDD/Values.lean`): the built-ins
+`int`, `decimal`, `string`, `date`, `uuid`, `bool`, `datetime`, `timestamp`,
+`time` and `duration`, `named n` for a project-defined type such as the
+enumeration `OrderStatus`, and `optional v`. Schemas refer to value types only.
 There are no operations on values and no composite values, and translations
 leave value types unchanged, so a translation cannot convert a value.
+
+A model declares its project-defined types in one list shared by its contexts
+(`DDD/Literals.lean`): enumerations with their values, and named types over a
+built-in. Each value type has one normal form per value in the exchange format
+(timestamps in UTC with `Z`, decimals without trailing zeros, durations in
+days, hours, minutes and seconds), and the readers put literals in normal form,
+so that equality of literals is equality of values.
 
 The interpretation `K : ValueType → Type` is a parameter of the state layer, one
 for an integration, shared by all its contexts. General theorems hold for every
@@ -127,11 +135,16 @@ is not reflexive on NaN. The interpretation of the examples
 | `date` | `Date` | days since 1970-01-01, proleptic Gregorian calendar |
 | `uuid` | `Uuid` | `BitVec 128` |
 | `bool` | `Bool` | |
+| `time` | `TimeOfDay` | seconds since midnight, a `Decimal` |
+| `datetime` | `DateTime` | a `Date` and a time of day |
+| `timestamp` | `Instant` | seconds since 1970-01-01T00:00:00Z, a `Decimal` |
+| `duration` | `Duration` | seconds, a `Decimal` |
 | `named n` | `String` | the names of the elements, not restricted to a declared list |
+| `optional v` | `Option (K v)` | |
 
 Representations matter only for checks on concrete values and for the exchange
-format, so they live with the examples and with the literals of `Json.lean`
-(section 10).
+format, so they live with the examples and with the literals of
+`Literals.lean` and `Json.lean` (section 10).
 
 ### The presentation
 

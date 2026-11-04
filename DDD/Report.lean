@@ -14,16 +14,23 @@ decided by `Certificate.checkClaim` alone, which is sound
 - acyclicity: those, and a path longer than the number of entity types;
 - translation: the problems of the target schema and of the translation
   (`Translation.problems`), none exactly when the check passes;
-- gluing, state, restriction, homomorphism: the parts of the check that fail, with
+- the list of value types: its problems (`TypeList.problems`), none exactly
+  when it is sound;
+- declared value types: the attributes whose value types the list does not admit
+  (`Schema.typeProblems`), none exactly when the check passes;
+- state: the parts of the check that fail, and each literal that is not a value
+  of its type in normal form, with the reason;
+- gluing, restriction, homomorphism: the parts of the check that fail, with
   the problems of the schemas and translations involved and the names that two
   schemas share outside a kernel.
 
 A failing claim with no explanation reports that its check fails.
 
 A context map document (`MapDoc`) is checked through the certificate of its
-claims (`MapDoc.certificate`): each context is well formed, and each arrow is a
-valid translation from the schema of its source to the schema of its target.
-`MapDoc.report` gives the results by context and by arrow.
+claims (`MapDoc.certificate`): its list of value types is sound, each context is
+well formed and declares its value types, and each arrow is a valid translation
+from the schema of its source to the schema of its target. `MapDoc.report` gives
+the results for the list, by context and by arrow.
 
 Every problem is a JSON object with a `kind`, the names it concerns, and a
 `message`. `Certificate.report` and `MapDoc.report` are the output of
@@ -103,6 +110,29 @@ def toJson (source target : String) (p : Problem) : Json :=
 
 end Translation.Problem
 
+/-- A problem of the list of value types. -/
+def TypeList.Problem.toJson (p : TypeList.Problem) : Json :=
+  problemJson p.kind (match p with
+    | .duplicateType n | .builtinName n | .emptyEnum n => [("type", .str n)]
+    | .duplicateValue n v => [("type", .str n), ("value", .str v)]
+    | .baseNotBuiltin n b => [("type", .str n), ("base", Lean.toJson b)]) p.describe
+
+/-- A value type of an attribute of the schema named `schema` that the list does not
+admit. -/
+def Schema.TypeProblem.toJson (schema : String) (p : Schema.TypeProblem) : Json :=
+  problemJson p.kind ([("schema", .str schema)] ++ match p with
+    | .undeclared a n => [("generator", .str s!"{a.src}.{a.name}"), ("source", .str a.src),
+        ("type", Lean.toJson a.tgt), ("name", .str n)]
+    | .nestedOptional a => [("generator", .str s!"{a.src}.{a.name}"), ("source", .str a.src),
+        ("type", Lean.toJson a.tgt)]) p.describe
+
+/-- A literal of the state named `state` that is not a value of its type in normal
+form. -/
+def LitProblem.toJson (state : String) (p : LitProblem) : Json :=
+  problemJson "literal" [("state", .str state), ("generator", .str s!"{p.attr.1}.{p.attr.2}"),
+    ("entity", (p.entity : Nat)), ("value", Lean.toJson p.lit), ("type", Lean.toJson p.type)]
+    s!"{p.attr.1}.{p.attr.2} of entity {p.entity}: {p.message}"
+
 /-- A path out of an entity type of `S` with more generators than `S` has entity
 types, if there is one; such a path runs through a cycle. -/
 def Schema.longPath? (S : Schema) : Option (String × List String) :=
@@ -120,6 +150,8 @@ def Claim.refFields : Claim → List (String × Json)
   | .gluing k l r g _ => [("claim", .str "gluing"), ("kernel", .str k), ("left", .str l),
       ("right", .str r), ("glued", .str g)]
   | .state x => [("claim", .str "state"), ("state", .str x)]
+  | .valueTypes => [("claim", .str "valueTypes")]
+  | .declared s => [("claim", .str "declared"), ("schema", .str s)]
   | .restriction s t _ x y => [("claim", .str "restriction"), ("source", .str s),
       ("target", .str t), ("state", .str x), ("result", .str y)]
   | .homomorphism x y _ => [("claim", .str "homomorphism"), ("from", .str x), ("to", .str y)]
@@ -191,11 +223,15 @@ def explain : Claim → List Json
     | some (s, X) => match c.schema? s with
       | some S => c.schemaProblems s ++ failing [
           (X.check S, "stateCheck", s!"{x} does not pass the check of {s}"),
-          (X.litsFit, "valueType", s!"a value of {x} does not have its declared type"),
           (X.checkValueObjects S, "valueObject",
-            s!"two entities of a value object of {x} have the same attributes")]
+            s!"two entities of a value object of {x} have the same attributes")] ++
+          (X.litProblems c.valueTypes).map (LitProblem.toJson x)
       | none => [unknown "schema" s]
     | none => [unknown "state" x]
+  | .valueTypes => c.valueTypes.problems.map TypeList.Problem.toJson
+  | .declared s => match c.schema? s with
+    | some S => (S.typeProblems c.valueTypes).map (Schema.TypeProblem.toJson s)
+    | none => [unknown "schema" s]
   | .restriction s t T x y => match c.schema? s, c.schema? t, c.state? x, c.state? y with
     | some S, some S', some (sx, X), some (sy, Y) =>
       failing [(sx == t, "stateSchema", s!"{x} is a state of {sx}, not of {t}"),
@@ -249,29 +285,39 @@ variable (M : MapDoc)
 /-- The schema of the context named `n`, if there is one. -/
 def schema? (n : String) : Option Schema := (M.contexts.lookup n).map (·.1)
 
-/-- The certificate of a context map document: its contexts as schemas, and the
-claims that each context is well formed and each arrow a valid translation, the
-contexts first, then the arrows, in their order. -/
+/-- The certificate of a context map document: its list of value types, its
+contexts as schemas, and the claims that the list is sound, that each context is
+well formed and declares its value types, and that each arrow is a valid
+translation: the list first, then the contexts, then the arrows, in their order. -/
 def certificate : Certificate where
   producer := "map"
+  valueTypes := M.valueTypes
   schemas := M.contexts.map fun ctx => (ctx.1, ctx.2.1)
   states := []
-  claims := M.contexts.map (fun ctx => .wellFormed ctx.1) ++
+  claims := [.valueTypes] ++ M.contexts.flatMap (fun ctx => [.wellFormed ctx.1, .declared ctx.1]) ++
     M.arrows.map fun a => .translation a.2.1 a.2.2.1 a.2.2.2
 
-/-- The report of a context map document, by context and by arrow. -/
+/-- The report of a context map document: the list of value types, then each
+context, with the problems of its well-formedness and of its value types, and each
+arrow. -/
 def report : Json :=
   let c := M.certificate
+  let (typesOk, typeProblems) := c.result .valueTypes
+  let valueTypes := Json.mkObj [("ok", .bool typesOk),
+    ("problems", Json.arr typeProblems.toArray)]
   let contexts := M.contexts.map fun ctx =>
-    let (ok, ps) := c.result (.wellFormed ctx.1)
-    Json.mkObj [("name", .str ctx.1), ("ok", .bool ok), ("problems", Json.arr ps.toArray)]
+    let (ok₁, ps₁) := c.result (.wellFormed ctx.1)
+    let (ok₂, ps₂) := c.result (.declared ctx.1)
+    Json.mkObj [("name", .str ctx.1), ("ok", .bool (ok₁ && ok₂)),
+      ("problems", Json.arr (ps₁ ++ ps₂).toArray)]
   let arrows := M.arrows.map fun a =>
     let (ok, ps) := c.result (.translation a.2.1 a.2.2.1 a.2.2.2)
     Json.mkObj [("name", .str a.1), ("source", .str a.2.1), ("target", .str a.2.2.1),
       ("ok", .bool ok), ("problems", Json.arr ps.toArray)]
-  let failed := (contexts ++ arrows).filter fun j => j.getObjValD "ok" != .bool true
+  let failed := (valueTypes :: contexts ++ arrows).filter fun j => j.getObjValD "ok" != .bool true
   Json.mkObj [("format", .str formatVersion), ("kind", .str "mapReport"),
-    ("contexts", Json.arr contexts.toArray), ("arrows", Json.arr arrows.toArray),
+    ("valueTypes", valueTypes), ("contexts", Json.arr contexts.toArray),
+    ("arrows", Json.arr arrows.toArray),
     ("failed", (failed.length : Nat))]
 
 /-- A context map document, read from JSON with its format and kind checked. -/

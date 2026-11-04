@@ -39,7 +39,15 @@ instance nontrivial : ∀ v, Nontrivial (K v)
   | .date => ⟨⟨⟨0⟩, ⟨1⟩, by decide⟩⟩
   | .uuid => ⟨⟨⟨0⟩, ⟨1⟩, by decide⟩⟩
   | .bool => inferInstanceAs (Nontrivial Bool)
+  | .datetime =>
+    ⟨⟨⟨⟨0⟩, ⟨⟨0, 0, Or.inl rfl⟩⟩⟩, ⟨⟨1⟩, ⟨⟨0, 0, Or.inl rfl⟩⟩⟩, by decide⟩⟩
+  | .timestamp => ⟨⟨⟨⟨0, 0, Or.inl rfl⟩⟩, ⟨⟨1, 0, Or.inl rfl⟩⟩, by decide⟩⟩
+  | .time => ⟨⟨⟨⟨0, 0, Or.inl rfl⟩⟩, ⟨⟨1, 0, Or.inl rfl⟩⟩, by decide⟩⟩
+  | .duration => ⟨⟨⟨⟨0, 0, Or.inl rfl⟩⟩, ⟨⟨1, 0, Or.inl rfl⟩⟩, by decide⟩⟩
   | .named _ => show Nontrivial String from ⟨⟨"", "a", by decide⟩⟩
+  | .optional v =>
+    have := nontrivial v
+    inferInstanceAs (Nontrivial (Option (K v)))
 
 /-! ## Arrows with `Σ_T` -/
 

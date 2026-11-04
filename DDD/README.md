@@ -21,11 +21,29 @@ decisions.
 
 ### Value types
 
-A set of value types, `ValueType`: `int`, `decimal`, `string`, `date`,
-`uuid`, `bool`, and project-defined types `named n` (an enumeration such as
-`OrderStatus`). Schemas refer to value types only, and translations leave them
-unchanged. There are no operations on values: translations cannot convert
-values, and there are no composite values. Their interpretation
+A set of value types, `ValueType`: the built-ins `int`, `decimal`, `string`,
+`date`, `uuid`, `bool`, `datetime` (a date and a time of day, without time
+zone), `timestamp` (an instant), `time` (a time of day) and `duration` (an exact
+length of time, without months or years); project-defined types `named n`; and
+`optional v`, whose values are absent or a value of `v`. Schemas refer to value
+types only, and translations leave them unchanged. There are no operations on
+values: translations cannot convert values, and there are no composite values.
+
+A model declares its project-defined types in one list, shared by all its
+contexts (`TypeList`, `Literals.lean`): enumerations with their values, and
+named types over a built-in. A name in the list means the same type in every
+context. The list is sound when names are declared once and differ from the
+built-ins, enumerations have values and none twice, and bases are built-ins;
+it admits the built-ins, its names, and `optional v` for an admitted `v` that
+is not optional.
+
+Values are written as literals in the exchange format, and each value type has
+one normal form per value: decimals without trailing zeros, timestamps in UTC
+with `Z`, durations in days, hours, minutes and seconds, UUIDs in lower case,
+and so on (`TypeList.normalize`). The readers of certificates and of context map
+documents put literals in normal form, so that equality of literals is equality
+of values; a literal that does not parse as its type is a problem. Their
+interpretation
 `K : ValueType → Type` is a parameter of the state layer, fixed for an
 integration, so all contexts share it; the general theorems hold for every `K`.
 Per-model checks compare values, so they require decidable equality on every
@@ -225,7 +243,10 @@ computes; Lean checks.
   search comes from Catlab, on the acsets of the states. Restriction follows
   the image path of each generator, as `FinState.restrict` does; Catlab's data
   migration does not accept acsets whose schema is built at run time.
-- Output is JSON: schemas, states, and certificates of claims about them.
+- Output is JSON: schemas, states, and certificates of claims about them. The
+  list of value types of the map is passed on to the certificate as it is, and
+  literals as they are written; Lean puts them in normal form when it reads the
+  certificate.
 - Catlab is pinned to 0.16.20: the pushout of acsets fails in 0.17.6.
 
 The JSON format is versioned and covered by round-trip tests. Julia output is
@@ -236,6 +257,7 @@ untrusted; correctness rests on the Lean checkers and their soundness lemmas.
 ```
 DDD/
   Values.lean        value types
+  Literals.lean      literals, the list of value types, normal forms
   Schema.lean        presentations, well-formedness
   Semantics.lean     quiver, Paths, Quotient, Schema.cat
   PathEq.lean        path equality for free and acyclic schemas
@@ -264,8 +286,9 @@ DDD/
   Certificate.lean   certificates, their checks and soundness
   Problems.lean      the failures of the checks of schemas and translations
   Report.lean        reports of certificates and context map documents
-  Examples/          Values, Catalog, Orders, Payments, Shipping, Integration,
-                     Gluing, Routes, Exchange, Merge, Sigma, Open, Problems
+  Examples/          Values, Literals, Catalog, Orders, Payments, Shipping,
+                     Integration, Gluing, Routes, Exchange, Merge, Sigma, Open,
+                     Problems
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check, a native executable (lake exe csd-check), and
                      csd-export, run with lake env lean --run;

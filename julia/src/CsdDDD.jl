@@ -75,9 +75,12 @@ refs(S::DDDSchema) = [(S.graph[r, (:ref_src, :entity_name)], S.graph[r, :ref_nam
 attrs(S::DDDSchema) = [(S.graph[a, (:attr_src, :entity_name)], S.graph[a, :attr_name],
   S.graph[a, :attr_type]) for a in parts(S.graph, :Attr)]
 
-# Value types are kept as strings: "int", ..., "bool", or "named:N".
-vtype_from_json(j) = j isa AbstractString ? String(j) : "named:" * String(j["named"])
-vtype_to_json(t) = startswith(t, "named:") ? Dict("named" => t[7:end]) : t
+# Value types are kept as strings: "int", ..., "duration", "named:N", or
+# "optional:T" for the optional type of T.
+vtype_from_json(j) = j isa AbstractString ? String(j) :
+  haskey(j, "named") ? "named:" * String(j["named"]) : "optional:" * vtype_from_json(j["optional"])
+vtype_to_json(t) = startswith(t, "named:") ? Dict("named" => t[7:end]) :
+  startswith(t, "optional:") ? Dict("optional" => vtype_to_json(t[10:end])) : t
 
 function split_gen(s)
   i = findfirst('.', s)
@@ -238,7 +241,9 @@ end
 """
 A finite state of a schema, as in `DDD/Data.lean`: a count per entity type, a
 column per reference (targets, numbered from 1 here and from 0 in JSON), and a
-column per attribute (values: `Int`, `String` or `Bool`).
+column per attribute (values: `Int`, `String`, `Bool`, or `nothing` for the
+absent value of an optional type). Literals are kept as written; Lean puts them
+in normal form when it reads a certificate.
 """
 struct State
   sizes::Vector{Pair{String,Int}}
@@ -307,7 +312,8 @@ end
 # ---------------------------------------------------------------------------
 # States as acsets, for homomorphism search
 
-julia_type(t) = t == "int" ? Int : t == "bool" ? Bool : String
+julia_type(t) = t == "int" ? Int : t == "bool" ? Bool :
+  startswith(t, "optional:") ? Union{Nothing,julia_type(t[10:end])} : String
 type_symbol(t) = Symbol(replace(t, ":" => "_"))
 
 "The presentation of `S` as a Catlab schema."
@@ -363,12 +369,13 @@ end
 
 mutable struct Certificate
   producer::String
+  valueTypes::Vector{Any}
   schemas::Vector{Any}
   states::Vector{Any}
   claims::Vector{Any}
 end
 
-Certificate(producer) = Certificate(producer, [], [], [])
+Certificate(producer) = Certificate(producer, [], [], [], [])
 
 add_schema!(c::Certificate, name, S::DDDSchema) =
   push!(c.schemas, Dict("name" => name, "schema" => write_schema(S)))
@@ -381,7 +388,8 @@ add_claim!(c::Certificate, kind; kw...) =
 
 function write_certificate(path, c::Certificate)
   doc = Dict("format" => FORMAT, "kind" => "certificate", "producer" => c.producer,
-    "schemas" => c.schemas, "states" => c.states, "claims" => c.claims)
+    "valueTypes" => c.valueTypes, "schemas" => c.schemas, "states" => c.states,
+    "claims" => c.claims)
   open(io -> JSON3.pretty(io, doc), path, "w")
 end
 

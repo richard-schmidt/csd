@@ -1,4 +1,5 @@
 import DDD.Translation
+import DDD.Literals
 import Mathlib.Data.List.Dedup
 
 /-!
@@ -16,24 +17,15 @@ reports and editors.
 - `Translation.problems T S S' peq`: the failures of the conditions of
   `Translation.Valid`, with `peq` deciding path equality in `S'`. There are none
   exactly when `checkValid` passes (`Translation.problems_eq_nil_iff`).
+- `Schema.typeProblems L S`: the attributes of `S` whose value types the list of
+  value types `L` does not admit, an undeclared name or an optional of an
+  optional; none exactly when `L` admits every value type of `S`
+  (`Schema.typeProblems_eq_nil_iff`).
 - `describe` states a problem as a sentence and `kind` names its condition;
   `DDD.Report` gives problems as JSON.
 -/
 
 namespace DDD
-
-/-- The elements of `l` that occur more than once, each listed once. -/
-def dups (l : List String) : List String := (l.filter fun x => 1 < l.count x).dedup
-
-theorem dups_eq_nil_iff (l : List String) : dups l = [] ↔ l.Nodup := by
-  rw [dups, List.dedup_eq_nil, List.filter_eq_nil_iff, List.nodup_iff_count_le_one]
-  constructor
-  · intro h a
-    by_cases ha : a ∈ l
-    · simpa using h a ha
-    · simp [List.count_eq_zero_of_not_mem ha]
-  · intro h a _
-    simpa using h a
 
 /-! ## Text -/
 
@@ -41,15 +33,6 @@ theorem dups_eq_nil_iff (l : List String) : dups l = [] ↔ l.Nodup := by
 def pathText : List String → String
   | [] => "id"
   | ns => ".".intercalate ns
-
-def ValueType.text : ValueType → String
-  | .int => "int"
-  | .decimal => "decimal"
-  | .string => "string"
-  | .date => "date"
-  | .uuid => "uuid"
-  | .bool => "bool"
-  | .named n => n
 
 def Ob.text : Ob → String
   | .entity e => e
@@ -367,5 +350,53 @@ def kind : Problem → String
 end Problem
 
 end Translation
+
+/-! ## Value types of attributes -/
+
+namespace Schema
+
+/-- An attribute whose value type the list of value types does not admit. -/
+inductive TypeProblem where
+  /-- The value type of the attribute `a` names `n`, which the list does not
+  declare. -/
+  | undeclared (a : Attr) (n : String)
+  /-- The value type of the attribute `a` is optional twice. -/
+  | nestedOptional (a : Attr)
+deriving DecidableEq, Repr
+
+variable (L : TypeList) (S : Schema)
+
+/-- The attributes of `S` whose value types `L` does not admit, in their order. -/
+def typeProblems : List TypeProblem :=
+  S.attrs.flatMap fun a =>
+    (match L.undeclared? a.tgt with
+      | some n => [.undeclared a n]
+      | none => []) ++
+    (if a.tgt.nested then [.nestedOptional a] else [])
+
+theorem typeProblems_eq_nil_iff :
+    S.typeProblems L = [] ↔ ∀ a ∈ S.attrs, L.admits a.tgt = true := by
+  simp only [typeProblems, List.flatMap_eq_nil_iff, List.append_eq_nil_iff]
+  refine forall₂_congr fun a _ => ?_
+  rw [L.admits_iff]
+  cases h₁ : L.undeclared? a.tgt <;> cases h₂ : a.tgt.nested <;> simp
+
+namespace TypeProblem
+
+def describe : TypeProblem → String
+  | .undeclared a n =>
+    s!"the attribute {a.src}.{a.name} has the value type {a.tgt.text}, and {n} is not \
+      declared in the list of value types"
+  | .nestedOptional a =>
+    s!"the attribute {a.src}.{a.name} has the value type {a.tgt.text}; a value type is \
+      optional at most once"
+
+def kind : TypeProblem → String
+  | .undeclared .. => "undeclaredValueType"
+  | .nestedOptional .. => "nestedOptional"
+
+end TypeProblem
+
+end Schema
 
 end DDD

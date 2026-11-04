@@ -1,4 +1,5 @@
 import DDD.Data
+import DDD.Literals
 import Lean.Data.Json
 
 /-!
@@ -7,20 +8,27 @@ import Lean.Data.Json
 JSON for the deep data, shared with the Julia side. Every document carries the
 format identifier `formatVersion`.
 
-- Value types: `"int"`, `"decimal"`, `"string"`, `"date"`, `"uuid"`, `"bool"`, and
-  `{"named": n}`.
+- Value types: `"int"`, `"decimal"`, `"string"`, `"date"`, `"uuid"`, `"bool"`,
+  `"datetime"`, `"timestamp"`, `"time"`, `"duration"`, `{"named": n}` and
+  `{"optional": t}`.
+- The list of value types (`TypeList`): `name`, with `values` for an
+  enumeration or `base` for a named type over a built-in.
 - Generators are named `Entity.name`; the entity type is the part before the
   first dot, so entity type names contain no dot.
 - A schema: `entities`, `references` (`name`, `target`), `attributes` (`name`,
   `type`), `equations` (`source`, `lhs`, `rhs`), `aggregates` (`root`, `members`
   with `entity` and `owner`), `valueObjects`. Lists keep their order.
 - A translation: `entities` (`source`, `target`) and `generators` (`name`, `path`).
-- A context map (`MapDoc`): `contexts` (`name`, `schema`, `kernel`), `arrows`
-  (`name`, `source`, `target`, `translation`), and `routeEquations` (`lhs`, `rhs`,
-  lists of arrow names).
+- A context map (`MapDoc`): `valueTypes`, `contexts` (`name`, `schema`,
+  `kernel`), `arrows` (`name`, `source`, `target`, `translation`), and
+  `routeEquations` (`lhs`, `rhs`, lists of arrow names).
 - A finite state, relative to its schema: `entities` (`type`, `count`),
   `references` and `attributes` (`name`, `column`). Entities are numbered from 0.
-  Attribute values are literals (`Lit`): JSON integers, strings and booleans.
+  Attribute values are literals (`Lit`): JSON integers, strings, booleans and
+  `null`; a JSON number that is not an integer is read as its decimal text.
+  `FinState.fromJson` keeps the literals as written; `FinState.normalize` puts
+  them in normal form (`DDD.Literals`), and the readers of certificates and of
+  context map documents apply it.
 - A homomorphism of finite states: `components` (`type`, `column`).
 
 `Schema.fromJson (Schema.toJson S) = .ok S` for every schema whose entity type
@@ -44,49 +52,62 @@ def ValueType.toJson : ValueType → Json
   | .date => .str "date"
   | .uuid => .str "uuid"
   | .bool => .str "bool"
+  | .datetime => .str "datetime"
+  | .timestamp => .str "timestamp"
+  | .time => .str "time"
+  | .duration => .str "duration"
   | .named n => Json.mkObj [("named", .str n)]
+  | .optional v => Json.mkObj [("optional", v.toJson)]
 
-def ValueType.fromJson : Json → Except String ValueType
+partial def ValueType.fromJson : Json → Except String ValueType
   | .str "int" => pure .int
   | .str "decimal" => pure .decimal
   | .str "string" => pure .string
   | .str "date" => pure .date
   | .str "uuid" => pure .uuid
   | .str "bool" => pure .bool
+  | .str "datetime" => pure .datetime
+  | .str "timestamp" => pure .timestamp
+  | .str "time" => pure .time
+  | .str "duration" => pure .duration
   | .str s => throw s!"unknown value type {s}"
-  | j => .named <$> j.getObjValAs? String "named"
+  | j => match j.getObjVal? "named", j.getObjVal? "optional" with
+    | .ok n, _ => .named <$> n.getStr?
+    | _, .ok t => .optional <$> ValueType.fromJson t
+    | _, _ => throw s!"unknown value type {j.compress}"
 
 instance : ToJson ValueType := ⟨ValueType.toJson⟩
 instance : FromJson ValueType := ⟨ValueType.fromJson⟩
-
-/-- A literal value: the values of finite states in the exchange format. Decimals,
-dates, UUIDs and named values are written as text. -/
-inductive Lit where
-  | int (i : Int)
-  | text (s : String)
-  | bool (b : Bool)
-deriving DecidableEq, Repr
-
-/-- The literals that a value type admits. -/
-def Lit.fits : Lit → ValueType → Bool
-  | .int _, .int => true
-  | .bool _, .bool => true
-  | .text _, .int => false
-  | .text _, .bool => false
-  | .text _, _ => true
-  | _, _ => false
 
 instance : ToJson Lit where
   toJson
     | .int i => toJson i
     | .text s => .str s
     | .bool b => .bool b
+    | .null => .null
 
 instance : FromJson Lit where
   fromJson?
     | .str s => pure (.text s)
     | .bool b => pure (.bool b)
-    | j => .int <$> j.getInt?
+    | .null => pure .null
+    | .num n => pure (if n.exponent == 0 then .int n.mantissa else .text (toString n))
+    | j => throw s!"not a literal: {j.compress}"
+
+def TypeList.toJson (L : TypeList) : Json := Json.arr (L.decls.map fun d =>
+  match d.2 with
+  | .enum vs => Json.mkObj [("name", .str d.1), ("values", Lean.toJson vs)]
+  | .over b => Json.mkObj [("name", .str d.1), ("base", b.toJson)]).toArray
+
+def TypeList.fromJson (j : Json) : Except String TypeList := do
+  let a ← j.getArr?
+  let decls ← a.toList.mapM fun d => do
+    let name ← d.getObjValAs? String "name"
+    match d.getObjValAs? (List String) "values", d.getObjVal? "base" with
+    | .ok vs, _ => pure (name, TypeDecl.enum vs)
+    | _, .ok b => pure (name, TypeDecl.over (← ValueType.fromJson b))
+    | _, _ => throw s!"the value type {name} has neither values nor a base"
+  pure { decls }
 
 /-! ## Names -/
 
@@ -171,10 +192,11 @@ instance : FromJson Translation := ⟨Translation.fromJson⟩
 
 /-! ## Context maps -/
 
-/-- A context map as data: contexts with their schemas and kernel flags, named
-arrows with their translations, and equations between routes, as lists of arrow
-names. -/
+/-- A context map as data: the list of value types, contexts with their schemas
+and kernel flags, named arrows with their translations, and equations between
+routes, as lists of arrow names. -/
 structure MapDoc where
+  valueTypes : TypeList := {}
   contexts : List (String × Schema × Bool)
   arrows : List (String × String × String × Translation)
   routeEqns : List (List String × List String) := []
@@ -182,6 +204,7 @@ deriving DecidableEq
 
 def MapDoc.toJson (M : MapDoc) : Json := Json.mkObj [
   ("format", .str formatVersion), ("kind", .str "map"),
+  ("valueTypes", M.valueTypes.toJson),
   ("contexts", Json.arr (M.contexts.map fun c =>
     Json.mkObj [("name", .str c.1), ("schema", c.2.1.toJson), ("kernel", .bool c.2.2)]).toArray),
   ("arrows", Json.arr (M.arrows.map fun a =>
@@ -191,6 +214,9 @@ def MapDoc.toJson (M : MapDoc) : Json := Json.mkObj [
     Json.mkObj [("lhs", Lean.toJson e.1), ("rhs", Lean.toJson e.2)]).toArray)]
 
 def MapDoc.fromJson (j : Json) : Except String MapDoc := do
+  let valueTypes ← match j.getObjVal? "valueTypes" with
+    | .ok v => TypeList.fromJson v
+    | .error _ => pure {}
   let contexts ← (← getList j "contexts").mapM fun c => do
     pure (← c.getObjValAs? String "name", ← Schema.fromJson (← c.getObjVal? "schema"),
       (c.getObjValAs? Bool "kernel").toOption.getD false)
@@ -199,7 +225,7 @@ def MapDoc.fromJson (j : Json) : Except String MapDoc := do
       ← a.getObjValAs? String "target", ← Translation.fromJson (← a.getObjVal? "translation"))
   let routeEqns ← (← getList j "routeEquations").mapM fun e => do
     pure (← e.getObjValAs? (List String) "lhs", ← e.getObjValAs? (List String) "rhs")
-  pure { contexts, arrows, routeEqns }
+  pure { valueTypes, contexts, arrows, routeEqns }
 
 /-! ## Finite states and homomorphisms -/
 
@@ -231,9 +257,35 @@ def FinState.fromJson (S : Schema) (j : Json) : Except String (FinState LitK) :=
     pure ((e, n), col)
   pure { sizes, refs, attrs }
 
-/-- Every attribute value of `X` is a literal of its value type. -/
-def FinState.litsFit (X : FinState LitK) : Bool :=
-  X.attrs.all fun c => c.2.all fun x => x.2.fits x.1
+/-- `X` with each literal in normal form for its value type, where it has one; a
+literal that is not a value of its type is kept as written. -/
+def FinState.normalize (L : TypeList) (X : FinState LitK) : FinState LitK :=
+  { X with attrs := X.attrs.map fun c => (c.1, c.2.map fun x =>
+      ⟨x.1, (L.normalize x.1 x.2).toOption.getD x.2⟩) }
+
+/-- Every attribute value of `X` is a literal of its value type, in normal form. -/
+def FinState.litsFit (L : TypeList) (X : FinState LitK) : Bool :=
+  X.attrs.all fun c => c.2.all fun x => match L.normalize x.1 x.2 with
+    | .ok l => l == x.2
+    | .error _ => false
+
+/-- A literal that is not a value of its type, or not in normal form: the
+attribute, the number of the entity, the literal, its value type, and why. -/
+structure LitProblem where
+  attr : String × String
+  entity : Nat
+  lit : Lit
+  type : ValueType
+  message : String
+
+/-- The literals of `X` that are not values of their types in normal form. -/
+def FinState.litProblems (L : TypeList) (X : FinState LitK) : List LitProblem :=
+  X.attrs.flatMap fun c => ((List.range c.2.length).zip c.2).filterMap fun (i, x) =>
+    match L.normalize x.1 x.2 with
+    | .ok l => if l == x.2 then none
+      else some ⟨c.1, i, x.2, x.1,
+        s!"{x.2.render} is not in normal form; it is written {l.render}"⟩
+    | .error e => some ⟨c.1, i, x.2, x.1, e⟩
 
 def FinHom.toJson (h : FinHom) : Json := Json.mkObj [
   ("components", Json.arr (h.comps.map fun c =>

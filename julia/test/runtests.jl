@@ -30,6 +30,13 @@ end
   end
 end
 
+@testset "samples" begin
+  for x in get(ws, "samples", [])
+    @test roundtrip(write_schema, read_schema, x["schema"]) == plain(x["schema"])
+    @test roundtrip(write_state, read_state, x["state"]) == plain(x["state"])
+  end
+end
+
 @testset "states" begin
   cert = JSON3.read(read(joinpath(@__DIR__, "..", "out", "certificate.json"), String))
   for x in cert["states"]
