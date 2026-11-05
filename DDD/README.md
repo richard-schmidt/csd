@@ -348,6 +348,8 @@ DDD/
   StateSigma.lean    Σ on attributed states, the condition for it
   Open.lean          open schemas, their composition and its laws
   Rename.lean        qualified names, isomorphisms of open schemas
+  NormalForm.lean    the normal form of a translation: an inclusion into a
+                     definitional extension of its target
   OpenMachine.lean   machines on open schemas, serial wiring
   Events.lean        services and events along the routes of J
   Aggregates.lean    aggregate schemas, the rules across aggregates,
@@ -379,7 +381,7 @@ DDD/
   Report.lean        reports of certificates and context map documents
   Examples/          Values, Literals, Catalog, Orders, Payments, Shipping,
                      Integration, Gluing, Routes, Structure, Conversions,
-                     Exchange, Merge, Sigma, Open, Problems
+                     Exchange, Merge, Sigma, Open, NormalForm, Problems
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check, a native executable (lake exe csd-check), and
                      csd-export, run with lake env lean --run;
@@ -681,6 +683,19 @@ placed and Orders records its instant: `placedOn ↦ placedAt.date`
 translations that convert, `Translation.vproblems` explains their failures, and
 the Julia side restricts the state of Orders to OrdersPL through the conversion;
 `Exchange.publishCertificate` checks the restriction in Lean.
+The normal form (`NormalForm.lean`): `Translation.ext T S S'` is `S'` with the
+image of each entity type of `S` renamed after it and a derived generator with the
+equation `g = T g` for each generator of `S` whose image is another path;
+`checkNormalForm` checks that `T` keeps entity types apart, that the extension is
+well formed and includes `S`, and, by `checkSameFunctor`, that the translations
+between the extension and `S'` are inverse and that the inclusion followed by the
+one to `S'` is `T`. When it passes, the extension presents a category isomorphic
+to that of `S'` and the functor of `T` factors through it (`normalForm`).
+`Examples/NormalForm.lean`: OrdersPL → Payments factors through Payments with
+payers named `Customer`, invoices named `Order` and four derived generators; the
+published language contains roots only of the extension, which is an open schema
+with it as input. CatalogPL → Orders, which sends two entity types to one, fails
+the check.
 
 ## Next steps
 
