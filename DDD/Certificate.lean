@@ -1,6 +1,5 @@
 import DDD.Compose
-import DDD.ConvNF
-import DDD.Json
+import DDD.LitData
 
 /-!
 # Certificates
@@ -11,7 +10,9 @@ check (`Certificate.checkClaim`) and a meaning (`Certificate.Holds`), and a
 claim that passes its check holds (`Certificate.checkClaim_sound`).
 
 - `wellFormed`, `acyclic`: a schema is well formed, and acyclic.
-- `translation`: a translation between two schemas is valid.
+- `translation`: a translation between two schemas is valid with the conversions
+  of the list of value types (`Translation.VValid`), checked with
+  `Schema.pathEqV`; an attribute may go to a path that ends in conversions.
 - `gluing`: a schema computed outside Lean is the gluing of two schemas along a
   kernel, up to the order of its lists (`Schema.checkSameUpToOrder`). Its
   schema category is then the pushout in `Cat` of the kernel span, with the
@@ -29,7 +30,11 @@ claim that passes its check holds (`Certificate.checkClaim_sound`).
   literal written in another form passes, and one that is not a value of its
   type fails.
 - `restriction`: a finite state is the restriction of another along a
-  translation; its state is then isomorphic to `Translation.restrictState`.
+  translation. Along a valid translation, its state is isomorphic to
+  `Translation.restrictState` (`FinState.IsRestriction`); along a translation
+  that converts, for a sound list, its state in the literal interpretation is
+  isomorphic to `Translation.vrestrictState` (`FinState.IsVRestriction`), and the
+  check computes it with `FinState.vrestrictLit`.
 - `homomorphism`: a homomorphism of finite states that is a morphism of their
   states.
 - `pathEquality`: two paths out of an object of a schema present the same
@@ -118,6 +123,12 @@ theorem Gluing.isPushout_of_perm (D : Gluing) {G : Schema} (hG : G.WellFormed)
       rw [Iso.refl_hom, Category.id_comp]
       exact Translation.functor_empty_comp_empty D.wf_glued hG _ _ _)
 
+/-- `Y` is the restriction of `X` along the valid translation `T`: both pass the
+check, and the state of `Y` is isomorphic to `Δ_T` applied to the state of `X`. -/
+def FinState.IsRestriction (T : Translation) (S S' : Schema) (X Y : FinState LitK) : Prop :=
+  ∃ (hS' : S'.WellFormed) (hT : T.Valid S S') (hX : X.check S' = true) (hY : Y.check S = true),
+    Nonempty (Y.toState hY ≅ Translation.restrictState hS' hT (X.toState hX))
+
 /-! ## Certificates -/
 
 /-- A claim of a certificate, about named schemas and named states. -/
@@ -160,7 +171,8 @@ def checkClaim : Claim → Bool
     | some S => S.checkWellFormed && S.checkAcyclic
     | none => false
   | .translation s t T => match c.schema? s, c.schema? t with
-    | some S, some S' => S'.checkWellFormed && T.checkValid S S' S'.pathEq
+    | some S, some S' =>
+      S'.checkWellFormed && T.checkVValid c.valueTypes S S' (S'.pathEqV c.valueTypes)
     | _, _ => false
   | .gluing k l r g ff => match c.schema? k, c.schema? l, c.schema? r, c.schema? g with
     | some K, some L, some R, some G =>
@@ -186,8 +198,11 @@ def checkClaim : Claim → Bool
     | none => false
   | .restriction s t T x y => match c.schema? s, c.schema? t, c.state? x, c.state? y with
     | some S, some S', some (sx, X), some (sy, Y) =>
-      sx == t && sy == s && S.checkWellFormed && S'.checkWellFormed &&
-        T.checkValid S S' S'.pathEq && X.check S' && decide (Y = X.restrict T S S')
+      sx == t && sy == s && S.checkWellFormed && S'.checkWellFormed && X.check S' &&
+        ((T.checkValid S S' S'.pathEq && decide (Y = X.restrict T S S')) ||
+          (c.valueTypes.checkSound &&
+            T.checkVValid c.valueTypes S S' (S'.pathEqV c.valueTypes) &&
+            X.litsFit c.valueTypes && decide (Y = X.vrestrictLit c.valueTypes T S S')))
     | _, _, _, _ => false
   | .homomorphism x y h => match c.state? x, c.state? y with
     | some (sx, X), some (sy, Y) => sx == sy && match c.schema? sx with
@@ -205,7 +220,8 @@ def checkClaim : Claim → Bool
 def Holds : Claim → Prop
   | .wellFormed s => ∃ S, c.schema? s = some S ∧ S.WellFormed
   | .acyclic s => ∃ S, c.schema? s = some S ∧ S.WellFormed ∧ S.Acyclic
-  | .translation s t T => ∃ S S', c.schema? s = some S ∧ c.schema? t = some S' ∧ T.Valid S S'
+  | .translation s t T => ∃ S S', c.schema? s = some S ∧ c.schema? t = some S' ∧
+      T.VValid c.valueTypes S S'
   | .gluing k l r g ff => ∃ (D : Gluing) (G : Schema) (hG : G.WellFormed)
       (hl : ({} : Translation).Valid D.left G) (hr : ({} : Translation).Valid D.right G),
       c.schema? k = some D.kernel ∧ c.schema? l = some D.left ∧ c.schema? r = some D.right ∧
@@ -222,11 +238,10 @@ def Holds : Claim → Prop
   | .valueTypes => c.valueTypes.Sound
   | .declared s =>
     ∃ S, c.schema? s = some S ∧ ∀ a ∈ S.attrs, c.valueTypes.admits a.tgt = true
-  | .restriction s t T x y => ∃ (S S' : Schema) (X Y : FinState LitK) (hS' : S'.WellFormed)
-      (hT : T.Valid S S') (hX : X.check S' = true) (hY : Y.check S = true),
+  | .restriction s t T x y => ∃ (S S' : Schema) (X Y : FinState LitK),
       c.schema? s = some S ∧ c.schema? t = some S' ∧ c.state? x = some (t, X) ∧
       c.state? y = some (s, Y) ∧
-      Nonempty (Y.toState hY ≅ Translation.restrictState hS' hT (X.toState hX))
+      (FinState.IsRestriction T S S' X Y ∨ FinState.IsVRestriction c.valueTypes T S S' X Y)
   | .homomorphism x y _ => ∃ (s : String) (S : Schema) (X Y : FinState LitK)
       (hX : X.check S = true) (hY : Y.check S = true),
       c.state? x = some (s, X) ∧ c.state? y = some (s, Y) ∧ c.schema? s = some S ∧
@@ -263,8 +278,8 @@ theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl 
     | some S' =>
       simp only [hs, ht, Bool.and_eq_true] at h
       have hw := (Schema.checkWellFormed_iff S').mp h.1
-      exact ⟨S, S', hs, ht, Translation.checkValid_sound
-        (fun a _ _ hp => Schema.pathEq_sound hw a hp) h.2⟩
+      exact ⟨S, S', hs, ht, Translation.checkVValid_sound
+        (fun a _ _ hp => Schema.pathEqV_sound hw a hp) h.2⟩
   | gluing k l r g ff =>
     simp only [checkClaim] at h
     cases hK : c.schema? k with
@@ -355,13 +370,21 @@ theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl 
     | none => simp [hs, ht, hx, hy] at h
     | some q =>
     obtain ⟨sy, Y⟩ := q
-    simp only [hs, ht, hx, hy, Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
-    obtain ⟨⟨⟨⟨⟨⟨rfl, rfl⟩, wS⟩, wS'⟩, hT⟩, hX⟩, rfl⟩ := h
+    simp only [hs, ht, hx, hy, Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq,
+      decide_eq_true_eq] at h
+    obtain ⟨⟨⟨⟨⟨rfl, rfl⟩, wS⟩, wS'⟩, hX⟩, h⟩ := h
     have wS₁ := (Schema.checkWellFormed_iff S).mp wS
     have wS'₁ := (Schema.checkWellFormed_iff S').mp wS'
-    have hT' := Translation.checkValid_sound (fun a _ _ hp => Schema.pathEq_sound wS'₁ a hp) hT
-    exact ⟨S, S', X, _, wS'₁, hT', hX, FinState.restrict_check wS₁ hX hT', hs, ht, hx, hy,
-      ⟨FinState.restrictIso wS₁ wS'₁ hX hT'⟩⟩
+    refine ⟨S, S', X, Y, hs, ht, hx, hy, ?_⟩
+    rcases h with ⟨hT, rfl⟩ | ⟨⟨⟨hL, hT⟩, hfit⟩, rfl⟩
+    · have hT' := Translation.checkValid_sound (fun a _ _ hp => Schema.pathEq_sound wS'₁ a hp) hT
+      exact Or.inl ⟨wS'₁, hT', hX, FinState.restrict_check wS₁ hX hT',
+        ⟨FinState.restrictIso wS₁ wS'₁ hX hT'⟩⟩
+    · have hT' := Translation.checkVValid_sound
+        (fun a _ _ hp => Schema.pathEqV_sound wS'₁ a hp) hT
+      have hL' := (TypeList.checkSound_iff _).mp hL
+      exact Or.inr (FinState.isVRestriction_vrestrictLit hL' wS₁ wS'₁ hT'
+        (FinState.litsFit_of_check hL' hfit) hX)
   | homomorphism x y hh =>
     simp only [checkClaim] at h
     cases hx : c.state? x with

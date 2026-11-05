@@ -1,4 +1,4 @@
-import DDD.Compose
+import DDD.VCompose
 import DDD.Glue
 import Mathlib.CategoryTheory.Category.Cat.Op
 import Mathlib.CategoryTheory.Grothendieck
@@ -7,23 +7,26 @@ import Mathlib.CategoryTheory.Grothendieck
 # Context maps and their integrations
 
 A context map is a quiver of contexts, with an arrow `u ⟶ d` from each upstream
-context `u` to each downstream context `d` it serves, a well-formed schema per
-context, a valid translation per arrow, from the upstream schema to the
-downstream one, declared equations between routes, and the contexts marked as
-kernels.
+context `u` to each downstream context `d` it serves, a sound list of value types,
+a well-formed schema per context, a translation per arrow from the upstream schema
+to the downstream one, valid with the conversions of the list
+(`Translation.VValid`), declared equations between routes, and the contexts marked
+as kernels. A translation may send an attribute to a path that ends in
+conversions.
 
 - `ContextMap.J`: the category of contexts, the free category on the arrows
   (`Paths`) quotiented by the declared equations between routes (`routeEqns`).
   Without declarations it is the free category.
 - `ContextMap.diagram`: the functor `D : J ⥤ Cat`, sending each context to its
-  schema category, each arrow to the functor of its translation, and each route
-  to the composite. It is defined on the quotient because routes declared equal
-  have the same composite (`coherent`).
+  schema category with conversions (`Schema.vcat`), each arrow to the functor of
+  its translation, and each route to the composite. It is defined on the quotient
+  because routes declared equal have the same composite (`coherent`).
 - Coherence by check: `routeTranslation p` is the composite translation along a
-  route, and its functor is the functor of the route (`routeDiagram_map`).
-  Equations declared as a list of `RouteEqn` are checked by `checkRouteEqn`;
-  `coherent_of_check` gives `coherent` from the checks, and
-  `routeDiagram_map_ne` refutes an equation whose check fails.
+  route (`Translation.vcomp`), and its functor is the functor of the route
+  (`routeDiagram_map`). Equations declared as a list of `RouteEqn` are checked by
+  `checkRouteEqn`, with path equality by `Schema.pathEqV`; `coherent_of_check`
+  gives `coherent` from the checks, and `routeDiagram_map_ne` refutes an equation
+  whose check fails.
 - `ContextMap.Lax`: the lax integration, `(Grothendieck (D ⋙ Cat.opFunctor))ᵒᵖ`.
   `embed c` includes the schema of the context `c`. A reference from `x` in a
   downstream context `d` to `y` in an upstream context `u` is a morphism
@@ -35,15 +38,16 @@ kernels.
   `endo_eq_id_of_rank` gives the hypothesis on the free category for every
   context map with a rank that increases along its arrows, so for every map
   without cycles, and `ContextMap.endo_eq_id` carries it to `J`.
-- Published languages: `Publishes f` for an arrow `f : p ⟶ o` states that `f`
-  includes `p` in its owner `o` and that `p` contains roots of `o` only
-  (`Schema.RootsOnly`); it is decidable.
+- Published languages: `Publishes f` for an arrow `f : p ⟶ o` states that the
+  translation of `f` keeps the entity types of `p` apart and sends them to roots
+  of `o` (`Translation.RootsOnly`); it is decidable. The translation may convert.
 - Strict integration: every arrow out of a context marked as a kernel is the
-  empty translation, an inclusion that keeps names. Two arrows out of a kernel
-  whose targets share nothing outside it glue (`kernelGluing`); the kernel span
-  of the gluing is the image of the two arrows under `D`
-  (`kernelGluing_ι₁`, `kernelGluing_ι₂`), so the glued schema category is the
-  pushout of that span in `Cat` (`isPushout_kernel`).
+  empty translation, an inclusion that keeps names, and is valid without
+  conversions (`valid_empty`, from the faithfulness of `Schema.vinc`). Two arrows
+  out of a kernel whose targets share nothing outside it glue (`kernelGluing`);
+  the glued schema category is the pushout in `Cat` of the two inclusions
+  (`isPushout_kernel`), whose extensions to the conversions are the images of the
+  arrows under `D` (`vinc_diagram_map`).
 -/
 
 namespace DDD
@@ -90,67 +94,73 @@ section Routes
 variable {C : Type} [Quiver.{1} C]
 
 /-- The functor on the free category of the arrows: each context to its schema
-category, each arrow to the functor of its translation, and each route to the
-composite. -/
-def routeDiagram (schema : C → Schema) (translation : ∀ {u d : C}, (u ⟶ d) → Translation)
+category with the conversions of `L`, each arrow to the functor of its translation,
+and each route to the composite. -/
+def routeDiagram (L : TypeList) (schema : C → Schema)
+    (translation : ∀ {u d : C}, (u ⟶ d) → Translation)
     (wellFormed : ∀ c, (schema c).WellFormed)
-    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d)) :
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).VValid L (schema u) (schema d)) :
     Paths C ⥤ Cat.{0, 0} :=
   Paths.lift
-    { obj c := (schema c).cat
-      map f := (translation f).functor (wellFormed _) (valid f) }
+    { obj c := (schema c).vcat L
+      map f := (translation f).vfunctor (wellFormed _) (wellFormed _) (valid f) }
 
 /-- The composite of the translations along a route, as finite data. -/
-def routeTranslation (schema : C → Schema) (translation : ∀ {u d : C}, (u ⟶ d) → Translation)
-    {u : C} : ∀ {d : C}, Quiver.Path u d → Translation
+def routeTranslation (L : TypeList) (schema : C → Schema)
+    (translation : ∀ {u d : C}, (u ⟶ d) → Translation) {u : C} :
+    ∀ {d : C}, Quiver.Path u d → Translation
   | _, .nil => {}
   | _, .cons (b := b) p f =>
-    (routeTranslation schema translation p).comp (schema u) (schema b) (translation f)
+    (routeTranslation L schema translation p).vcomp (schema u) (schema b) L (translation f)
 
-@[simp] theorem routeTranslation_nil (schema : C → Schema)
+@[simp] theorem routeTranslation_nil (L : TypeList) (schema : C → Schema)
     (translation : ∀ {u d : C}, (u ⟶ d) → Translation) (u : C) :
-    routeTranslation schema translation (Quiver.Path.nil : Quiver.Path u u) = {} := rfl
+    routeTranslation L schema translation (Quiver.Path.nil : Quiver.Path u u) = {} := rfl
 
-@[simp] theorem routeTranslation_cons (schema : C → Schema)
+@[simp] theorem routeTranslation_cons (L : TypeList) (schema : C → Schema)
     (translation : ∀ {u d : C}, (u ⟶ d) → Translation) {u b d : C} (p : Quiver.Path u b)
     (f : b ⟶ d) :
-    routeTranslation schema translation (p.cons f) =
-      (routeTranslation schema translation p).comp (schema u) (schema b) (translation f) := rfl
+    routeTranslation L schema translation (p.cons f) =
+      (routeTranslation L schema translation p).vcomp (schema u) (schema b) L (translation f) :=
+  rfl
 
-variable {schema : C → Schema} {translation : ∀ {u d : C}, (u ⟶ d) → Translation}
+variable {L : TypeList} {schema : C → Schema}
+  {translation : ∀ {u d : C}, (u ⟶ d) → Translation}
 
 theorem routeTranslation_valid (wellFormed : ∀ c, (schema c).WellFormed)
-    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d)) :
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).VValid L (schema u) (schema d)) :
     {u : C} → ∀ {d : C} (p : Quiver.Path u d),
-      (routeTranslation schema translation p).Valid (schema u) (schema d)
+      (routeTranslation L schema translation p).VValid L (schema u) (schema d)
   | u, _, .nil => by
     rw [routeTranslation_nil]
-    exact Translation.empty_valid_self (wellFormed u)
+    exact (Translation.empty_valid_self (wellFormed u)).vvalid
   | u, _, .cons p f => by
     rw [routeTranslation_cons]
-    exact Translation.comp_valid (wellFormed u) (wellFormed _)
+    exact Translation.vcomp_vvalid (wellFormed u) (wellFormed _) (wellFormed _)
       (routeTranslation_valid wellFormed valid p) (valid f)
 
 /-- The functor of a route is the functor of the composite translation along it. -/
 theorem routeDiagram_map (wellFormed : ∀ c, (schema c).WellFormed)
-    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d))
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).VValid L (schema u) (schema d))
     {u d : C} (p : Quiver.Path u d) :
-    (routeDiagram schema translation wellFormed valid).map p =
-      Translation.functor (wellFormed d) (routeTranslation_valid wellFormed valid p) := by
+    (routeDiagram L schema translation wellFormed valid).map p =
+      Translation.vfunctor _ (wellFormed u) (wellFormed d)
+        (routeTranslation_valid wellFormed valid p) := by
   induction p with
   | nil =>
     refine (Paths.lift_nil _ _).trans ?_
-    rw [Translation.functor_congr (wellFormed u) _ (Translation.empty_valid_self (wellFormed u))
-      (routeTranslation_nil schema translation u), Translation.functor_empty_self]
+    rw [Translation.vfunctor_congr (wellFormed u) (wellFormed u) _
+      (Translation.empty_valid_self (wellFormed u)).vvalid
+      (routeTranslation_nil L schema translation u), Translation.vfunctor_empty_self]
     rfl
   | cons p f ih =>
     refine (Paths.lift_cons _ _ _).trans ?_
-    change (routeDiagram schema translation wellFormed valid).map p ≫ _ = _
-    rw [ih, Translation.functor_congr (wellFormed _) _
-      (Translation.comp_valid (wellFormed u) (wellFormed _)
+    change (routeDiagram L schema translation wellFormed valid).map p ≫ _ = _
+    rw [ih, Translation.vfunctor_congr (wellFormed u) (wellFormed _) _
+      (Translation.vcomp_vvalid (wellFormed u) (wellFormed _) (wellFormed _)
         (routeTranslation_valid wellFormed valid p) (valid f))
-        (routeTranslation_cons schema translation p f),
-      Translation.functor_comp (wellFormed u) (wellFormed _) (wellFormed _)]
+        (routeTranslation_cons L schema translation p f),
+      Translation.vfunctor_vcomp (wellFormed u) (wellFormed _) (wellFormed _)]
     rfl
 
 /-- An equation between two routes with the same endpoints. -/
@@ -164,59 +174,63 @@ structure RouteEqn (C : Type) [Quiver.{1} C] where
 def RouteEqn.rel (eqns : List (RouteEqn C)) : HomRel (Paths C) :=
   fun u d p q => (⟨u, d, p, q⟩ : RouteEqn C) ∈ eqns
 
-variable (schema translation) in
+variable (L schema translation) in
 /-- The check for a declared equation: the composite translations along its two
 routes induce the same functor. -/
 def checkRouteEqn (e : RouteEqn C) : Bool :=
-  (routeTranslation schema translation e.lhs).checkSameFunctor
-    (routeTranslation schema translation e.rhs) (schema e.src) (schema e.tgt).pathEq
+  (routeTranslation L schema translation e.lhs).checkSameFunctor
+    (routeTranslation L schema translation e.rhs) (schema e.src) ((schema e.tgt).pathEqV L)
 
 /-- Coherence by check: when every declared equation passes `checkRouteEqn`, the
 translations respect the declarations. -/
 theorem coherent_of_check (wellFormed : ∀ c, (schema c).WellFormed)
-    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d))
-    (eqns : List (RouteEqn C)) (h : ∀ e ∈ eqns, checkRouteEqn schema translation e = true) :
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).VValid L (schema u) (schema d))
+    (eqns : List (RouteEqn C)) (h : ∀ e ∈ eqns, checkRouteEqn L schema translation e = true) :
     ∀ ⦃u d : Paths C⦄ (p q : u ⟶ d), RouteEqn.rel eqns p q →
-      (routeDiagram schema translation wellFormed valid).map p =
-        (routeDiagram schema translation wellFormed valid).map q := by
+      (routeDiagram L schema translation wellFormed valid).map p =
+        (routeDiagram L schema translation wellFormed valid).map q := by
   intro u d p q hpq
   rw [routeDiagram_map wellFormed valid p, routeDiagram_map wellFormed valid q]
-  exact Translation.checkSameFunctor_sound (wellFormed d) _ _
-    (fun a _ _ h => Schema.pathEq_sound (wellFormed d) a h) (h _ hpq)
+  exact Translation.checkSameFunctor_vsound (wellFormed u) (wellFormed d) _ _
+    (fun a _ _ h => Schema.pathEqV_sound (wellFormed d) a h) (h _ hpq)
 
 /-- When path equality in the target is decided, a failed check refutes the
 equation: the two routes have different functors. -/
 theorem routeDiagram_map_ne (wellFormed : ∀ c, (schema c).WellFormed)
-    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d))
+    (valid : ∀ {u d : C} (f : u ⟶ d), (translation f).VValid L (schema u) (schema d))
     (e : RouteEqn C)
-    (hpeq : ∀ (a : (schema e.tgt).Obj) (l l' : List String),
-      (schema e.tgt).pathEq a.1 l l' = true ↔ (schema e.tgt).PathEq a l l')
-    (h : checkRouteEqn schema translation e = false) :
-    (routeDiagram schema translation wellFormed valid).map e.lhs ≠
-      (routeDiagram schema translation wellFormed valid).map e.rhs := by
+    (hpeq : ∀ (a : (schema e.tgt).VObj L) (l l' : List String),
+      (schema e.tgt).pathEqV L a.1 l l' = true ↔ (schema e.tgt).VPathEq L a l l')
+    (h : checkRouteEqn L schema translation e = false) :
+    (routeDiagram L schema translation wellFormed valid).map e.lhs ≠
+      (routeDiagram L schema translation wellFormed valid).map e.rhs := by
   intro hm
   rw [routeDiagram_map wellFormed valid, routeDiagram_map wellFormed valid] at hm
-  have := (Translation.checkSameFunctor_iff (wellFormed e.src) (wellFormed e.tgt) _ _ hpeq).mpr hm
+  have := (Translation.checkSameFunctor_viff (wellFormed e.src) (wellFormed e.tgt) _ _ hpeq).mpr hm
   simp [checkRouteEqn, this] at h
 
 end Routes
 
-/-- A context map on the contexts `C`: a well-formed schema per context, a valid
-translation per arrow, from the upstream schema to the downstream one, the
-declared equations between routes, which the translations respect, and the
-contexts marked as kernels, out of which every arrow is an inclusion. By default
-no equation is declared and no context is a kernel. -/
+/-- A context map on the contexts `C`: a sound list of value types, a well-formed
+schema per context, a translation per arrow from the upstream schema to the
+downstream one, valid with the conversions of the list, the declared equations
+between routes, which the translations respect, and the contexts marked as
+kernels, out of which every arrow is an inclusion. By default the list of value
+types is empty, no equation is declared and no context is a kernel. -/
 structure ContextMap (C : Type) [Quiver.{1} C] where
+  /-- The value types and their conversions. -/
+  valueTypes : TypeList := {}
+  sound : valueTypes.Sound := by exact (TypeList.checkSound_iff _).mp (by decide)
   schema : C → Schema
   translation : ∀ {u d : C}, (u ⟶ d) → Translation
   wellFormed : ∀ c, (schema c).WellFormed
-  valid : ∀ {u d : C} (f : u ⟶ d), (translation f).Valid (schema u) (schema d)
+  valid : ∀ {u d : C} (f : u ⟶ d), (translation f).VValid valueTypes (schema u) (schema d)
   /-- The declared equations between routes. -/
   routeEqns : HomRel (Paths C) := fun _ _ _ _ => False
   /-- Routes declared equal have the same composite functor. -/
   coherent : ∀ ⦃u d : Paths C⦄ (p q : u ⟶ d), routeEqns p q →
-      (routeDiagram schema translation wellFormed valid).map p =
-        (routeDiagram schema translation wellFormed valid).map q := by
+      (routeDiagram valueTypes schema translation wellFormed valid).map p =
+        (routeDiagram valueTypes schema translation wellFormed valid).map q := by
     intro _ _ _ _ h
     cases h
   /-- The contexts marked as kernels. -/
@@ -235,7 +249,7 @@ variable {C : Type} [Quiver.{1} C] (M : ContextMap C)
 /-- The diagram on the free category of the arrows, before the declared
 equations. -/
 def freeDiagram : Paths C ⥤ Cat.{0, 0} :=
-  routeDiagram M.schema M.translation M.wellFormed M.valid
+  routeDiagram M.valueTypes M.schema M.translation M.wellFormed M.valid
 
 /-- The category of contexts: the free category on the arrows, quotiented by the
 declared equations between routes. -/
@@ -267,13 +281,14 @@ theorem route_surjective {u d : C} (f : M.ctx u ⟶ M.ctx d) :
 def diagram : M.J ⥤ Cat.{0, 0} :=
   CategoryTheory.Quotient.lift M.routeEqns M.freeDiagram fun _ _ p q h => M.coherent p q h
 
-theorem diagram_obj (c : C) : M.diagram.obj (M.ctx c) = (M.schema c).cat := rfl
+theorem diagram_obj (c : C) : M.diagram.obj (M.ctx c) = (M.schema c).vcat M.valueTypes := rfl
 
 theorem diagram_map_route {u d : C} (p : Quiver.Path u d) :
     M.diagram.map (M.route p) = M.freeDiagram.map p := rfl
 
 theorem diagram_map_arrow {u d : C} (f : u ⟶ d) :
-    M.diagram.map (M.arrow f) = (M.translation f).functor (M.wellFormed _) (M.valid f) :=
+    M.diagram.map (M.arrow f) =
+      (M.translation f).vfunctor (M.wellFormed _) (M.wellFormed _) (M.valid f) :=
   Paths.lift_toPath _ _
 
 /-- If the only route from each context to itself is the empty one, every
@@ -291,14 +306,15 @@ def Lax : Type := (Grothendieck (M.diagram ⋙ Cat.opFunctor))ᵒᵖ
 instance : Category M.Lax :=
   inferInstanceAs (Category (Grothendieck (M.diagram ⋙ Cat.opFunctor))ᵒᵖ)
 
-/-- The schema of the context `c` inside the lax integration. -/
-def embed (c : C) : (M.schema c).cat ⥤ M.Lax :=
+/-- The schema of the context `c`, with conversions, inside the lax integration. -/
+def embed (c : C) : (M.schema c).vcat M.valueTypes ⥤ M.Lax :=
   (Grothendieck.ι (M.diagram ⋙ Cat.opFunctor) (M.ctx c)).rightOp
 
 /-- A reference from `x` in the downstream context `d` to `y` in the upstream
 context `u`: a morphism `f : u ⟶ d` of `J` and a morphism `x ⟶ D f y` in the
 schema of `d`. -/
-def ref {u d : C} (f : M.ctx u ⟶ M.ctx d) {x : (M.schema d).cat} {y : (M.schema u).cat}
+def ref {u d : C} (f : M.ctx u ⟶ M.ctx d) {x : (M.schema d).vcat M.valueTypes}
+    {y : (M.schema u).vcat M.valueTypes}
     (φ : x ⟶ (M.diagram.map f).obj y) : (M.embed d).obj x ⟶ (M.embed u).obj y :=
   Quiver.Hom.op (⟨f, φ.op⟩ : CategoryTheory.Grothendieck.Hom (F := M.diagram ⋙ Cat.opFunctor)
     ⟨M.ctx u, Opposite.op y⟩ ⟨M.ctx d, Opposite.op x⟩)
@@ -308,8 +324,8 @@ onto `Jᵒᵖ`. -/
 def projection : M.Lax ⥤ M.Jᵒᵖ :=
   (Grothendieck.forget (M.diagram ⋙ Cat.opFunctor)).op
 
-theorem projection_ref {u d : C} (f : M.ctx u ⟶ M.ctx d) {x : (M.schema d).cat}
-    {y : (M.schema u).cat} (φ : x ⟶ (M.diagram.map f).obj y) :
+theorem projection_ref {u d : C} (f : M.ctx u ⟶ M.ctx d) {x : (M.schema d).vcat M.valueTypes}
+    {y : (M.schema u).vcat M.valueTypes} (φ : x ⟶ (M.diagram.map f).obj y) :
     M.projection.map (M.ref f φ) = f.op := rfl
 
 instance (c : C) : (M.embed c).Faithful :=
@@ -335,10 +351,13 @@ theorem nonInterference (hJ : ∀ (c : M.J) (f : c ⟶ c), f = 𝟙 c) (c : C) :
 
 /-! ## Published languages -/
 
-/-- The arrow `f : p ⟶ o` presents `p` as a published language of `o`: `f` is
-the empty translation, and `p` contains roots of `o` only. -/
+/-- The arrow `f : p ⟶ o` presents `p` as a published language of `o`: its
+translation keeps the entity types of `p` apart and sends them to roots of `o`
+(`Translation.RootsOnly`). An inclusion that keeps names sends `p` to roots
+exactly when `Schema.RootsOnly` holds (`Translation.rootsOnly_empty`). -/
 def Publishes {p o : C} (f : p ⟶ o) : Prop :=
-  M.translation f = {} ∧ (M.schema p).RootsOnly (M.schema o)
+  ((M.schema p).entities.map (M.translation f).ent).Nodup ∧
+    (M.translation f).RootsOnly (M.schema p) (M.schema o)
 
 instance {p o : C} (f : p ⟶ o) : Decidable (M.Publishes f) :=
   inferInstanceAs (Decidable (_ ∧ _))
@@ -349,7 +368,18 @@ instance {p o : C} (f : p ⟶ o) : Decidable (M.Publishes f) :=
 names. -/
 theorem valid_empty {k d : C} (f : k ⟶ d) (hk : M.kernel k = true) :
     ({} : Translation).Valid (M.schema k) (M.schema d) :=
-  M.inclusion f hk ▸ M.valid f
+  Translation.VValid.valid_empty (M.wellFormed k) (M.wellFormed d) M.sound
+    (M.inclusion f hk ▸ M.valid f)
+
+/-- On the schema category, the image under `D` of an arrow out of a kernel is its
+inclusion. -/
+theorem vinc_diagram_map {k d : C} (f : k ⟶ d) (hk : M.kernel k = true) :
+    (M.schema k).vinc M.valueTypes ⋙ M.diagram.map (M.arrow f) =
+      Translation.functor (M.wellFormed d) (M.valid_empty f hk) ⋙
+        (M.schema d).vinc M.valueTypes := by
+  rw [diagram_map_arrow, Translation.vfunctor_congr _ _ _ (M.valid_empty f hk).vvalid
+    (M.inclusion f hk)]
+  exact Translation.vinc_comp_vfunctor _ _ _ _
 
 variable {k d₁ d₂ : C} (f₁ : k ⟶ d₁) (f₂ : k ⟶ d₂) (hk : M.kernel k = true)
   (hc : Schema.gluingClashes (M.schema k) (M.schema d₁) (M.schema d₂) = [])
@@ -370,24 +400,14 @@ def kernelGluing : Gluing where
     ⟨M.valid_empty f₁ hk, M.valid_empty f₂ hk, (Schema.gluingClashes_eq_nil_iff.mp hc).1,
       (Schema.gluingClashes_eq_nil_iff.mp hc).2⟩
 
-/-- The first leg of the kernel span is the image of the first arrow under `D`. -/
-theorem kernelGluing_ι₁ : (M.kernelGluing f₁ f₂ hk hc hwf).ι₁ = M.diagram.map (M.arrow f₁) := by
-  rw [diagram_map_arrow]
-  exact Translation.functor_congr _ _ _ (M.inclusion f₁ hk).symm
-
-/-- The second leg of the kernel span is the image of the second arrow under
-`D`. -/
-theorem kernelGluing_ι₂ : (M.kernelGluing f₁ f₂ hk hc hwf).ι₂ = M.diagram.map (M.arrow f₂) := by
-  rw [diagram_map_arrow]
-  exact Translation.functor_congr _ _ _ (M.inclusion f₂ hk).symm
-
-/-- Strict integration along a kernel: the glued schema category is the pushout
-in `Cat` of the images under `D` of the two arrows out of the kernel. -/
+/-- Strict integration along a kernel: the glued schema category is the pushout in
+`Cat` of the inclusions along the two arrows out of the kernel, whose extensions to
+the conversions are their images under `D` (`vinc_diagram_map`). -/
 theorem isPushout_kernel :
-    IsPushout (M.diagram.map (M.arrow f₁)) (M.diagram.map (M.arrow f₂))
-      (M.kernelGluing f₁ f₂ hk hc hwf).inl (M.kernelGluing f₁ f₂ hk hc hwf).inr := by
-  rw [← kernelGluing_ι₁, ← kernelGluing_ι₂]
-  exact (M.kernelGluing f₁ f₂ hk hc hwf).isPushout
+    IsPushout (C := Cat.{0, 0}) (Translation.functor (M.wellFormed d₁) (M.valid_empty f₁ hk))
+      (Translation.functor (M.wellFormed d₂) (M.valid_empty f₂ hk))
+      (M.kernelGluing f₁ f₂ hk hc hwf).inl (M.kernelGluing f₁ f₂ hk hc hwf).inr :=
+  (M.kernelGluing f₁ f₂ hk hc hwf).isPushout
 
 end ContextMap
 

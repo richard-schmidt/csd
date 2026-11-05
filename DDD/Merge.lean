@@ -18,15 +18,18 @@ schema of the component is the union of the schemas of its members
   and each member after the first shares the value types with an earlier one
   through a kernel. Kernels include into members along `links`, a list of the
   arrows out of kernels; a member includes into itself.
-- `Component.isColimit`: the glued schema category is the colimit of `D`
-  restricted to the members and the arrows between them, which are inclusions
-  out of kernels. For one kernel with two arrows the diagram is a span, and the
-  colimit is the pushout of `isPushout_kernel`.
+- `Component.isColimit`: the glued schema category is the colimit of the
+  inclusions between the members (`Component.diagram`), the arrows between them,
+  which are out of kernels. With conversions these inclusions are the images of
+  the arrows under `D` (`ContextMap.vinc_diagram_map`). For one kernel with two
+  arrows the diagram is a span, and the colimit is the pushout of
+  `isPushout_kernel`.
 - `Component.map`: the context map after the merge, on `Merged`: the component is
   one context with the glued schema, and every arrow into a member becomes an
   arrow into it, its translation composed with the inclusion of the member
-  (`Translation.comp`; `diagram_into`). No arrow leaves the component
-  (`Component.closed`), so no arrow leaves the glued context.
+  (`Translation.vcomp`; `diagram_into`, with `Component.vleg`). The arrow may
+  convert. No arrow leaves the component (`Component.closed`), so no arrow leaves
+  the glued context.
 - Non-interference: lax non-interference for the merged map when the map has a
   rank (`Component.nonInterference`), and strict non-interference for each leg
   from `checkFullyFaithful` (`Component.leg_fullyFaithful`).
@@ -91,15 +94,21 @@ variable (M : ContextMap C)
 def membersIncl (ms : List C) : Paths (Members ms) ⥤ M.J :=
   Paths.lift { obj := fun a => M.ctx a.1, map := fun f => M.arrow f }
 
-/-- `D` restricted to the contexts of `ms` and the arrows between them. -/
-def membersDiagram (ms : List C) : Paths (Members ms) ⥤ Cat.{0, 0} :=
-  M.membersIncl ms ⋙ M.diagram
+/-- The schema categories of the contexts of `ms` and, along the arrows between
+them, the inclusions, when every arrow out of a context of `ms` is out of a kernel.
+Their extensions to the conversions are the images under `D`
+(`vinc_diagram_map`). -/
+def membersDiagram (ms : List C) (hk : ∀ {a b : C} (_ : a ⟶ b), a ∈ ms → M.kernel a = true) :
+    Paths (Members ms) ⥤ Cat.{0, 0} :=
+  Paths.lift
+    { obj := fun a => (M.schema a.1).cat
+      map := fun {a _} f => Translation.functor (M.wellFormed _) (M.valid_empty f (hk f a.2)) }
 
-theorem membersDiagram_map {ms : List C} {a b : Members ms} (f : a ⟶ b) :
-    (M.membersDiagram ms).map f.toPath =
-      (M.translation f).functor (M.wellFormed _) (M.valid f) := by
-  simp only [membersDiagram, membersIncl, Functor.comp_map, Paths.lift_toPath]
-  exact M.diagram_map_arrow f
+theorem membersDiagram_map {ms : List C}
+    {hk : ∀ {a b : C} (_ : a ⟶ b), a ∈ ms → M.kernel a = true} {a b : Members ms} (f : a ⟶ b) :
+    (M.membersDiagram ms hk).map f.toPath =
+      Translation.functor (M.wellFormed _) (M.valid_empty f (hk f a.2)) :=
+  Paths.lift_toPath _ _
 
 /-! ## The condition -/
 
@@ -148,6 +157,10 @@ variable {M} (P : M.Component)
 
 /-- The glued schema of the component. -/
 abbrev glued : Schema := Schema.glueAll (P.members.map M.schema)
+
+/-- The inclusions between the members. -/
+abbrev diagram : Paths (Members P.members) ⥤ Cat.{0, 0} :=
+  M.membersDiagram P.members fun f h => (P.closed f h).2
 
 theorem check_links : ∀ l ∈ P.links, l.1 ∈ P.members ∧ l.2.1 ∈ P.members := by
   have h := P.check
@@ -233,30 +246,28 @@ def leg (a : Members P.members) : (M.schema a.1).cat ⥤ P.glued.cat := P.cover.
 /-- Along an arrow between members, the legs commute: the arrow is an inclusion
 out of a kernel. -/
 theorem leg_arrow {a b : Members P.members} (f : a ⟶ b) :
-    (M.membersDiagram P.members).map f.toPath ⋙ P.leg b = P.leg a := by
-  have hk := (P.closed f a.2).2
-  rw [membersDiagram_map, Translation.functor_congr _ _ (M.valid_empty f hk) (M.inclusion f hk)]
+    P.diagram.map f.toPath ⋙ P.leg b = P.leg a := by
+  rw [membersDiagram_map (hk := fun f h => (P.closed f h).2)]
   exact Translation.functor_empty_comp_empty _ _ _ _ _
 
 /-! ## The colimit -/
 
 /-- Along a route between members, the legs commute. -/
 theorem leg_path {a : Members P.members} : ∀ {b : Members P.members} (p : Quiver.Path a b),
-    (M.membersDiagram P.members).map p ≫ P.leg b = P.leg a
-  | _, .nil => ((congrArg (· ≫ P.leg a) ((M.membersDiagram P.members).map_id a)).trans
+    P.diagram.map p ≫ P.leg b = P.leg a
+  | _, .nil => ((congrArg (· ≫ P.leg a) (P.diagram.map_id a)).trans
       (Category.id_comp _))
   | _, .cons (b := b) p f => by
-    have hc : (M.membersDiagram P.members).map (p.cons f) =
-        (M.membersDiagram P.members).map p ≫ (M.membersDiagram P.members).map f.toPath := by
-      simp only [membersDiagram, Functor.comp_map, membersIncl, Paths.lift_cons,
-        Paths.lift_toPath, CategoryTheory.Functor.map_comp]
+    have hc : P.diagram.map (p.cons f) =
+        P.diagram.map p ≫ P.diagram.map f.toPath := by
+      simp only [membersDiagram, Paths.lift_cons, Paths.lift_toPath]
     rw [hc, Category.assoc,
-      show (M.membersDiagram P.members).map f.toPath ≫ P.leg _ = P.leg b from P.leg_arrow f]
+      show P.diagram.map f.toPath ≫ P.leg _ = P.leg b from P.leg_arrow f]
     exact leg_path p
 
 /-- The glued schema category with the legs, as a cocone over `D` restricted to
 the members. -/
-def cocone : Limits.Cocone (M.membersDiagram P.members) where
+def cocone : Limits.Cocone P.diagram where
   pt := P.glued.cat
   ι :=
     { app := fun a => P.leg a
@@ -269,7 +280,7 @@ section Agree
 
 variable {X : Type*} [Category X] {F : ∀ a : Members P.members, (M.schema a.1).cat ⥤ X}
   (hF : ∀ {a b : Members P.members} (f : a ⟶ b),
-    (M.membersDiagram P.members).map f.toPath ⋙ F b = F a)
+    P.diagram.map f.toPath ⋙ F b = F a)
 
 include hF in
 /-- Along a link, the functors are related by the inclusion. -/
@@ -277,8 +288,7 @@ theorem compat_link {k c : C} (hk : k ∈ P.members) (hc : c ∈ P.members) (f :
     Translation.functor (M.wellFormed c) (M.valid_empty f (P.closed f hk).2) ⋙ F ⟨c, hc⟩ =
       F ⟨k, hk⟩ := by
   have h := hF (a := ⟨k, hk⟩) (b := ⟨c, hc⟩) f
-  rwa [membersDiagram_map, Translation.functor_congr _ _ (M.valid_empty f (P.closed f hk).2)
-    (M.inclusion f (P.closed f hk).2)] at h
+  rwa [membersDiagram_map (hk := fun f h => (P.closed f h).2)] at h
 
 include hF in
 /-- Where `k` reaches `c`, the functor of `c` agrees with the functor of `k` on an
@@ -397,18 +407,17 @@ theorem agree : Schema.Agree (fun a : Members P.members => M.schema a.1) F where
 end Agree
 
 /-- The legs of a cocone over `D` restricted to the members. -/
-def coconeLegs (s : Limits.Cocone (M.membersDiagram P.members)) :
+def coconeLegs (s : Limits.Cocone P.diagram) :
     ∀ a : Members P.members, (M.schema a.1).cat ⥤ s.pt := fun a => s.ι.app a
 
 /-- The legs of a cocone over `D` restricted to the members agree where the
 members overlap. -/
-theorem agree_cocone (s : Limits.Cocone (M.membersDiagram P.members)) :
+theorem agree_cocone (s : Limits.Cocone P.diagram) :
     Schema.Agree (fun a : Members P.members => M.schema a.1) (P.coconeLegs s) :=
   P.agree fun f => s.w f.toPath
 
 /-- Strict integration along the kernels of a component: the glued schema
-category is the colimit of `D` restricted to the members and the arrows between
-them. -/
+category is the colimit of the inclusions between the members. -/
 noncomputable def isColimit : Limits.IsColimit P.cocone where
   desc s := P.cover.desc (P.agree_cocone s)
   fac _ a := P.cover.leg_desc _ a
@@ -436,14 +445,16 @@ theorem mergedWellFormed : ∀ c, (P.mergedSchema c).WellFormed
 composed with the inclusion of the member for an arrow into the glued context. -/
 def mergedTranslation : ∀ {u d : Merged P.members}, (u ⟶ d) → Translation
   | .other _ _, .other _ _, f => M.translation f
-  | .other u _, .glued, f => (M.translation f.2).comp (M.schema u) (M.schema f.1.1) {}
+  | .other u _, .glued, f =>
+    (M.translation f.2).vcomp (M.schema u) (M.schema f.1.1) M.valueTypes {}
   | .glued, _, f => PEmpty.elim f
 
 theorem mergedValid : ∀ {u d : Merged P.members} (f : u ⟶ d),
-    (P.mergedTranslation f).Valid (P.mergedSchema u) (P.mergedSchema d)
+    (P.mergedTranslation f).VValid M.valueTypes (P.mergedSchema u) (P.mergedSchema d)
   | .other _ _, .other _ _, f => M.valid f
   | .other u _, .glued, f =>
-    Translation.comp_valid (M.wellFormed u) P.wf_glued (M.valid f.2) (P.sub f.1)
+    Translation.vcomp_vvalid (M.wellFormed u) (M.wellFormed _) P.wf_glued (M.valid f.2)
+      (P.sub f.1).vvalid
   | .glued, _, f => PEmpty.elim f
 
 /-- The kernels after the merge: the kernels outside the component. -/
@@ -459,6 +470,8 @@ theorem mergedInclusion : ∀ {u d : Merged P.members} (f : u ⟶ d),
 
 /-- The context map after the merge. It declares no equation between routes. -/
 def map : ContextMap (Merged P.members) where
+  valueTypes := M.valueTypes
+  sound := M.sound
   schema := P.mergedSchema
   translation := P.mergedTranslation
   wellFormed := P.mergedWellFormed
@@ -466,20 +479,31 @@ def map : ContextMap (Merged P.members) where
   kernel := P.mergedKernel
   inclusion := P.mergedInclusion
 
+/-- The inclusion of a member into the glued schema category, with conversions. -/
+def vleg (a : Members P.members) :
+    (M.schema a.1).vcat M.valueTypes ⥤ P.glued.vcat M.valueTypes :=
+  Translation.vfunctor {} (M.wellFormed _) P.wf_glued (P.sub a).vvalid
+
+/-- With conversions, the inclusion of a member extends its leg. -/
+theorem vinc_vleg (a : Members P.members) :
+    (M.schema a.1).vinc M.valueTypes ⋙ P.vleg a = P.leg a ⋙ P.glued.vinc M.valueTypes :=
+  Translation.vinc_comp_vfunctor _ _ _ (P.sub a)
+
 /-- An arrow into a member goes to the glued context, with the functor of the
-arrow followed by the leg of the member. -/
+arrow followed by the inclusion of the member. -/
 theorem diagram_into {u : C} (hu : u ∉ P.members) (d : Members P.members) (f : u ⟶ d.1) :
     P.map.diagram.map (P.map.arrow (u := .other u hu) (d := .glued) ⟨d, f⟩) =
-      M.diagram.map (M.arrow f) ⋙ P.leg d := by
+      M.diagram.map (M.arrow f) ⋙ P.vleg d := by
   rw [diagram_map_arrow, diagram_map_arrow]
-  exact Translation.functor_comp (M.wellFormed u) (M.wellFormed d.1) P.wf_glued (M.valid f)
-    (P.sub d)
+  exact Translation.vfunctor_vcomp (M.wellFormed u) (M.wellFormed d.1) P.wf_glued (M.valid f)
+    (P.sub d).vvalid
 
 /-- An arrow between contexts outside the component is unchanged. -/
 theorem diagram_other {u d : C} (hu : u ∉ P.members) (hd : d ∉ P.members) (f : u ⟶ d) :
     P.map.diagram.map (P.map.arrow (u := .other u hu) (d := .other d hd) f) =
       M.diagram.map (M.arrow f) := by
   rw [diagram_map_arrow, diagram_map_arrow]
+  rfl
 
 /-- Lax non-interference after the merge, for a map with a rank that increases
 along its arrows. -/

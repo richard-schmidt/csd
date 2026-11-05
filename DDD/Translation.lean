@@ -274,6 +274,22 @@ theorem functor_empty_genMor (hS' : S'.WellFormed) (hT : ({} : Translation).Vali
   exact Schema.mor_eq_of_names (Subtype.ext (ob_empty a.1)) (Subtype.ext (ob_empty b.1)) _ _
     (by rw [names_functorPath_empty]; rfl)
 
+/-! ## Roots -/
+
+/-- `T` sends the entity types of `P` to roots of `S`: no image of an entity type of
+`P` is a member of an aggregate of `S`. -/
+def RootsOnly (T : Translation) (P S : Schema) : Prop :=
+  ∀ e ∈ P.entities, ∀ A ∈ S.aggregates, T.ent e ∉ A.members.map (·.entity)
+
+instance (T : Translation) (P S : Schema) : Decidable (T.RootsOnly P S) := by
+  unfold RootsOnly
+  infer_instance
+
+/-- The inclusion that keeps names sends `P` to roots of `S` exactly when `P`
+contains roots of `S` only. -/
+theorem rootsOnly_empty (P S : Schema) : ({} : Translation).RootsOnly P S ↔ P.RootsOnly S :=
+  Iff.rfl
+
 end Translation
 
 end DDD

@@ -12,8 +12,8 @@ decided by `Certificate.checkClaim` alone, which is sound
 - well-formedness: the problems of the schema (`Schema.problems`), none exactly
   when the check passes;
 - acyclicity: those, and a path longer than the number of entity types;
-- translation: the problems of the target schema and of the translation
-  (`Translation.problems`), none exactly when the check passes;
+- translation: the problems of the target schema and of the translation with
+  conversions (`Translation.vproblems`), none exactly when the check passes;
 - the list of value types: its problems (`TypeList.problems`), none exactly
   when it is sound;
 - declared value types: the attributes whose value types the list does not admit
@@ -212,7 +212,8 @@ def explain : Claim → List Json
     | none => [unknown "schema" s]
   | .translation s t T => match c.schema? s, c.schema? t with
     | some S, some S' =>
-      c.schemaProblems t ++ (T.problems S S' S'.pathEq).map (Translation.Problem.toJson s t)
+      c.schemaProblems t ++ (T.vproblems c.valueTypes S S' (S'.pathEqV c.valueTypes)).map
+        (Translation.Problem.toJson s t)
     | _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
       (if (c.schema? t).isNone then [unknown "schema" t] else [])
   | .gluing k l r g ff => match c.schema? k, c.schema? l, c.schema? r, c.schema? g with
@@ -262,10 +263,19 @@ def explain : Claim → List Json
       failing [(sx == t, "stateSchema", s!"{x} is a state of {sx}, not of {t}"),
         (sy == s, "stateSchema", s!"{y} is a state of {sy}, not of {s}")] ++
       c.schemaProblems s ++ c.schemaProblems t ++
-      (T.problems S S' S'.pathEq).map (Translation.Problem.toJson s t) ++
-      failing [(X.check S', "stateCheck", s!"{x} does not pass the check of {t}"),
-        (decide (Y = X.restrict T S S'), "restriction",
+      (T.vproblems c.valueTypes S S' (S'.pathEqV c.valueTypes)).map
+        (Translation.Problem.toJson s t) ++
+      failing [(X.check S', "stateCheck", s!"{x} does not pass the check of {t}")] ++
+      (if T.checkValid S S' S'.pathEq then
+        failing [(decide (Y = X.restrict T S S'), "restriction",
           s!"{y} is not the restriction of {x} along {s} → {t}")]
+      else
+        failing [(c.valueTypes.checkSound, "valueTypesUnsound",
+            "the list of value types is not sound"),
+          (X.litsFit c.valueTypes, "literals",
+            s!"the literals of {x} are not values of their types in normal form"),
+          (decide (Y = X.vrestrictLit c.valueTypes T S S'), "restriction",
+            s!"{y} is not the restriction of {x} along {s} → {t} with conversions")])
     | _, _, _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
       (if (c.schema? t).isNone then [unknown "schema" t] else []) ++
       (if (c.state? x).isNone then [unknown "state" x] else []) ++

@@ -2677,6 +2677,65 @@ theorem pathEqV_iff_of_acyclic (hS : S.WellFormed) (hL : L.Sound) (hA : S.Acycli
   ⟨pathEqV_sound hS a, pathEqV_complete hS hL fun a l l' h =>
     (pathEq_iff_of_acyclic hS hA a l l').mpr h⟩
 
+theorem entityLen_of_tgt? {o x : Ob} {l : List String} (h : S.tgt? o l = some x) :
+    S.entityLen o l = l.length := by
+  have := entityLen_append_tgt? (S := S) [] h
+  simpa [entityLen] using this
+
+/-- For a sound list of value types, `S.cat` is faithful in `S.vcat L`: two paths of
+`S` that are equal with conversions are equal in `S`. -/
+theorem pathEq_of_vPathEq (hS : S.WellFormed) (hL : L.Sound) {a : S.Obj} {l l' : List String}
+    {o o' : Ob} (hl : S.tgt? a.1 l = some o) (hl' : S.tgt? a.1 l' = some o')
+    (h : S.VPathEq L ⟨a.1, a.2⟩ l l') : S.PathEq a l l' := by
+  obtain ⟨b, p, q, rfl, rfl, hpq⟩ := h
+  have hs := (splitEq_of_vmor hS hL hpq).1
+  rw [entityLen_of_tgt? hl, entityLen_of_tgt? hl', List.take_length, List.take_length] at hs
+  exact pathEq_of_rewrites hS hs hl
+
 end Schema
+
+namespace Translation
+
+open Schema
+
+variable {S S' : Schema} {L : TypeList}
+
+/-- Along an inclusion valid with conversions, a path of `S` is a path of `S'`. -/
+theorem VValid.tgt?_empty (hT : ({} : Translation).VValid L S S') :
+    ∀ {o x : Ob} {l : List String}, S.tgt? o l = some x → S'.tgt? o l = some x
+  | _, _, [], h => h
+  | o, x, n :: ns, h => by
+    cases hs : S.step? o n with
+    | none => simp [hs] at h
+    | some o₁ =>
+      simp only [Schema.tgt?_cons, hs, Option.bind_some] at h
+      have h₁ := hT.vtgt?_gen (Schema.vstep?_of_step? (L := L) hs)
+      simp only [ob_empty, gen_empty] at h₁
+      cases o with
+      | value => simp [Schema.step?] at hs
+      | entity e =>
+        have h₂ : S'.step? (.entity e) n = some o₁ := by
+          simpa [Schema.vtgt?, Schema.vstep?] using h₁
+        simp only [Schema.tgt?_cons, h₂, Option.bind_some]
+        exact VValid.tgt?_empty hT h
+
+/-- For a sound list of value types, an inclusion valid with conversions is valid. -/
+theorem VValid.valid_empty (hS : S.WellFormed) (hS' : S'.WellFormed) (hL : L.Sound)
+    (hT : ({} : Translation).VValid L S S') : ({} : Translation).Valid S S' where
+  entity := hT.entity
+  ref := hT.ref
+  attr a ha := by
+    have h := hT.attr a ha
+    simp only [ob_empty, gen_empty] at h ⊢
+    simpa [Schema.vtgt?, Schema.vstep?] using h
+  eqn q hq := by
+    obtain ⟨o, hl, hr⟩ := hS.eqn_parallel q hq
+    obtain ⟨hm, hpe⟩ := hT.eqn q hq
+    simp only [ent_empty] at hm hpe ⊢
+    rw [mapPath_empty hl, mapPath_empty hr] at hpe ⊢
+    exact ⟨hm, pathEq_of_vPathEq hS' hL (a := ⟨.entity q.src, hm⟩) (hT.tgt?_empty hl)
+      (hT.tgt?_empty hr) hpe⟩
+
+end Translation
 
 end DDD

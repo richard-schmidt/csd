@@ -3,6 +3,7 @@ import DDD.Examples.Catalog
 import DDD.Examples.Orders
 import DDD.Examples.Payments
 import DDD.Examples.Shipping
+import DDD.Examples.Conversions
 import Showcase.ContextMapNotifications
 
 /-!
@@ -11,11 +12,16 @@ import Showcase.ContextMapNotifications
 Seven contexts: Catalog, Orders, Payments and Shipping, the published languages
 CatalogPL and OrdersPL of Catalog and Orders, and `Customers`, the kernel that
 Orders and Shipping share (customers with a name and an address, addresses with
-a street and a city). The arrows, with their translations checked valid with
-`decide`:
+a street and a city). The value types are those of `Conversions.lean`. The
+arrows, with their translations checked valid with `decide`:
 
-- CatalogPL → Catalog and OrdersPL → Orders: each published language included
-  in its owner by the empty translation. Both contain roots only
+- CatalogPL → Catalog: the published language included in its owner by the empty
+  translation.
+- OrdersPL → Orders: the published language in its owner, each name kept except
+  the date an order was placed, which goes to the date of the instant Orders
+  records, `placedOn ↦ placedAt.date`, a path that ends in a conversion. The
+  translation is valid with conversions (`ordersPublish_vvalid`) and not without
+  (`ordersPublish_not_valid`). Both published languages go to roots only
   (`catalog_publishes`, `orders_publishes`).
 - CatalogPL → Orders, an anti-corruption layer: a variant and its product both
   go to the Orders product, which keeps the variant's SKU, its price as list
@@ -38,8 +44,9 @@ upstream context reach the domain of each downstream one (`reaches`).
 
 `contextMap` declares no equation between routes, so `contextMap.J` is the free
 category on the arrows, and `contextMap.diagram` is the context map as a functor
-`J ⥤ Cat`. The map has no cycle (`rank`), so each context embeds into the lax
-integration fully faithfully and injectively on objects (`nonInterference`).
+`J ⥤ Cat`, to the schema categories with conversions. The map has no cycle
+(`rank`), so each context embeds into the lax integration fully faithfully and
+injectively on objects (`nonInterference`).
 `refundOfOrder` is a reference across contexts: from a refund in Payments to
 the order it refunds in OrdersPL, as the morphism `refund ⟶ T order` of
 Payments, where `T order` is the invoice. `publishedOrder` is the reference
@@ -112,11 +119,20 @@ def ordersPayments : Translation where
   gens := [⟨"Order", "customer", ["payer"]⟩, ⟨"Order", "billTo", ["payer", "address"]⟩,
     ⟨"Order", "id", ["orderId"]⟩, ⟨"Order", "placedOn", ["orderedOn"]⟩]
 
+/-- OrdersPL → Orders: the date an order was placed is the date of the instant
+Orders records. -/
+def ordersPublish : Translation where
+  gens := [⟨"Order", "placedOn", ["placedAt", "date"]⟩]
+
 /-- The translation along each arrow; the inclusions are the empty translation. -/
 def translation : {u d : Context} → Arrow u d → Translation
   | _, _, .catalogPL_orders => catalogOrders
+  | _, _, .ordersPL_orders => ordersPublish
   | _, _, .ordersPL_payments => ordersPayments
   | _, _, _ => {}
+
+/-- The value types of the map. -/
+abbrev types : TypeList := Conversions.types
 
 theorem catalogOrders_valid : catalogOrders.Valid Catalog.published Orders.schema :=
   Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Orders.wellFormed a h)
@@ -126,22 +142,30 @@ theorem ordersPayments_valid : ordersPayments.Valid Orders.published Payments.sc
   Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Payments.wellFormed a h)
     (by decide)
 
+theorem ordersPublish_vvalid : ordersPublish.VValid types Orders.published Orders.schema :=
+  Translation.checkVValid_sound (fun a _ _ h => Schema.pathEqV_sound Orders.wellFormed a h)
+    (by decide)
+
+/-- Without conversions, `placedOn` has no image: `placedAt.date` is not a path of
+Orders. -/
+theorem ordersPublish_not_valid : ¬ ordersPublish.Valid Orders.published Orders.schema :=
+  fun h => absurd ((Translation.checkValid_iff (fun a l l' =>
+    Schema.pathEq_iff_of_acyclic Orders.wellFormed Orders.acyclic a l l')).mpr h) (by decide)
+
 theorem valid : ∀ {u d : Context} (f : Arrow u d),
-    (translation f).Valid (schema u) (schema d)
+    (translation f).VValid types (schema u) (schema d)
   | _, _, .catalogPL_catalog =>
-    Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Catalog.wellFormed a h)
-      (by decide)
-  | _, _, .catalogPL_orders => catalogOrders_valid
-  | _, _, .ordersPL_orders =>
-    Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Orders.wellFormed a h)
-      (by decide)
-  | _, _, .ordersPL_payments => ordersPayments_valid
+    (Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Catalog.wellFormed a h)
+      (by decide)).vvalid
+  | _, _, .catalogPL_orders => catalogOrders_valid.vvalid
+  | _, _, .ordersPL_orders => ordersPublish_vvalid
+  | _, _, .ordersPL_payments => ordersPayments_valid.vvalid
   | _, _, .customers_orders =>
-    Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Orders.wellFormed a h)
-      (by decide)
+    (Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Orders.wellFormed a h)
+      (by decide)).vvalid
   | _, _, .customers_shipping =>
-    Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Shipping.wellFormed a h)
-      (by decide)
+    (Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Shipping.wellFormed a h)
+      (by decide)).vvalid
 
 /-- OrdersPL → Payments with the billing address sent to the invoice's shipping
 address. It is not a translation: the equation `billTo = customer.address` goes
@@ -164,6 +188,8 @@ def kernel : Context → Bool
 
 /-- The seven contexts, their schemas and translations, and the kernel. -/
 def contextMap : ContextMap Context where
+  valueTypes := types
+  sound := Conversions.types_sound
   schema := schema
   translation := translation
   wellFormed := wellFormed
@@ -177,7 +203,8 @@ example : contextMap.J ⥤ Cat := contextMap.diagram
 /-- Catalog publishes CatalogPL: an inclusion, and roots only. -/
 theorem catalog_publishes : contextMap.Publishes Arrow.catalogPL_catalog := by decide
 
-/-- Orders publishes OrdersPL: an inclusion, and roots only. -/
+/-- Orders publishes OrdersPL: entity types kept apart and sent to roots, with the
+date of each order computed from its instant. -/
 theorem orders_publishes : contextMap.Publishes Arrow.ordersPL_orders := by decide
 
 /-- Arrows go from a lower to a higher rank, so the map has no cycle. -/
@@ -239,22 +266,24 @@ def ordersToPayments : contextMap.ctx .OrdersPL ⟶ contextMap.ctx .Payments :=
   contextMap.arrow .ordersPL_payments
 
 /-- The refund entity type, in the schema category of Payments. -/
-def refund : (contextMap.schema .Payments).cat := Schema.obj _ ⟨.entity "Refund", by decide⟩
+def refund : (contextMap.schema .Payments).vcat types :=
+  Schema.vobj _ _ ⟨.entity "Refund", by decide⟩
 
 /-- The order entity type, in the schema category of OrdersPL. -/
-def order : (contextMap.schema .OrdersPL).cat := Schema.obj _ ⟨.entity "Order", by decide⟩
+def order : (contextMap.schema .OrdersPL).vcat types :=
+  Schema.vobj _ _ ⟨.entity "Order", by decide⟩
 
 /-- The image of the order in Payments is the invoice. -/
 theorem translate_order :
     (contextMap.diagram.map ordersToPayments).obj order =
-      Schema.obj Payments.schema ⟨.entity "Invoice", by decide⟩ := rfl
+      Schema.vobj Payments.schema types ⟨.entity "Invoice", by decide⟩ := rfl
 
 /-- A refund refers to the order it refunds: the reference `invoice` from a refund
 to the image of the order. -/
 def refundOfOrder :
     (contextMap.embed .Payments).obj refund ⟶ (contextMap.embed .OrdersPL).obj order :=
   contextMap.ref ordersToPayments
-    (Schema.mor (Payments.schema.pathOf Payments.wellFormed ⟨.entity "Refund", by decide⟩
+    (Schema.vmor (Payments.schema.vpathOf Payments.wellFormed ⟨.entity "Refund", by decide⟩
       ⟨.entity "Invoice", by decide⟩ ["invoice"] (by decide)) ≫ eqToHom translate_order.symm)
 
 /-- The reference lies over the arrow from OrdersPL to Payments. -/
@@ -262,7 +291,8 @@ theorem projection_refundOfOrder :
     contextMap.projection.map refundOfOrder = ordersToPayments.op := rfl
 
 /-- The order entity type, in the schema category of Orders. -/
-def orderOfOrders : (contextMap.schema .Orders).cat := Schema.obj _ ⟨.entity "Order", by decide⟩
+def orderOfOrders : (contextMap.schema .Orders).vcat types :=
+  Schema.vobj _ _ ⟨.entity "Order", by decide⟩
 
 /-- The inclusion of OrdersPL sends its order to the order of Orders. -/
 theorem include_order :

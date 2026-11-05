@@ -295,27 +295,48 @@ function step(S::DDDSchema, X::State, (e, i)::Tuple{String,Int}, n)
   lookup(X.attrs, (e, n))[i]
 end
 
-"Following a list of generator names from entity `i` of type `e`."
-function eval_path(S::DDDSchema, X::State, x, names)
+"A value type of a schema, in the form of the list of value types."
+vtype_read(t::String) = startswith(t, "named:") ? ("named", t[7:end]) :
+  startswith(t, "optional:") ? ("optional", vtype_read(t[10:end])) : t
+
+"""
+Following a list of names from entity `i` of type `e`: generators of `S`, and,
+after an attribute, the conversions of the list of value types `L` on the
+literal, as `FinState.evalLit`.
+"""
+function eval_path(S::DDDSchema, X::State, x, names; L = nothing)
+  v = nothing
   for n in names
-    x isa Tuple || error("a path continues after an attribute")
-    x = step(S, X, x, n)
+    if v === nothing
+      x isa Tuple || error("a path continues after an attribute")
+      a = findfirst(t -> t[1] == x[1] && t[2] == n, attrs(S))
+      a !== nothing && (v = vtype_read(attrs(S)[a][3]))
+      x = step(S, X, x, n)
+    else
+      L === nothing && error("a path continues after an attribute")
+      w = conv(L, v, n)
+      w === nothing && error("there is no conversion $n out of $(type_text(v))")
+      x = conv_lit(L, v, n, x)
+      v = w
+    end
   end
   x
 end
 
 """
-    restrict(T, S, S′, X)
+    restrict(T, S, S′, X; L)
 
 `Δ_T X` for a state `X` of `S′` and a translation `T` from `S` to `S′`, as
 `FinState.restrict` computes it: the entities of `T e` for each entity type `e`
-of `S`, and the column of each generator along its image path.
+of `S`, and the column of each generator along its image path. With the list of
+value types `L`, an image path may end in conversions, as `FinState.vrestrictLit`
+computes them.
 """
-function restrict(T::Translation, S::DDDSchema, S′::DDDSchema, X::State)
+function restrict(T::Translation, S::DDDSchema, S′::DDDSchema, X::State; L = nothing)
   sizes = [e => size_of(X, ent(T, e)) for e in entities(S)]
   rcols = [(s, n) => [eval_path(S′, X, (ent(T, s), i), gen(T, s, n))[2]
       for i in 1:size_of(X, ent(T, s))] for (s, n, _) in refs(S)]
-  acols = [(s, n) => Any[eval_path(S′, X, (ent(T, s), i), gen(T, s, n))
+  acols = [(s, n) => Any[eval_path(S′, X, (ent(T, s), i), gen(T, s, n); L = L)
       for i in 1:size_of(X, ent(T, s))] for (s, n, _) in attrs(S)]
   State(sizes, rcols, acols)
 end

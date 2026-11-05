@@ -80,8 +80,8 @@ def orders : OpenSchema customers customers where
   wfI := customers_wellFormed
   wfO := customers_wellFormed
   wf := Orders.wellFormed
-  inI := valid Arrow.customers_orders
-  inO := valid Arrow.customers_orders
+  inI := contextMap.valid_empty Arrow.customers_orders rfl
+  inO := contextMap.valid_empty Arrow.customers_orders rfl
   rootsI := by decide
   rootsO := by decide
 
@@ -91,7 +91,7 @@ def shipping : OpenSchema customers Merge.addresses where
   wfI := customers_wellFormed
   wfO := addresses_wellFormed
   wf := Shipping.wellFormed
-  inI := valid Arrow.customers_shipping
+  inI := contextMap.valid_empty Arrow.customers_shipping rfl
   inO := addresses_shipping
   rootsI := by decide
   rootsO := by decide
@@ -164,7 +164,7 @@ noncomputable example : (idCustomers.comp orders idCustomers_orders).S.cat ≅ O
 /-- Two ordering contexts that share customers clash on every other name. -/
 theorem orders_clash : gluingClashes customers Orders.schema Orders.schema =
     ["Order", "OrderLine", "Product", "Order.customer", "Order.billTo", "Order.shipTo",
-      "OrderLine.order", "OrderLine.product", "Order.id", "Order.placedOn", "Order.status",
+      "OrderLine.order", "OrderLine.product", "Order.id", "Order.placedAt", "Order.status",
       "OrderLine.quantity", "OrderLine.unitPrice", "OrderLine.sku", "Product.sku",
       "Product.name", "Product.listPrice"] := by
   decide
@@ -250,7 +250,8 @@ def orderOfAda : FinState K where
     (("Order", "shipTo"), [0]), (("OrderLine", "order"), []), (("OrderLine", "product"), [])]
   attrs := [(("Customer", "name"), [⟨.string, "Ada"⟩]),
     (("Address", "street"), [⟨.string, "Main St"⟩]), (("Address", "city"), [⟨.string, "Bern"⟩]),
-    (("Order", "id"), [⟨.uuid, ⟨0⟩⟩]), (("Order", "placedOn"), [⟨.date, ⟨20000⟩⟩]),
+    (("Order", "id"), [⟨.uuid, ⟨0⟩⟩]), (("Order", "placedAt"),
+      [⟨.timestamp, ⟨⟨1728000000, 0, Or.inl rfl⟩⟩⟩]),
     (("Order", "status"), [⟨.named "OrderStatus", "placed"⟩]),
     (("OrderLine", "quantity"), []), (("OrderLine", "unitPrice"), []), (("OrderLine", "sku"), []),
     (("Product", "sku"), []), (("Product", "name"), []), (("Product", "listPrice"), [])]

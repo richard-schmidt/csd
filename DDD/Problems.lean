@@ -1,5 +1,4 @@
-import DDD.Translation
-import DDD.Literals
+import DDD.ValueCat
 import Mathlib.Data.List.Dedup
 
 /-!
@@ -17,6 +16,8 @@ reports and editors.
 - `Translation.problems T S S' peq`: the failures of the conditions of
   `Translation.Valid`, with `peq` deciding path equality in `S'`. There are none
   exactly when `checkValid` passes (`Translation.problems_eq_nil_iff`).
+  `Translation.vproblems T L S S' peq` does the same for `Translation.VValid`, with
+  attribute images through conversions (`Translation.vproblems_eq_nil_iff`).
 - `Schema.typeProblems L S`: the attributes of `S` whose value types the list of
   value types `L` does not admit, an undeclared name or an optional of an
   optional; none exactly when `L` admits every value type of `S`
@@ -384,6 +385,48 @@ def problems : List Problem :=
 theorem problems_eq_nil_iff : T.problems S S' peq = [] ↔ T.checkValid S S' peq = true := by
   simp only [problems, checkValid, List.append_eq_nil_iff, Bool.and_eq_true, List.all_eq_true,
     List.filterMap_eq_nil_iff, decide_eq_true_eq]
+  refine and_congr (and_congr (and_congr ?_ ?_) ?_) ?_
+  · refine forall₂_congr fun e _ => ?_
+    by_cases h : T.ent e ∈ S'.entities <;> simp [h]
+  · refine forall₂_congr fun r _ => ?_
+    split <;> simp_all
+  · refine forall₂_congr fun a _ => ?_
+    split <;> simp_all
+  · refine forall₂_congr fun q _ => ?_
+    by_cases hs : T.ent q.src ∈ S'.entities <;>
+      by_cases hp : peq (.entity (T.ent q.src)) (T.mapPath S (.entity q.src) q.lhs)
+        (T.mapPath S (.entity q.src) q.rhs) = true <;> simp [hs, hp]
+
+/-- The failures of the conditions of `VValid`, in their order: as `problems`, with
+the image of each attribute a path of generators and conversions, and `peq`
+deciding path equality in `S'.vcat L`. -/
+def vproblems (L : TypeList) (S S' : Schema) (peq : Ob → List String → List String → Bool) :
+    List Problem :=
+  (S.entities.filterMap fun e =>
+    if T.ent e ∈ S'.entities then none else some (.entity e (T.ent e))) ++
+  (S.refs.filterMap fun r =>
+    if S'.tgt? (T.ob (.entity r.src)) (T.gen (.entity r.src) r.name) =
+        some (T.ob (.entity r.tgt)) then none
+    else some (.ref r (T.gen (.entity r.src) r.name) (T.ob (.entity r.tgt))
+      (S'.tgt? (T.ob (.entity r.src)) (T.gen (.entity r.src) r.name)))) ++
+  (S.attrs.filterMap fun a =>
+    if S'.vtgt? L (T.ob (.entity a.src)) (T.gen (.entity a.src) a.name) =
+        some (.value a.tgt) then none
+    else some (.attr a (T.gen (.entity a.src) a.name)
+      (S'.vtgt? L (T.ob (.entity a.src)) (T.gen (.entity a.src) a.name)))) ++
+  (S.eqns.filterMap fun q =>
+    if T.ent q.src ∈ S'.entities then
+      if peq (.entity (T.ent q.src)) (T.mapPath S (.entity q.src) q.lhs)
+          (T.mapPath S (.entity q.src) q.rhs) then none
+      else some (.eqn q (T.mapPath S (.entity q.src) q.lhs) (T.mapPath S (.entity q.src) q.rhs))
+    else some (.eqnSource q (T.ent q.src)))
+
+/-- A translation has no problem with conversions exactly when it passes the check of
+validity with conversions. -/
+theorem vproblems_eq_nil_iff (L : TypeList) :
+    T.vproblems L S S' peq = [] ↔ T.checkVValid L S S' peq = true := by
+  simp only [vproblems, checkVValid, List.append_eq_nil_iff, Bool.and_eq_true,
+    List.all_eq_true, List.filterMap_eq_nil_iff, decide_eq_true_eq]
   refine and_congr (and_congr (and_congr ?_ ?_) ?_) ?_
   · refine forall₂_congr fun e _ => ?_
     by_cases h : T.ent e ∈ S'.entities <;> simp [h]

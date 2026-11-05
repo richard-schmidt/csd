@@ -642,34 +642,127 @@ theorem vmapPath_value : ∀ {v : ValueType} {x : Ob} {l : List String},
       simp only [vtgt?_cons, vstep?, hc, Option.map_some, Option.bind_some] at h
       simp [vmapPath, gen, vstep?, hc, vmapPath_value h]
 
+variable (L) in
+/-- `T` is a translation from `S` to `S'` with conversions: as `Valid`, except that an
+attribute may go to a path that ends in conversions, and each equation goes to an
+equation that holds in `S'.vcat L`. -/
+structure VValid (S S' : Schema) : Prop where
+  /-- Entity types go to entity types. -/
+  entity : ∀ e ∈ S.entities, T.ent e ∈ S'.entities
+  /-- A reference `r : e ⟶ e'` goes to a path from the image of `e` to the image
+  of `e'`. -/
+  ref : ∀ r ∈ S.refs,
+    S'.tgt? (T.ob (.entity r.src)) (T.gen (.entity r.src) r.name) = some (T.ob (.entity r.tgt))
+  /-- An attribute `a : e ⟶ v` goes to a path of generators and conversions from the
+  image of `e` to `v`. -/
+  attr : ∀ a ∈ S.attrs,
+    S'.vtgt? L (T.ob (.entity a.src)) (T.gen (.entity a.src) a.name) = some (.value a.tgt)
+  /-- Each equation goes to an equation that holds in `S'.vcat L`. -/
+  eqn : ∀ q ∈ S.eqns, ∃ h : T.ent q.src ∈ S'.entities,
+    S'.VPathEq L ⟨.entity (T.ent q.src), h⟩ (T.mapPath S (.entity q.src) q.lhs)
+      (T.mapPath S (.entity q.src) q.rhs)
+
+variable (L) in
+/-- The check for `VValid`, with `peq` deciding path equality in `S'.vcat L`. -/
+def checkVValid (S S' : Schema) (peq : Ob → List String → List String → Bool) : Bool :=
+  S.entities.all (fun e => decide (T.ent e ∈ S'.entities)) &&
+  S.refs.all (fun r => decide (S'.tgt? (T.ob (.entity r.src)) (T.gen (.entity r.src) r.name) =
+    some (T.ob (.entity r.tgt)))) &&
+  S.attrs.all (fun a => decide (S'.vtgt? L (T.ob (.entity a.src)) (T.gen (.entity a.src) a.name) =
+    some (.value a.tgt))) &&
+  S.eqns.all (fun q => decide (T.ent q.src ∈ S'.entities) &&
+    peq (.entity (T.ent q.src)) (T.mapPath S (.entity q.src) q.lhs)
+      (T.mapPath S (.entity q.src) q.rhs))
+
+variable {T}
+
+/-- `checkVValid` decides `VValid` when `peq` decides path equality in `S'.vcat L`. -/
+theorem checkVValid_iff {peq : Ob → List String → List String → Bool}
+    (hpeq : ∀ (a : S'.VObj L) (l l' : List String), peq a.1 l l' = true ↔ S'.VPathEq L a l l') :
+    T.checkVValid L S S' peq = true ↔ T.VValid L S S' := by
+  simp only [checkVValid, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true]
+  constructor
+  · rintro ⟨⟨⟨he, hr⟩, ha⟩, hq⟩
+    exact ⟨he, hr, ha, fun q hq' => ⟨(hq q hq').1,
+      (hpeq ⟨.entity (T.ent q.src), (hq q hq').1⟩ _ _).mp (hq q hq').2⟩⟩
+  · intro h
+    refine ⟨⟨⟨h.entity, h.ref⟩, h.attr⟩, fun q hq => ?_⟩
+    obtain ⟨hm, hpe⟩ := h.eqn q hq
+    exact ⟨hm, (hpeq ⟨.entity (T.ent q.src), hm⟩ _ _).mpr hpe⟩
+
+/-- `checkVValid` is sound when `peq` is. -/
+theorem checkVValid_sound {peq : Ob → List String → List String → Bool}
+    (hpeq : ∀ (a : S'.VObj L) (l l' : List String), peq a.1 l l' = true → S'.VPathEq L a l l')
+    (h : T.checkVValid L S S' peq = true) : T.VValid L S S' := by
+  simp only [checkVValid, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true] at h
+  obtain ⟨⟨⟨he, hr⟩, ha⟩, hq⟩ := h
+  exact ⟨he, hr, ha, fun q hq' =>
+    ⟨(hq q hq').1, hpeq ⟨.entity (T.ent q.src), (hq q hq').1⟩ _ _ (hq q hq').2⟩⟩
+
+/-- A valid translation is valid with conversions. -/
+theorem Valid.vvalid (hT : T.Valid S S') : T.VValid L S S' where
+  entity := hT.entity
+  ref := hT.ref
+  attr a ha := vtgt?_of_tgt? (hT.attr a ha)
+  eqn q hq := by
+    obtain ⟨hm, hpe⟩ := hT.eqn q hq
+    exact ⟨hm, VPathEq.of_pathEq hpe⟩
+
 /-- A generator or a conversion goes to a path between the images of its ends. -/
-theorem vtgt?_gen (hT : T.Valid S S') {o o' : Ob} {n : String} (h : S.vstep? L o n = some o') :
-    S'.vtgt? L (T.ob o) (T.gen o n) = some (T.ob o') := by
+theorem VValid.vtgt?_gen (hT : T.VValid L S S') {o o' : Ob} {n : String}
+    (h : S.vstep? L o n = some o') : S'.vtgt? L (T.ob o) (T.gen o n) = some (T.ob o') := by
   cases o with
-  | entity e => exact vtgt?_of_tgt? (tgt?_gen hT (show S.step? (.entity e) n = some o' from h))
+  | entity e =>
+    change S.step? (.entity e) n = some o' at h
+    simp only [Schema.step?] at h
+    split at h
+    · rename_i r hr
+      cases h
+      unfold Schema.ref? at hr
+      have hp := List.find?_some hr
+      simp only [Bool.and_eq_true, beq_iff_eq] at hp
+      obtain ⟨rfl, rfl⟩ := hp
+      exact vtgt?_of_tgt? (hT.ref r (List.mem_of_find?_eq_some hr))
+    · obtain ⟨a, ha, rfl⟩ := Option.map_eq_some_iff.mp h
+      unfold Schema.attr? at ha
+      have hp := List.find?_some ha
+      simp only [Bool.and_eq_true, beq_iff_eq] at hp
+      obtain ⟨rfl, rfl⟩ := hp
+      exact hT.attr a (List.mem_of_find?_eq_some ha)
   | value v =>
     obtain ⟨w, hw, rfl⟩ := Option.map_eq_some_iff.mp h
     simp [ob, gen, vstep?, hw]
 
-/-- The image of an object, with conversions. -/
-def vobj (hT : T.Valid S S') (a : S.VObj L) : S'.VObj L := ⟨T.ob a.1, isOb_ob hT a.2⟩
+theorem VValid.isOb_ob (hT : T.VValid L S S') : ∀ {o : Ob}, S.IsOb o → S'.IsOb (T.ob o)
+  | .entity e, h => hT.entity e h
+  | .value _, _ => trivial
 
+variable (T)
+
+/-- A generator or a conversion goes to a path between the images of its ends. -/
+theorem vtgt?_gen (hT : T.Valid S S') {o o' : Ob} {n : String} (h : S.vstep? L o n = some o') :
+    S'.vtgt? L (T.ob o) (T.gen o n) = some (T.ob o') :=
+  (hT.vvalid (L := L)).vtgt?_gen h
+
+/-- The image of an object, with conversions. -/
+def vobj (hT : T.VValid L S S') (a : S.VObj L) : S'.VObj L := ⟨T.ob a.1, hT.isOb_ob a.2⟩
 
 theorem vmapPath_singleton (o : Ob) (n : String) : T.vmapPath S L o [n] = T.gen o n := by
   simp only [vmapPath]
   cases S.vstep? L o n <;> simp
 
 /-- Each generator and conversion goes to the path of its image. -/
-def vprefunctor (hS' : S'.WellFormed) (hT : T.Valid S S') : S.VObj L ⥤q Paths (S'.VObj L) where
+def vprefunctor (hS' : S'.WellFormed) (hT : T.VValid L S S') :
+    S.VObj L ⥤q Paths (S'.VObj L) where
   obj := T.vobj hT
-  map {a b} f := S'.vpathOf hS' (T.vobj hT a) (T.vobj hT b) (T.gen a.1 f.1) (T.vtgt?_gen hT f.2)
+  map {a b} f := S'.vpathOf hS' (T.vobj hT a) (T.vobj hT b) (T.gen a.1 f.1) (hT.vtgt?_gen f.2)
 
 /-- The image of a path of generators and conversions. -/
-def vfunctorPath (hS' : S'.WellFormed) (hT : T.Valid S S') {a b : S.VObj L}
+def vfunctorPath (hS' : S'.WellFormed) (hT : T.VValid L S S') {a b : S.VObj L}
     (p : Quiver.Path a b) : Quiver.Path (T.vobj hT a) (T.vobj hT b) :=
   (Paths.lift (T.vprefunctor hS' hT)).map p
 
-theorem vnames_vfunctorPath (hS' : S'.WellFormed) (hT : T.Valid S S') {a b : S.VObj L}
+theorem vnames_vfunctorPath (hS' : S'.WellFormed) (hT : T.VValid L S S') {a b : S.VObj L}
     (p : Quiver.Path a b) : vnames (T.vfunctorPath hS' hT p) = T.vmapPath S L a.1 (vnames p) := by
   induction p with
   | nil => rfl
@@ -678,9 +771,10 @@ theorem vnames_vfunctorPath (hS' : S'.WellFormed) (hT : T.Valid S S') {a b : S.V
       vmapPath_append T (vtgt?_vnames p), vmapPath_singleton]
     exact congrArg _ (vnames_vpathOf _ _ _ _ _)
 
-/-- The functor between the categories with conversions that a valid translation
-induces: the images of the generators, and each conversion to itself. -/
-def vfunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S') :
+/-- The functor between the categories with conversions that a translation valid
+with conversions induces: the images of the generators, and each conversion to
+itself. -/
+def vfunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.VValid L S S') :
     S.vcat L ⥤ S'.vcat L :=
   CategoryTheory.Quotient.lift (S.vrel L)
     (Paths.lift (T.vprefunctor hS' hT) ⋙ CategoryTheory.Quotient.functor (S'.vrel L)) (by
@@ -694,7 +788,7 @@ def vfunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S') :
         have hobj : T.vobj hT a = ⟨.entity (T.ent q.src), hm⟩ := Subtype.ext (by
           simp [vobj, ha, ob])
         rw [hobj]
-        exact VPathEq.of_pathEq hpe
+        exact hpe
       · change vmor (T.vfunctorPath hS' hT f₁) = vmor (T.vfunctorPath hS' hT f₂)
         apply CategoryTheory.Quotient.sound
         have hv : (T.vobj hT a).1 = .value v := by simp [vobj, ha, ob]
@@ -706,13 +800,24 @@ def vfunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S') :
             T.vmapPath_value t₂]
           exact h⟩)
 
-theorem vfunctor_map_vmor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S')
+theorem vfunctor_map_vmor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.VValid L S S')
     {a b : S.VObj L} (p : Quiver.Path a b) :
     (T.vfunctor hS hS' hT).map (vmor p) = vmor (T.vfunctorPath hS' hT p) := rfl
 
+variable {T} in
+/-- The paths a translation valid with conversions sends two equal paths to are
+equal. -/
+theorem VValid.map_vPathEq (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.VValid L S S')
+    {a : S.VObj L} {l l' : List String} (h : S.VPathEq L a l l') :
+    S'.VPathEq L (T.vobj hT a) (T.vmapPath S L a.1 l) (T.vmapPath S L a.1 l') := by
+  obtain ⟨b, p, q, rfl, rfl, hpq⟩ := h
+  refine ⟨T.vobj hT b, T.vfunctorPath hS' hT p, T.vfunctorPath hS' hT q,
+    T.vnames_vfunctorPath hS' hT p, T.vnames_vfunctorPath hS' hT q, ?_⟩
+  rw [← vfunctor_map_vmor T hS, ← vfunctor_map_vmor T hS, hpq]
+
 /-- With conversions, the functor of a translation extends its functor. -/
 theorem vinc_comp_vfunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S') :
-    S.vinc L ⋙ T.vfunctor hS hS' hT = T.functor hS' hT ⋙ S'.vinc L := by
+    S.vinc L ⋙ T.vfunctor hS hS' hT.vvalid = T.functor hS' hT ⋙ S'.vinc L := by
   refine Schema.ext_functor (fun a => rfl) fun a b e => ?_
   simp only [Functor.comp_map, eqToHom_refl, Category.id_comp, Category.comp_id]
   rw [vinc_map_mor, vfunctor_map_vmor, functor_map_mor, vinc_map_mor]
@@ -723,7 +828,7 @@ theorem vinc_comp_vfunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Val
   rfl
 
 /-- Translations are the identity on the category of value types. -/
-theorem vvals_comp_vfunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.Valid S S') :
+theorem vvals_comp_vfunctor (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.VValid L S S') :
     S.vvals L ⋙ T.vfunctor hS hS' hT = S'.vvals L := by
   have hob : ∀ a : emptySchema.VObj L, T.ob a.1 = a.1 := by
     rintro ⟨⟨e⟩ | ⟨v⟩, h⟩

@@ -16,12 +16,13 @@ members in the order Orders, Shipping, Payments, Customers, Addresses:
 
 Checked with `decide`: the condition of the component, the arrows out of its
 members, well-formedness and acyclicity of the glued schema. The glued schema
-category is the colimit of `D` restricted to the component (`isColimit`).
+category is the colimit of the inclusions between the members (`isColimit`).
 
 The merged map (`merged`) has four contexts: the glued context, Catalog,
 CatalogPL and OrdersPL. CatalogPL → Orders, OrdersPL → Orders and
 OrdersPL → Payments become arrows into the glued context, each translation
-composed with the inclusion of its target (`invoice_route`). The merged map has
+composed with the inclusion of its target (`invoice_route`); the translation of
+OrdersPL → Orders converts. The merged map has
 no cycle, so each of its contexts embeds into its lax integration fully
 faithfully (`merged_nonInterference`). Checked with `decide +kernel`: strict
 non-interference for each member, every leg is fully faithful.
@@ -71,17 +72,18 @@ def translation : {u d : Context} → Arrow u d → Translation
   | _, _, .base f => Integration.translation f
   | _, _, _ => {}
 
-theorem valid : ∀ {u d : Context} (f : Arrow u d), (translation f).Valid (schema u) (schema d)
+theorem valid : ∀ {u d : Context} (f : Arrow u d),
+    (translation f).VValid Integration.types (schema u) (schema d)
   | _, _, .base f => Integration.valid f
   | _, _, .addresses_orders =>
-    Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Orders.wellFormed a h)
-      (by decide)
+    (Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Orders.wellFormed a h)
+      (by decide)).vvalid
   | _, _, .addresses_shipping =>
-    Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Shipping.wellFormed a h)
-      (by decide)
+    (Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Shipping.wellFormed a h)
+      (by decide)).vvalid
   | _, _, .addresses_payments =>
-    Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Payments.wellFormed a h)
-      (by decide)
+    (Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Payments.wellFormed a h)
+      (by decide)).vvalid
 
 /-- `Customers` and `Addresses` are the kernels. -/
 def kernel : Context → Bool
@@ -90,6 +92,8 @@ def kernel : Context → Bool
 
 /-- The eight contexts, their schemas and translations, and the two kernels. -/
 def contextMap : ContextMap Context where
+  valueTypes := Integration.types
+  sound := Conversions.types_sound
   schema := schema
   translation := translation
   wellFormed := wellFormed
@@ -137,7 +141,8 @@ theorem glued_entities : component.glued.entities =
 
 theorem glued_acyclic : component.glued.Acyclic := by decide
 
-/-- The glued schema category is the colimit of `D` restricted to the component. -/
+/-- The glued schema category is the colimit of the inclusions between the
+members. -/
 noncomputable example : Limits.IsColimit component.cocone := component.isColimit
 
 /-! ## Strict non-interference -/
@@ -178,7 +183,7 @@ theorem invoice_route :
     merged.diagram.map (merged.arrow (u := .other (.base .OrdersPL) (by decide)) (d := .glued)
       ⟨⟨.base .Payments, by decide⟩, Arrow.base .ordersPL_payments⟩) =
       contextMap.diagram.map (contextMap.arrow (Arrow.base .ordersPL_payments)) ⋙
-        component.leg ⟨.base .Payments, by decide⟩ :=
+        component.vleg ⟨.base .Payments, by decide⟩ :=
   component.diagram_into _ _ _
 
 /-- Arrows go from a lower to a higher rank. -/

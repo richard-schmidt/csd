@@ -22,6 +22,7 @@ cert = Certificate("csd-julia 0.1, Catlab $(pkgversion(CsdDDD.Catlab))")
 # The list of value types of the map, passed on as it is.
 cert.valueTypes = collect(get(map, "valueTypes", []))
 add_claim!(cert, "valueTypes")
+types = read_types(get(map, "valueTypes", []))
 
 # Contexts and arrows of the map.
 schemas = Dict{String,DDDSchema}()
@@ -122,7 +123,8 @@ XO = make_state(schemas["Orders"],
     ("Order", "customer") => [1, 2], ("Order", "billTo") => [1, 2], ("Order", "shipTo") => [2, 2],
     ("OrderLine", "order") => [1, 1, 2], ("OrderLine", "product") => [1, 2, 1])),
   merge(customers_attrs, Dict(
-    ("Order", "id") => ORDER_IDS, ("Order", "placedOn") => ["2026-10-01", "2026-10-02"],
+    ("Order", "id") => ORDER_IDS,
+    ("Order", "placedAt") => ["2026-10-01T09:30:00Z", "2026-10-02T14:05:00Z"],
     ("Order", "status") => ["placed", "shipped"],
     ("OrderLine", "quantity") => [2, 1, 4], ("OrderLine", "unitPrice") => ["12.50", "8.00", "12.50"],
     ("OrderLine", "sku") => ["V-100", "V-200", "V-100"],
@@ -180,15 +182,20 @@ for (x, s, X) in states
   check_state(schemas[s], X) || error("$x violates an equation of $s")
 end
 
-# Restrictions: data gluing, and the anti-corruption layer into Payments.
+# Restrictions: data gluing, the published language of Orders, whose date of an
+# order is the date of its instant, and the anti-corruption layer into Payments.
 empty = Translation()
 XK = restrict(empty, schemas["Customers"], schemas["Orders"], XO)
 restrict(empty, schemas["Customers"], schemas["Shipping"], XS) == XK ||
   error("XO and XS disagree on the kernel")
 restrict(empty, L, G, XG) == XO || error("XG does not restrict to XO")
 restrict(empty, schemas["Shipping"], G, XG) == XS || error("XG does not restrict to XS")
+XOPL = restrict(translations["ordersPL_orders"], schemas["OrdersPL"], schemas["Orders"], XO;
+  L = types)
+CsdDDD.lookup(XOPL.attrs, ("Order", "placedOn")) == ["2026-10-01", "2026-10-02"] ||
+  error("XOPL does not publish the dates of the orders")
 XPL = restrict(translations["ordersPL_payments"], schemas["OrdersPL"], schemas["Payments"], XP)
-push!(states, ("XK", "Customers", XK), ("XPL", "OrdersPL", XPL))
+push!(states, ("XK", "Customers", XK), ("XOPL", "OrdersPL", XOPL), ("XPL", "OrdersPL", XPL))
 
 for (x, s, X) in states
   add_state!(cert, x, s, X)
@@ -200,6 +207,7 @@ restriction("Orders", "Orders+Shipping", empty, "XG", "XO")
 restriction("Shipping", "Orders+Shipping", empty, "XG", "XS")
 restriction("Customers", "Orders", empty, "XO", "XK")
 restriction("Customers", "Shipping", empty, "XS", "XK")
+restriction("OrdersPL", "Orders", translations["ordersPL_orders"], "XO", "XOPL")
 restriction("OrdersPL", "Payments", translations["ordersPL_payments"], "XP", "XPL")
 
 # Samples: a schema and a state read from the workspace and passed on, with
@@ -218,7 +226,6 @@ end
 
 # Conversions of literals in normal form, computed here and checked by Lean with
 # TypeList.applyLit.
-types = read_types(get(map, "valueTypes", []))
 for x in get(ws, "conversions", [])
   v = read_type(x["type"])
   path = String.(x["path"])

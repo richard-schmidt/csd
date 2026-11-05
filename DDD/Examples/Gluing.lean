@@ -11,7 +11,8 @@ addresses with a street and a city. Both include it with the same names, and
 they share nothing else, so the two arrows out of the kernel glue (`gluing`,
 from `ContextMap.kernelGluing`). The glued schema has the entity types of both,
 the customer and address once, and the equations of both; its category is the
-pushout of the images of the two arrows under `D` (`isPushout`).
+pushout of the inclusions along the two arrows (`isPushout`), whose extensions to
+the conversions are the images of the arrows under `D`.
 
 Checked with `decide`: the gluing conditions, well-formedness and acyclicity of
 the glued schema; with `decide +kernel`: strict non-interference, both legs are
@@ -38,9 +39,11 @@ def gluing : Gluing :=
 /-- The glued schema category is the pushout of the two inclusions of the
 kernel. -/
 theorem isPushout :
-    IsPushout (contextMap.diagram.map (contextMap.arrow .customers_orders))
-      (contextMap.diagram.map (contextMap.arrow .customers_shipping)) gluing.inl gluing.inr :=
-  contextMap.isPushout_kernel _ _ _ _ _
+    IsPushout (C := Cat.{0, 0})
+      (Translation.functor Orders.wellFormed (contextMap.valid_empty Arrow.customers_orders rfl))
+      (Translation.functor Shipping.wellFormed
+        (contextMap.valid_empty Arrow.customers_shipping rfl)) gluing.inl gluing.inr :=
+  contextMap.isPushout_kernel Arrow.customers_orders Arrow.customers_shipping rfl _ _
 
 theorem glued_entities : gluing.glued.entities =
     ["Customer", "Address", "Order", "OrderLine", "Product", "Shipment", "Item", "Carrier"] := by

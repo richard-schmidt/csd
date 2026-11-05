@@ -339,8 +339,8 @@ DDD/
   Compose.lean       composite translations, equality of induced functors
   Glue.lean          pushouts of presentations, bridge theorem, strict
                      non-interference
-  ContextMap.lean    J, D : J ⥤ Cat, lax integration, strict integration
-                     along kernels
+  ContextMap.lean    J, D : J ⥤ Cat to the categories with conversions, lax
+                     integration, strict integration along kernels
   Union.lean         unions of schemas, the covering theorem
   Merge.lean         components, their colimit, the merged map
   States.lean        states, migrations, gluing
@@ -358,7 +358,8 @@ DDD/
   Data.lean          finite states, keys, homomorphisms and restriction as
                      data
   ValueCat.lean      conversions, their equations, the category of value
-                     types, schemas with conversions
+                     types, schemas with conversions, translations valid with
+                     conversions
   VStates.lean       interpretations, states with conversions, the
                      equivalence with attributed states and what it carries
   ConvNF.lean        normal forms of conversions, path equality with
@@ -366,7 +367,12 @@ DDD/
   ConvComplete.lean  completeness of the normal forms; pathEqV decides path
                      equality with conversions
   LitInterp.lean     the literals as an interpretation of the value types
-  VData.lean         finite states evaluated through conversions
+  VCompose.lean      composite translations with conversions, equality of
+                     their functors
+  VData.lean         finite states evaluated through conversions, restriction
+                     along translations that convert
+  LitData.lean       finite states of literals in the literal interpretation,
+                     restriction on literals
   Json.lean          the exchange format csd-ddd/1
   Certificate.lean   certificates, their checks and soundness
   Problems.lean      the failures of the checks of schemas and translations
@@ -654,6 +660,27 @@ equality of tables with `pathEqV` (`status_active_ne`) and proves an equation
 on all literals of a named type over `timestamp` (`instant_date`). The
 conversions of `datetime`, `date` and `time` out of timestamps are computed on
 the characters of the text (`List.take`, `List.drop`, `List.dropLast`).
+Translations that convert: `Translation.VValid L T S S'` lets an attribute go to a
+path that ends in conversions, with equations checked in `S'.vcat L`
+(`checkVValid`, by `Schema.pathEqV`); a valid translation is valid with
+conversions (`Valid.vvalid`), and for a sound list an inclusion valid with
+conversions is valid (`VValid.valid_empty`, from the faithfulness of
+`Schema.vinc`, `Schema.pathEq_of_vPathEq`). Such a translation induces a functor
+between the categories with conversions (`Translation.vfunctor`), `Δ_T` on states
+with conversions (`vrestrictState`), and `Δ_T` on finite states
+(`FinState.vrestrict`, isomorphic to it, `vrestrictIso`) and on literals
+(`FinState.vrestrictLit`, `isVRestriction_vrestrictLit`). Composites
+(`Translation.vcomp`) and the check of equal functors carry over (`VCompose.lean`).
+A context map has a sound list of value types, its arrows are valid with
+conversions, and `D` goes to the categories with conversions; a published language
+is a translation that keeps entity types apart and goes to roots
+(`Translation.RootsOnly`); strict integration and merges stay with the inclusions
+out of kernels. In the example map, OrdersPL publishes the date an order was
+placed and Orders records its instant: `placedOn ↦ placedAt.date`
+(`Integration.ordersPublish`). The claims `translation` and `restriction` accept
+translations that convert, `Translation.vproblems` explains their failures, and
+the Julia side restricts the state of Orders to OrdersPL through the conversion;
+`Exchange.publishCertificate` checks the restriction in Lean.
 
 ## Next steps
 
@@ -1074,7 +1101,10 @@ covers it.
    generator `g` with the equation `g = T g` per generator of the source; the
    extension presents an isomorphic category. Gluing, open schemas and the
    roots-only check apply to the normal form. A translation that sends two
-   entity types to one has no such normal form and is not glued along.
+   entity types to one has no such normal form and is not glued along, nor
+   does a translation that sends an attribute to a path ending in conversions:
+   its extension would need an equation that ends in conversions, which schemas
+   do not have (Conditional). States and data restrict along it.
 3. `KeysKept T`: for each key `(e, F)` of the source, the target has a key on
    `T e` whose fields are images `T f` of fields in `F`, or a field of `F` goes
    to the empty path. The restriction of a keyed state is keyed
@@ -1138,6 +1168,18 @@ types.
 - Path equality for schemas with both cycles and equations, from a rewriting
   system supplied as a certificate, if a model needs it. It is not part of
   phase 4.
+- Equations whose sides end in conversions, if a model needs an equation on a
+  field of a record (`currency = total.currency`) or a merge or an open schema
+  along a translation that converts. `Schema.vrel` takes them as they are. The
+  results proved on `Schema.cat` then hold for the attributed states that
+  satisfy them, a full subcategory, through which limits, `Δ_T` and data gluing
+  carry over; colimits need a proof, and `Σ_T` a new condition. Path equality is
+  decided by substitution when each such equation defines one attribute, and is
+  only sound in general: using `p ; c = q` from right to left asks whether a
+  path of conversions factors through `c`, which for tables depends on the
+  tables of the list. Gluing leaves the defining form: an equation of the other
+  part on the defined attribute becomes a general one. Before item 15 if it is
+  taken, so that the closure is proved once.
 - Checking functions in modules apart from their soundness proofs, so that
   `csd-check` imports neither the proofs nor Mathlib's category theory, if the
   size of the executable or the time of its first build matters, for example on
@@ -1518,3 +1560,11 @@ Next step 14:
   not its normal form. That a conversion keeps normal forms is not proved.
 - The date, time and date and time of a timestamp are computed on the list of
   characters of its text, where the facts the equations need hold.
+- Schemas keep equations without conversions. A translation that converts is
+  valid, induces a functor between the categories with conversions and
+  restricts states and data; gluing, merges and open schemas stay with
+  translations whose images of attributes have no conversions. Equations that
+  end in conversions are a conditional item: the category with conversions takes
+  them as they are, but the results on attributed states would hold only on a
+  subcategory, `Σ_T` would need a new condition, and path equality with them is
+  sound but not complete once two parts are glued.

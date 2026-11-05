@@ -82,14 +82,14 @@ def translationByQuery : {u d : Context} → Arrow u d → Translation
   | _, _, f => translation f
 
 theorem valid : ∀ {u d : Context} (f : Arrow u d),
-    (translation f).Valid (schema u) (schema d)
-  | _, _, f => Translation.checkValid_sound
-    (fun a _ _ h => Schema.pathEq_sound (wellFormed _) a h) (by cases f <;> decide)
+    (translation f).VValid {} (schema u) (schema d)
+  | _, _, f => (Translation.checkValid_sound
+    (fun a _ _ h => Schema.pathEq_sound (wellFormed _) a h) (by cases f <;> decide)).vvalid
 
 theorem validByQuery : ∀ {u d : Context} (f : Arrow u d),
-    (translationByQuery f).Valid (schema u) (schema d)
-  | _, _, f => Translation.checkValid_sound
-    (fun a _ _ h => Schema.pathEq_sound (wellFormed _) a h) (by cases f <;> decide)
+    (translationByQuery f).VValid {} (schema u) (schema d)
+  | _, _, f => (Translation.checkValid_sound
+    (fun a _ _ h => Schema.pathEq_sound (wellFormed _) a h) (by cases f <;> decide)).vvalid
 
 /-- The route through Sales. -/
 def viaSales : Quiver.Path Context.Catalog Context.Reporting :=
@@ -105,7 +105,7 @@ def diamond : RouteEqn Context := ⟨.Catalog, .Reporting, viaSales, viaSearch�
 /-- The composite along each route sends a variant to a row, its SKU to `sku` and
 its price to `amount`. -/
 theorem viaSales_translation :
-    routeTranslation schema translation viaSales =
+    routeTranslation {} schema translation viaSales =
       { entities := [("Variant", "Row")]
         gens := [⟨"Variant", "sku", ["sku"]⟩, ⟨"Variant", "price", ["amount"]⟩] } := by
   decide
@@ -139,16 +139,17 @@ theorem nonInterference (c : Context) :
   declared.nonInterference (declared.endo_eq_id (endo_eq_id_of_rank rank rank_lt)) c
 
 /-- With Search reporting the SKU as the query, the check fails. -/
-theorem check_byQuery : checkRouteEqn schema translationByQuery diamond = false := by
+theorem check_byQuery : checkRouteEqn {} schema translationByQuery diamond = false := by
   decide
 
 /-- With Search reporting the SKU as the query, the two routes have different
 functors, so the diamond cannot be declared. -/
 theorem routes_ne :
-    (routeDiagram schema translationByQuery wellFormed validByQuery).map viaSales ≠
-      (routeDiagram schema translationByQuery wellFormed validByQuery).map viaSearch :=
+    (routeDiagram {} schema translationByQuery wellFormed validByQuery).map viaSales ≠
+      (routeDiagram {} schema translationByQuery wellFormed validByQuery).map viaSearch :=
   routeDiagram_map_ne wellFormed validByQuery diamond
-    (Schema.pathEq_iff_of_free (wellFormed _) reporting_free) check_byQuery
+    (Schema.pathEqV_iff_of_free (wellFormed _) ((TypeList.checkSound_iff _).mp (by decide))
+      reporting_free) check_byQuery
 
 /-- `searchByQuery`, without the declaration. -/
 def searchByQuery : ContextMap Context where

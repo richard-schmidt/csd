@@ -27,6 +27,11 @@ satisfies its keys, and the schema `billing` of `Conversions.lean` with a record
 value. The Julia side passes them through to its certificate, whose reader puts
 the literals in normal form and checks the keys.
 
+`publishCertificate` claims the restriction of a state of Orders along
+OrdersPL → Orders, whose translation sends the date an order was placed to the
+date of its instant (`Integration.ordersPublish`); Lean computes it with
+`FinState.vrestrictLit`, and the date is that of the instant in UTC.
+
 `conversions` lists paths of conversions and literals in normal form; the Julia
 side applies the conversions and claims the results, which Lean checks with
 `TypeList.applyLit`. `pathEqualities` lists equal paths of `billing`; the Julia
@@ -207,6 +212,57 @@ def sampleCertificate : Certificate where
     states := [("XSales", "Sales", Structure.twoLines)] }).checkClaim (.state "XSales")
 #guard ((({ sampleCertificate with states := [("XSales", "Sales", Structure.twoLines)] } :
     Certificate).explain (.state "XSales")).map (·.getObjValD "kind")) == [.str "key"]
+
+/-! ## A converted field through the published language of Orders -/
+
+/-- A state of Orders: a customer at an address, with an order placed at an instant
+written with an offset. -/
+def ordersState : FinState LitK where
+  sizes := [("Customer", 1), ("Address", 1), ("Order", 1), ("OrderLine", 0), ("Product", 0)]
+  refs := [(("Customer", "address"), [0]), (("Order", "customer"), [0]),
+    (("Order", "billTo"), [0]), (("Order", "shipTo"), [0]), (("OrderLine", "order"), []),
+    (("OrderLine", "product"), [])]
+  attrs := [(("Customer", "name"), col .string [.text "Ada"]),
+    (("Address", "street"), col .string [.text "Bahnhofstrasse 1"]),
+    (("Address", "city"), col .string [.text "Bern"]),
+    (("Order", "id"), col .uuid [.text "7c9e6679-7425-40de-944b-e07fc1f90ae7"]),
+    (("Order", "placedAt"), col .timestamp [.text "2026-10-01T01:30:00+02:00"]),
+    (("Order", "status"), col (.named "OrderStatus") [.text "placed"]),
+    (("OrderLine", "quantity"), []), (("OrderLine", "unitPrice"), []),
+    (("OrderLine", "sku"), []), (("Product", "sku"), []), (("Product", "name"), []),
+    (("Product", "listPrice"), [])]
+
+/-- Its restriction to the published language: the date of the order is the date
+of its instant in UTC. -/
+def publishedState : FinState LitK :=
+  (ordersState.normalize valueTypes).vrestrictLit valueTypes Integration.ordersPublish
+    Orders.published Orders.schema
+
+#guard publishedState.attrCol "Order" "placedOn" = some (col .date [.text "2026-09-30"])
+
+/-- The restriction along OrdersPL → Orders, as the Julia side claims it. -/
+def publishCertificate : Certificate where
+  valueTypes := valueTypes
+  schemas := [("Orders", Orders.schema), ("OrdersPL", Orders.published)]
+  states := [("XO", "Orders", ordersState.normalize valueTypes),
+    ("XOPL", "OrdersPL", publishedState)]
+  claims := [.valueTypes, .wellFormed "Orders", .wellFormed "OrdersPL",
+    .translation "OrdersPL" "Orders" Integration.ordersPublish, .state "XO", .state "XOPL",
+    .restriction "OrdersPL" "Orders" Integration.ordersPublish "XO" "XOPL"]
+
+#guard publishCertificate.check
+
+/-- The published state with the date of the instant in its own offset, which is
+not the date in UTC. -/
+def wrongDate : FinState LitK :=
+  { publishedState with
+    attrs := publishedState.attrs.map fun (c : (String × String) × List (Σ v, LitK v)) =>
+      if c.1 = ("Order", "placedOn") then (c.1, col .date [.text "2026-10-01"]) else c }
+
+#guard !({ publishCertificate with
+    states := [("XO", "Orders", ordersState.normalize valueTypes), ("XOPL", "OrdersPL", wrongDate)]
+    } : Certificate).checkClaim
+      (.restriction "OrdersPL" "Orders" Integration.ordersPublish "XO" "XOPL")
 
 /-- The sample's schema as a context of a map document, with the list of value
 types. -/

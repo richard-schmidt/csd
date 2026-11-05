@@ -5,7 +5,8 @@ import DDD.PathEq
 
 Customers, addresses, orders, order lines, and the products they refer to. A
 product here is the Orders view of a catalog variant: its SKU, name and list
-price. The status of an order is a project-defined value type, `OrderStatus`.
+price. An order records the instant it was placed (`placedAt`). The status of an
+order is a project-defined value type, `OrderStatus`.
 Addresses are value objects: an address is its street and city.
 
 Two equations:
@@ -21,9 +22,11 @@ Keys: an order has one line per product (`{order, product}`), and a product is
 identified by its SKU (`{sku}`).
 
 The published language of Orders (`published`): customers, addresses and orders,
-with the first equation. It contains roots only (`published_rootsOnly`); order
-lines belong to the order aggregate, so a published language with them fails the
-check (`withLines_not_rootsOnly`).
+with the first equation, and the date each order was placed (`placedOn`), which
+the translation into Orders computes from `placedAt` (`Integration.lean`). It
+contains roots only (`published_rootsOnly`); order lines belong to the order
+aggregate, so a published language with them fails the check
+(`withLines_not_rootsOnly`).
 
 The references have no cycle, so path equality is decided by
 `Schema.pathEqAcyclic_iff`. Checked with `decide`: well-formedness, acyclicity,
@@ -44,7 +47,7 @@ def schema : Schema where
     ⟨"billTo", "Order", "Address"⟩, ⟨"shipTo", "Order", "Address"⟩,
     ⟨"order", "OrderLine", "Order"⟩, ⟨"product", "OrderLine", "Product"⟩]
   attrs := [⟨"name", "Customer", .string⟩, ⟨"street", "Address", .string⟩,
-    ⟨"city", "Address", .string⟩, ⟨"id", "Order", .uuid⟩, ⟨"placedOn", "Order", .date⟩,
+    ⟨"city", "Address", .string⟩, ⟨"id", "Order", .uuid⟩, ⟨"placedAt", "Order", .timestamp⟩,
     ⟨"status", "Order", .named "OrderStatus"⟩, ⟨"quantity", "OrderLine", .int⟩,
     ⟨"unitPrice", "OrderLine", .decimal⟩, ⟨"sku", "OrderLine", .string⟩,
     ⟨"sku", "Product", .string⟩, ⟨"name", "Product", .string⟩,

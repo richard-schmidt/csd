@@ -16,9 +16,8 @@ has two values, `nontrivial`).
   a customer of the kernel is a customer of Orders with the same name and
   address, an order of the published language an invoice of Payments with the
   same order id, date, payer and addresses.
-- OrdersPL → Orders has no `Σ_T`: an order of Orders has a status, of the value
-  type `OrderStatus`, and no path of the published language leads from an order
-  to that value type.
+- OrdersPL → Orders converts the date of an order (`Integration.ordersPublish`);
+  `Σ_T` on attributed states is stated for translations without conversions.
 - CatalogPL → Orders has no `Σ_T`: a product of Orders has a list price, of type
   `decimal`, and a product of the published language of Catalog has a name only.
 
@@ -52,15 +51,15 @@ instance nontrivial : ∀ v, Nontrivial (K v)
 /-! ## Arrows with `Σ_T` -/
 
 theorem customers_orders_attrBijective :
-    AttrBijective Orders.wellFormed (valid Arrow.customers_orders) :=
+    AttrBijective Orders.wellFormed (contextMap.valid_empty Arrow.customers_orders rfl) :=
   have h := checkFullyFaithful_sound customers_wellFormed Orders.wellFormed (by decide)
-    Orders.acyclic (valid Arrow.customers_orders) (by decide +kernel)
+    Orders.acyclic (contextMap.valid_empty Arrow.customers_orders rfl) (by decide +kernel)
   attrBijective_of_fullyFaithful h.1 h.2
 
 theorem customers_shipping_attrBijective :
-    AttrBijective Shipping.wellFormed (valid Arrow.customers_shipping) :=
+    AttrBijective Shipping.wellFormed (contextMap.valid_empty Arrow.customers_shipping rfl) :=
   have h := checkFullyFaithful_sound customers_wellFormed Shipping.wellFormed (by decide)
-    Shipping.acyclic (valid Arrow.customers_shipping) (by decide +kernel)
+    Shipping.acyclic (contextMap.valid_empty Arrow.customers_shipping rfl) (by decide +kernel)
   attrBijective_of_fullyFaithful h.1 h.2
 
 theorem ordersPayments_attrBijective : AttrBijective Payments.wellFormed ordersPayments_valid :=
@@ -71,13 +70,15 @@ theorem ordersPayments_attrBijective : AttrBijective Payments.wellFormed ordersP
 /-- `Σ_T ⊣ Δ_T` along Customers → Orders. -/
 noncomputable def customersOrders :
     sigmaStateFunctor (K := K) customers_orders_attrBijective ⊣
-      restrictStateFunctor Orders.wellFormed (valid Arrow.customers_orders) :=
+      restrictStateFunctor Orders.wellFormed
+        (contextMap.valid_empty Arrow.customers_orders rfl) :=
   sigmaStateAdjunction customers_orders_attrBijective
 
 /-- `Σ_T ⊣ Δ_T` along Customers → Shipping. -/
 noncomputable def customersShipping :
     sigmaStateFunctor (K := K) customers_shipping_attrBijective ⊣
-      restrictStateFunctor Shipping.wellFormed (valid Arrow.customers_shipping) :=
+      restrictStateFunctor Shipping.wellFormed
+        (contextMap.valid_empty Arrow.customers_shipping rfl) :=
   sigmaStateAdjunction customers_shipping_attrBijective
 
 /-- `Σ_T ⊣ Δ_T` along OrdersPL → Payments: orders become invoices. -/
@@ -87,14 +88,6 @@ noncomputable def ordersInvoices :
   sigmaStateAdjunction ordersPayments_attrBijective
 
 /-! ## Arrows without `Σ_T` -/
-
-/-- An order of the published language has no status. -/
-theorem not_sigma_ordersPL_orders :
-    ¬ (restrictStateFunctor (K := K) Orders.wellFormed
-      (valid Arrow.ordersPL_orders)).IsRightAdjoint := by
-  rw [isRightAdjoint_restrictStateFunctor_iff]
-  exact not_attrBijective Orders.published_acyclic (e := "Order") (by decide) (l := ["status"])
-    (v := .named "OrderStatus") (by decide) (by decide)
 
 /-- A product of the published language of Catalog has no list price. -/
 theorem not_sigma_catalogPL_orders :
