@@ -740,6 +740,16 @@ def TypeList.normalizeFlat (L : TypeList) : ValueType → Lit → Except String 
   | .optional v, l => L.normalizeFlat v l
   | v, l => normalizeBuiltin v l
 
+/-- The normal form of the field `f`, of type `t`, of the record `n`, given the fields
+`xs` of a literal. -/
+def TypeList.normalizeField (L : TypeList) (n : String) (xs : List (String × Lit)) :
+    String × ValueType → Except String (String × Lit)
+  | (f, t) => match xs.lookup f with
+    | some l => match L.normalizeFlat t l with
+      | .ok v => pure (f, v)
+      | .error e => throw s!"the field {f} of {n}: {e}"
+    | none => throw s!"the field {f} of {n} is missing"
+
 /-- The normal form of the fields `xs` of a literal of the record `n` with the fields
 `fs`: each declared field once, in normal form, sorted by name. -/
 def TypeList.normalizeFields (L : TypeList) (n : String) (fs : List (String × ValueType))
@@ -748,11 +758,7 @@ def TypeList.normalizeFields (L : TypeList) (n : String) (fs : List (String × V
     throw s!"the field {f} of {n} is given more than once"
   if let some x := xs.find? fun x => !fs.any (·.1 == x.1) then
     throw s!"{x.1} is not a field of {n}"
-  let out ← fs.mapM fun (f, t) => match xs.lookup f with
-    | some l => match L.normalizeFlat t l with
-      | .ok v => pure (f, v)
-      | .error e => throw s!"the field {f} of {n}: {e}"
-    | none => throw s!"the field {f} of {n} is missing"
+  let out ← fs.mapM (L.normalizeField n xs)
   pure (.record (out.mergeSort fun a b => compare a.1 b.1 != .gt))
 
 /-- The normal form of a literal of a value type, given the list of value types. -/

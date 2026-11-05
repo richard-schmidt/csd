@@ -1,5 +1,6 @@
 import DDD.Report
 import DDD.VData
+import DDD.LitInterp
 
 /-!
 # Example: conversions
@@ -13,8 +14,10 @@ Each kind of conversion occurs in a path below: the built-ins out of
 `timestamp` and `int`, coercions both ways, `string`, tables, `some` and lifts,
 and the fields of a record. `pathEqualities` lists paths of `billing.vcat types`
 that are equal by the equations of `TypeList.Basic`, which `Schema.pathEqV`
-confirms; `conversions` lists paths of conversions with a literal in normal form
-and the literal `TypeList.applyLit` gives. Both are claims of the certificate
+confirms; since `billing` is acyclic and `types` sound, `pathEqV` also refutes
+(`status_active_ne`). `conversions` lists paths of conversions with a literal in
+normal form and the literal `TypeList.applyLit` gives; equal paths give equal
+literals (`instant_date`). Both are claims of the certificate
 `certificate`, which passes its check, and `Exchange.workspace` hands them to the
 Julia side, which evaluates the conversions on its own.
 -/
@@ -46,6 +49,8 @@ def types : TypeList where
 
 #guard types.checkSound
 
+theorem types_sound : types.Sound := (TypeList.checkSound_iff _).mp (by decide)
+
 /-- Invoices of customers, with attributes of the types of `types`. -/
 def billing : Schema where
   entities := ["Invoice", "Customer"]
@@ -56,6 +61,8 @@ def billing : Schema where
     ⟨"address", "Customer", .named "PostalAddress"⟩]
 
 theorem billing_wellFormed : billing.WellFormed := by decide
+
+theorem billing_acyclic : billing.Acyclic := by decide
 
 /-! ## Path equality -/
 
@@ -95,7 +102,21 @@ theorem status_active : billing.VPathEq types ⟨.entity "Invoice", by decide⟩
     ["status", "phase", "isOpen"] ["status", "active"] :=
   Schema.pathEqV_sound billing_wellFormed _ (by decide)
 
+/-- Two tables that compute different functions present different morphisms: `pathEqV`
+decides path equality in an acyclic schema. -/
+theorem status_active_ne : ¬ billing.VPathEq types ⟨.entity "Invoice", by decide⟩
+    ["status", "active"] ["status", "settled"] := fun h =>
+  absurd ((Schema.pathEqV_iff_of_acyclic billing_wellFormed types_sound billing_acyclic
+    _ _ _).mpr h) (by decide)
+
 /-! ## Conversions of literals -/
+
+/-- On every literal of `Instant`, the date through its date and time is its date. -/
+theorem instant_date {x : Lit} (hx : types.Fits (.named "Instant") x) :
+    types.applyLit (.named "Instant") ["timestamp", "datetime", "date"] x =
+      types.applyLit (.named "Instant") ["timestamp", "date"] x :=
+  Schema.applyLit_eq_of_vPathEq (S := emptySchema) types_sound
+    (Schema.convEq_sound emptySchema_wellFormed (by decide)) hx
 
 /-- A postal address in normal form: its fields sorted by name. -/
 def bern : Lit :=

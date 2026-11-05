@@ -160,6 +160,18 @@ section 9 carry over through the equivalence: limits and colimits, `Δ_T` and
 `Σ_T` with its condition (`Translation.vsigmaStateAdjunction`,
 `isRightAdjoint_vrestrict_iff`), and data gluing (`Gluing.vstateEquiv`).
 
+The literals form an interpretation (`TypeList.litInterp`,
+`DDD/LitInterp.lean`). The values of a type are the literals that fit it: an
+integer, a boolean or text as the type requires, a timestamp of more than ten
+characters, a value of an enumeration, a record with each of its fields, `null`
+at an optional type. Every literal in normal form fits its type
+(`fits_of_normalize`). Each conversion, as `TypeList.convLit`, takes a literal
+that fits its source to one that fits its target, and the literals satisfy the
+equations of `Basic` (`applyLit_basic`). `applyLit` computes the interpretation
+on paths (`applyLit_litInterp`): the result of a claim `conversion` is the image
+of its literal, and paths that are equal in `S.vcat L` give the same literal
+(`applyLit_eq_of_vPathEq`).
+
 The interpretation `K : ValueType → Type` is a parameter of the state layer, one
 for an integration, shared by all its contexts. General theorems hold for every
 `K`. Per-model checks compare values, so they need decidable equality on each
@@ -300,8 +312,14 @@ removed, `datetime` followed by `date` or `time` becomes `date` or `time`, a
 coercion before `string` is removed, a run of tables is one block compared by
 the function it computes, and `some` moves to the end, past the lifts. Every
 rule is an instance of an equation and checks that both sides end at the same
-type, so equal normal forms give equal morphisms (`pathEqV_sound`); the
-converse is not proved.
+type, so equal normal forms give equal morphisms (`pathEqV_sound`). For a
+sound list of value types the converse holds (`DDD/ConvComplete.lean`): no step
+of a reduced stack reduces with the stack below it, the two sides of each
+equation give equivalent reduced stacks, and at an optional type the stack is the
+lift of a stack of plain types. Out of an entity type, each rewrite changes the
+part of a path in `S` or its conversions, so `pathEqV` decides path equality in
+`S.vcat L` wherever `pathEq` decides it in `S` (`pathEqV_iff_of_free`,
+`pathEqV_iff_of_acyclic`).
 
 A schema with both cycles and equations has no decision procedure in the
 library; it would need a rewriting system supplied as a certificate. Catalog has
@@ -1213,6 +1231,8 @@ are outside the library.*
 | `ValueCat.lean` | `conv?`, `Basic`, `applyLit`, `Schema.vcat`, `TypeList.cat`, `vinc`, `vvals`, `VPathEq`, `Translation.vfunctor` |
 | `VStates.lean` | `Interp`, `RecordsAreProducts`, `VState`, `State.vext`, `VState.equivalence`, limits and colimits, `vsigmaStateAdjunction`, `isRightAdjoint_vrestrict_iff`, `Gluing.vstateEquiv` |
 | `ConvNF.lean` | `TypeList.nf`, `convEq_sound`, `Schema.pathEqV`, `pathEqV_sound` |
+| `ConvComplete.lean` | `TypeList.Red`, `push_congr`, `pushAll_basic`, `push_lift`, `nf_basic`, `convEq_complete`, `convEq_iff`, `pathEqV_iff_of_free`, `pathEqV_iff_of_acyclic` |
+| `LitInterp.lean` | `TypeList.Fits`, `convLit_fits`, `applyLit_basic`, `litInterp`, `applyLit_litInterp`, `applyLit_eq_of_vPathEq`, `fits_of_normalize` |
 | `VData.lean` | `FinState.evalV`, `evalV_vmor` |
 | `Json.lean` | the exchange format `csd-ddd/1` |
 | `Certificate.lean` | `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`, claims, `checkClaim_sound` |

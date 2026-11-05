@@ -91,8 +91,19 @@ Path equality in `S.vcat L` (`ConvNF.lean`) splits a path at the first value
 type: the part in `S` goes to `Schema.pathEq`, and the conversions to a normal
 form computed by rewriting with the equations of `Basic`, left to right
 (`TypeList.nf`). Two paths with the same normal form are equal
-(`pathEqV_sound`); the converse is not proved. Finite states evaluate paths
-with conversions through an interpretation (`FinState.evalV`, `VData.lean`).
+(`pathEqV_sound`). For a sound list of value types, two equal paths of
+conversions have the same normal form (`convEq_iff`, `ConvComplete.lean`), so
+`pathEqV` decides path equality in `S.vcat L` out of a value type, and in free
+and in acyclic schemas (`pathEqV_iff_of_free`, `pathEqV_iff_of_acyclic`).
+Finite states evaluate paths with conversions through an interpretation
+(`FinState.evalV`, `VData.lean`).
+
+The literals with `TypeList.convLit` form an interpretation of a sound list
+(`litInterp`, `LitInterp.lean`): the values of a type are the literals that fit
+it (`Fits`), which include its literals in normal form (`fits_of_normalize`),
+and the literals satisfy the equations of `Basic` (`applyLit_basic`). `applyLit`
+computes this interpretation on paths (`applyLit_litInterp`), so paths that are
+equal in `S.vcat L` give the same literal (`applyLit_eq_of_vPathEq`).
 
 ### Schemas
 
@@ -352,6 +363,9 @@ DDD/
                      equivalence with attributed states and what it carries
   ConvNF.lean        normal forms of conversions, path equality with
                      conversions
+  ConvComplete.lean  completeness of the normal forms; pathEqV decides path
+                     equality with conversions
+  LitInterp.lean     the literals as an interpretation of the value types
   VData.lean         finite states evaluated through conversions
   Json.lean          the exchange format csd-ddd/1
   Certificate.lean   certificates, their checks and soundness
@@ -623,9 +637,23 @@ which limits and colimits, `Δ_T`, `Σ_T` and its condition, and data gluing hol
 path equalities as theorems and checks eight with `pathEqV`, and its certificate
 passes. The Julia side evaluates the conversions of the workspace on literals in
 normal form; its certificate of 70 claims holds. The editor edits records and
-tables (csd-editor 65e95f0). Not proved: that equal morphisms have equal normal
-forms, and that literals in normal form with `TypeList.applyLit` form an
-interpretation.
+tables (csd-editor 65e95f0). Step 13 left two facts unproved, which step 14
+proves: that equal morphisms have equal normal forms, and that the literals with
+`TypeList.applyLit` form an interpretation.
+
+Next step 14 is in progress. Done: completeness of the normal forms of
+conversions (`ConvComplete.lean`): for a sound list of value types, `convEq`
+decides path equality of conversions (`convEq_iff`), and `pathEqV` decides path
+equality in `S.vcat L` out of a value type and in free and acyclic schemas
+(`pathEqV_iff_of_free`, `pathEqV_iff_of_acyclic`); and the literal
+interpretation (`LitInterp.lean`): the literals that fit a type, with
+`convLit`, form an interpretation `litInterp`, the literals in normal form fit
+their type, `applyLit` computes the interpretation on paths, and equal paths of
+conversions give the same literal. `Examples/Conversions.lean` refutes an
+equality of tables with `pathEqV` (`status_active_ne`) and proves an equation
+on all literals of a named type over `timestamp` (`instant_date`). The
+conversions of `datetime`, `date` and `time` out of timestamps are computed on
+the characters of the text (`List.take`, `List.drop`, `List.dropLast`).
 
 ## Next steps
 
@@ -1475,3 +1503,18 @@ Next step 13:
 - `TypeList.applyLit` is the semantics of conversions on literals that Lean and
   the Julia side share; the claim `conversion` compares the two. It is not shown
   to be an interpretation.
+
+Next step 14:
+
+- Completeness holds for a sound list of value types. A reduced stack has no step
+  that reduces with the stack below it; the two sides of each equation give
+  equivalent reduced stacks, and at an optional type the stack is the lift of a
+  stack of plain types on a stack that pushes there do not reach. Out of an
+  entity type, a path is its part in `S` and conversions, and each rewrite
+  changes one of the two, so `pathEqV` is complete wherever `pathEq` is.
+- The literal interpretation has as values the literals that fit a type, not
+  only those in normal form: the equations need the shape of a literal (text,
+  an integer, the fields of a record, more than ten characters in a timestamp),
+  not its normal form. That a conversion keeps normal forms is not proved.
+- The date, time and date and time of a timestamp are computed on the list of
+  characters of its text, where the facts the equations need hold.

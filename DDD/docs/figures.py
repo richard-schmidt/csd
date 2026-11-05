@@ -798,7 +798,7 @@ def aggregates():
 # 17. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1180, 562,
+    f = Fig("modules", 1180, 628,
             "Imports between the modules of the DDD library: a chain from value types to "
             "certificates and reports, context maps, states and open systems beside it, and the "
             "examples on top.")
@@ -848,7 +848,11 @@ def modules():
     f.arrow("ValueCat", "ConvNF", "", "acl")
     f.arrow("ValueCat", "VStates", "", "acl")
     f.arrow("VStates", "VData", "", "acl")
-    dy = 50
+    f.node("ConvComplete", 90, 308, "ConvComplete", w=120, h=30)
+    f.node("LitInterp", 225, 308, "LitInterp", w=96, h=30)
+    f.arrow("ConvNF", "ConvComplete", "", "acl")
+    f.arrow("ConvComplete", "LitInterp", "", "acl")
+    dy = 100
     f.region(20, 235 + dy, 1140, 220, "EXAMPLES")
     f.raw(f'<rect class="rg plain" x="38" y="{266 + dy}" width="358" height="44" rx="6"/>', "back")
     for name, x in [("Catalog", 82), ("Orders", 172), ("Payments", 262), ("Shipping", 352)]:
@@ -884,15 +888,17 @@ def modules():
     f.arrow("xConversions", "xExchange", "", "muted")
     f.poly([(1154, 55), (1170, 55), (1170, 365 + dy), (1150, 365 + dy)], "muted")
     f.poly([(1170, 288 + dy), (1150, 288 + dy)], "muted")
-    f.text(1160, 518, "arrows point from a module to the modules that import it; Certificate "
+    f.text(1160, 568, "arrows point from a module to the modules that import it; Certificate "
            "and Union also import Compose, Open imports Compose and Glue, Problems imports "
            "Translation,", "note", "end")
-    f.text(1160, 534, "OpenMachine imports Data and Production.Wiring, Aggregates imports Union "
+    f.text(1160, 584, "OpenMachine imports Data and Production.Wiring, Aggregates imports Union "
            "and States, the example Open imports Rename and AggregateMachine, the example "
            "Problems imports Integration, Exchange imports Structure,", "note", "end")
-    f.text(1160, 550, "ValueCat imports Literals, ConvNF imports PathEq, VStates imports "
-           "StateSigma, VData imports Data, Certificate imports ConvNF, the example "
-           "Conversions imports Report and VData", "note", "end")
+    f.text(1160, 600, "ValueCat imports Literals, ConvNF imports PathEq, VStates imports "
+           "StateSigma, VData imports Data, Certificate imports ConvNF, LitInterp imports "
+           "VStates,", "note", "end")
+    f.text(1160, 616, "the example Conversions imports Report, VData and LitInterp", "note",
+           "end")
     return f
 
 

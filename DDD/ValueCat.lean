@@ -189,11 +189,11 @@ def plainConvLit (v : ValueType) (n : String) (l : Lit) : Except String Lit :=
   if n = "some" then pure l
   else if n = "string" then pure (.text l.str)
   else match v, n, l with
-    | .timestamp, "datetime", .text s => pure (.text (s.dropRight 1))
-    | .timestamp, "date", .text s => pure (.text (s.take 10))
-    | .timestamp, "time", .text s => pure (.text ((s.drop 11).dropRight 1))
-    | .datetime, "date", .text s => pure (.text (s.take 10))
-    | .datetime, "time", .text s => pure (.text (s.drop 11))
+    | .timestamp, "datetime", .text s => pure (.text (String.ofList s.toList.dropLast))
+    | .timestamp, "date", .text s => pure (.text (String.ofList (s.toList.take 10)))
+    | .timestamp, "time", .text s => pure (.text (String.ofList (s.toList.drop 11).dropLast))
+    | .datetime, "date", .text s => pure (.text (String.ofList (s.toList.take 10)))
+    | .datetime, "time", .text s => pure (.text (String.ofList (s.toList.drop 11)))
     | .int, "decimal", .int i => pure (.text (toString i))
     | _, _, _ =>
       if (L.coerce? v n).isSome then pure l
