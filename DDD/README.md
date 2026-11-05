@@ -650,7 +650,9 @@ tables (csd-editor 65e95f0). Step 13 left two facts unproved, which step 14
 proves: that equal morphisms have equal normal forms, and that the literals with
 `TypeList.applyLit` form an interpretation.
 
-Next step 14 is in progress. Done: completeness of the normal forms of
+Next step 14, translations that convert and keys through restriction and gluing,
+is complete, with no `sorry`. It proves the two facts step 13 left open:
+completeness of the normal forms of
 conversions (`ConvComplete.lean`): for a sound list of value types, `convEq`
 decides path equality of conversions (`convEq_iff`), and `pathEqV` decides path
 equality in `S.vcat L` out of a value type and in free and acyclic schemas
@@ -707,6 +709,15 @@ states it; a map document checks it for each arrow, and an arrow that fails it h
 the problem `keyNotKept`. Every arrow of the example map keeps keys
 (`Integration.keysKept`); the broken map has an arrow that sends the street of an
 address to its city, which loses the key of the value object `Address`.
+Keys through gluing: `Schema.State.KeysOf Y B` states that `Y` satisfies the keys
+of `B`; along an inclusion the restriction satisfies the keys of the included
+schema exactly when the state does (`Translation.keys_restrict_empty_iff`). A
+state of a glued schema satisfies the keys of the two schemas exactly when its
+restrictions satisfy their keys (`Gluing.keysOf_iff`), and it then satisfies the
+keys of the glued schema (`Gluing.keys_of_keysOf`); `Gluing.keyedStateEquiv` and
+`Schema.keyedFamilyEquiv` restrict data gluing and the family equivalence of the
+aggregates to such states. `Examples/Gluing.lean` states keyed data gluing for
+Orders and Shipping.
 
 ## Next steps
 
@@ -1586,6 +1597,31 @@ Next step 14:
   not its normal form. That a conversion keeps normal forms is not proved.
 - The date, time and date and time of a timestamp are computed on the list of
   characters of its text, where the facts the equations need hold.
+- `D` of a context map goes to the categories with conversions, so that an arrow
+  may convert. Strict integration and merges keep the schema categories: the
+  arrows they use are inclusions out of kernels, valid without conversions by the
+  faithfulness of `Schema.vinc`, and `vinc_diagram_map` relates them to `D`. That
+  the glued category with conversions is the pushout of the categories with
+  conversions is not proved.
+- The claim `restriction` has two meanings: along a valid translation, the state
+  of the result is `Δ_T` of the state; along a translation that converts, the
+  states are read in the literal interpretation, which needs the literals to fit
+  their types.
+- The normal form is checked, like the qualification of `Rename.lean`: the
+  isomorphism of the extension with the target is proved for each translation
+  that passes `checkNormalForm`, not for all injective translations. Well-formedness
+  of the extension depends on the target: a derived reference into a member of an
+  aggregate from outside breaks it, and a derived name may clash with a generator
+  of the target.
+- `KeysKept` is decided on the names of the images: a key goes to a key whose
+  fields are images of single generators. A key kept only through an equation of
+  the target is not recognized.
+- A glued state is asked to satisfy the keys of the two parts, not those of the
+  glued schema: a value object of the glued schema has the fields of both parts,
+  so its key is weaker, and the keys of the parts imply it (`keys_of_keysOf`).
+- `Σ_T` on attributed states stays with translations without conversions; the
+  example of a translation without `Σ_T` along OrdersPL → Orders is dropped since
+  that arrow now converts.
 - Schemas keep equations without conversions. A translation that converts is
   valid, induces a functor between the categories with conversions and
   restricts states and data; gluing, merges and open schemas stay with

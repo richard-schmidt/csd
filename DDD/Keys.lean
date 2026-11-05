@@ -1,4 +1,5 @@
 import DDD.VData
+import DDD.Aggregates
 
 /-!
 # Keys through restriction and gluing
@@ -12,6 +13,16 @@ has a key on `T e` each of whose fields is the image `T f` of a field `f` of `F`
   `FinState.restrict_checkKeys` states the same of the checks on data, and
   `FinState.vrestrict_checkKeys` of the restriction along a translation that
   converts.
+- `Schema.State.KeysOf Y B`: `Y` satisfies the keys of `B`. Along an inclusion, the
+  restriction of a state satisfies the keys of the included schema exactly when
+  the state satisfies them (`Translation.keys_restrict_empty_iff`).
+- Gluing: a state of the glued schema satisfies the keys of the two schemas
+  exactly when its restrictions satisfy their keys (`Gluing.keysOf_iff`), and it
+  then satisfies the keys of the glued schema, whose value objects have the fields
+  of both (`Gluing.keys_of_keysOf`). `Gluing.keyedStateEquiv` restricts data
+  gluing to these states, and `Schema.keyedFamilyEquiv` restricts the family
+  equivalence of `Aggregates.lean`: a state of the internal schema satisfies the
+  keys exactly when each of its aggregate parts does.
 -/
 
 namespace DDD
@@ -219,5 +230,260 @@ theorem vrestrict_checkKeys (hS : S.WellFormed) (hZ : Z.check S' = true)
       exact absurd h (by simp)
 
 end FinState
+
+/-! ## Keys through inclusions -/
+
+namespace Schema
+
+variable {S : Schema}
+
+theorem mem_outNames_iff {e n : String} : n ∈ S.outNames e ↔ (e, n) ∈ S.gens := by
+  refine ⟨mem_gens_of_mem_outNames, fun h => ?_⟩
+  simp only [gens, List.mem_append, List.mem_map, Prod.mk.injEq] at h
+  simp only [outNames, List.mem_append, List.mem_map, List.mem_filter, beq_iff_eq]
+  rcases h with ⟨r, hr, rfl, rfl⟩ | ⟨a, ha, rfl, rfl⟩
+  · exact Or.inl ⟨r, ⟨hr, rfl⟩, rfl⟩
+  · exact Or.inr ⟨a, ⟨ha, rfl⟩, rfl⟩
+
+variable {K : ValueType → Type}
+
+/-- `Y` satisfies the keys of `B` on the entity types of `S`. -/
+def State.KeysOf (Y : S.State K) (B : Schema) : Prop :=
+  ∀ k ∈ B.allKeys, ∀ he : k.entity ∈ S.entities, Y.KeyHolds k.entity he k.fields
+
+/-- A key with more fields imposes less. -/
+theorem State.KeyHolds.mono {Y : S.State K} {e : String} {he : e ∈ S.entities}
+    {fs fs' : List String} (hsub : ∀ n ∈ fs, n ∈ fs') (h : Y.KeyHolds e he fs) :
+    Y.KeyHolds e he fs' :=
+  fun x y hxy => h x y fun n hn b hb => hxy n (hsub n hn) b hb
+
+end Schema
+
+namespace Translation
+
+variable {B G : Schema} {K : ValueType → Type}
+
+/-- Along an inclusion, a key on generators of the included schema holds in the
+restriction of a state exactly when it holds in the state. -/
+theorem keyHolds_restrict_empty (hB : B.WellFormed) (hG : G.WellFormed)
+    (hi : ({} : Translation).Valid B G)
+    (Y : G.State K) {e : String} (he : e ∈ B.entities) {fs : List String}
+    (hfs : ∀ n ∈ fs, (e, n) ∈ B.gens) :
+    (restrictState hG hi Y).KeyHolds e he fs ↔ Y.KeyHolds e (hi.entity e he) fs := by
+  have hstep : ∀ n ∈ fs, ∃ o, B.step? (.entity e) n = some o := fun n hn =>
+    Option.isSome_iff_exists.mp (step?_isSome_iff.mpr (hfs n hn))
+  -- The image of a generator of `B` is the generator of `G` of the same name.
+  have himage : ∀ (n : String) (b : B.Obj) (hb : B.step? (.entity e) n = some b.1)
+      (hb' : G.step? (.entity e) n = some (obj hi b).1),
+      functorPath hG hi (B.genPath ⟨.entity e, he⟩ b n hb) =
+        G.genPath (obj hi ⟨.entity e, he⟩) (obj hi b) n hb' := fun n b hb hb' =>
+    names_injective _ _ (by rw [names_functorPath, names_toPath, mapPath_singleton]; rfl)
+  constructor
+  · intro h x y hxy
+    refine h x y fun n hn b hb => ?_
+    have hb' : G.step? (.entity e) n = some (obj hi b).1 := by
+      rw [obj_empty]
+      exact step?_of_sub hi hb
+    change Y.F.map (G.mor (functorPath hG hi (B.genPath ⟨.entity e, he⟩ b n hb))) x =
+      Y.F.map (G.mor (functorPath hG hi (B.genPath ⟨.entity e, he⟩ b n hb))) y
+    rw [himage n b hb hb']
+    exact hxy n hn (obj hi b) hb'
+  · intro h x y hxy
+    refine h x y fun n hn b' hb' => ?_
+    obtain ⟨o, ho⟩ := hstep n hn
+    let b : B.Obj := ⟨o, isOb_of_step? hB ho⟩
+    have hb : B.step? (.entity e) n = some b.1 := ho
+    obtain rfl : b' = obj hi b := Subtype.ext (by
+      rw [obj_empty]
+      exact Option.some.inj (hb'.symm.trans (step?_of_sub hi hb)))
+    have h₁ := hxy n hn b hb
+    change Y.F.map (G.mor (functorPath hG hi (B.genPath ⟨.entity e, he⟩ b n hb))) x =
+      Y.F.map (G.mor (functorPath hG hi (B.genPath ⟨.entity e, he⟩ b n hb))) y at h₁
+    rw [himage n b hb hb'] at h₁
+    exact h₁
+
+/-- Along an inclusion, the restriction of a state satisfies the keys of the
+included schema exactly when the state satisfies them. -/
+theorem keys_restrict_empty_iff (hB : B.WellFormed) (hG : G.WellFormed)
+    (hi : ({} : Translation).Valid B G) (Y : G.State K) :
+    (restrictState hG hi Y).Keys ↔ Y.KeysOf B := by
+  constructor
+  · intro h k hk _
+    have hk' := hB.allKeys_spec hk
+    exact (keyHolds_restrict_empty hB hG hi Y hk'.1 hk'.2).mp (h k hk hk'.1)
+  · intro h k hk he
+    exact (keyHolds_restrict_empty hB hG hi Y he (hB.allKeys_spec hk).2).mpr
+      (h k hk (hi.entity _ he))
+
+end Translation
+
+/-! ## Keys through gluing -/
+
+namespace Schema
+
+variable {B₁ B₂ : Schema}
+
+/-- The generators of a glued schema are those of the two schemas. -/
+theorem mem_gens_glue {e n : String} :
+    (e, n) ∈ (glue B₁ B₂).gens ↔ (e, n) ∈ B₁.gens ∨ (e, n) ∈ B₂.gens := by
+  constructor
+  · intro h
+    simp only [gens, glue, List.map_append, List.mem_append, List.mem_map, List.mem_filter,
+      Prod.mk.injEq] at h
+    rcases h with ((⟨r, hr, rfl, rfl⟩ | ⟨r, ⟨hr, -⟩, rfl, rfl⟩) |
+      (⟨a, ha, rfl, rfl⟩ | ⟨a, ⟨ha, -⟩, rfl, rfl⟩))
+    · exact Or.inl (List.mem_append_left _ (List.mem_map_of_mem hr))
+    · exact Or.inr (List.mem_append_left _ (List.mem_map_of_mem hr))
+    · exact Or.inl (List.mem_append_right _ (List.mem_map_of_mem ha))
+    · exact Or.inr (List.mem_append_right _ (List.mem_map_of_mem ha))
+  · intro h
+    by_cases h₁ : (e, n) ∈ B₁.gens
+    · simp only [gens, List.mem_append, List.mem_map, Prod.mk.injEq] at h₁
+      simp only [gens, glue, List.map_append, List.mem_append, List.mem_map, List.mem_filter,
+        Prod.mk.injEq]
+      rcases h₁ with ⟨r, hr, rfl, rfl⟩ | ⟨a, ha, rfl, rfl⟩
+      · exact Or.inl (Or.inl ⟨r, hr, rfl, rfl⟩)
+      · exact Or.inr (Or.inl ⟨a, ha, rfl, rfl⟩)
+    · have h₂ := h.resolve_left h₁
+      simp only [gens, List.mem_append, List.mem_map, Prod.mk.injEq] at h₂
+      simp only [gens, glue, List.map_append, List.mem_append, List.mem_map, List.mem_filter,
+        Prod.mk.injEq, decide_eq_true_eq]
+      rcases h₂ with ⟨r, hr, rfl, rfl⟩ | ⟨a, ha, rfl, rfl⟩
+      · exact Or.inl (Or.inr ⟨r, ⟨hr, by
+          simpa only [gens, List.mem_append, List.mem_map, Prod.mk.injEq] using h₁⟩, rfl, rfl⟩)
+      · exact Or.inr (Or.inr ⟨a, ⟨ha, by
+          simpa only [gens, List.mem_append, List.mem_map, Prod.mk.injEq] using h₁⟩, rfl, rfl⟩)
+
+theorem outNames_subset_glue_left {e n : String} (h : n ∈ B₁.outNames e) :
+    n ∈ (glue B₁ B₂).outNames e :=
+  mem_outNames_iff.mpr (mem_gens_glue.mpr (Or.inl (mem_outNames_iff.mp h)))
+
+theorem outNames_subset_glue_right {e n : String} (h : n ∈ B₂.outNames e) :
+    n ∈ (glue B₁ B₂).outNames e :=
+  mem_outNames_iff.mpr (mem_gens_glue.mpr (Or.inr (mem_outNames_iff.mp h)))
+
+end Schema
+
+namespace Gluing
+
+variable (D : Gluing) {K : ValueType → Type}
+
+/-- A state of the glued schema satisfies the keys of the two schemas exactly when
+its two restrictions satisfy their keys. -/
+theorem keysOf_iff (X : D.glued.State K) :
+    (X.KeysOf D.left ∧ X.KeysOf D.right) ↔
+      ((D.stateEquiv X).1.1.Keys ∧ (D.stateEquiv X).1.2.Keys) :=
+  and_congr (Translation.keys_restrict_empty_iff D.wf_left D.wf_glued D.inl_valid X).symm
+    (Translation.keys_restrict_empty_iff D.wf_right D.wf_glued D.inr_valid X).symm
+
+/-- A state of the glued schema that satisfies the keys of the two schemas satisfies
+the keys of the glued schema: its declared keys and subtypes are those of the two,
+and a value object has at least the fields it has in either. -/
+theorem keys_of_keysOf {X : D.glued.State K} (hl : X.KeysOf D.left) (hr : X.KeysOf D.right) :
+    X.Keys := by
+  intro k hk he
+  simp only [glued, allKeys, glue, List.mem_append, List.mem_map, List.mem_filter] at hk
+  rcases hk with ((hk | ⟨hk, -⟩) | ⟨e, he₁ | ⟨he₂, -⟩, rfl⟩) | ⟨s, hs | ⟨hs, -⟩, rfl⟩
+  · exact hl k (List.mem_append_left _ (List.mem_append_left _ hk)) he
+  · exact hr k (List.mem_append_left _ (List.mem_append_left _ hk)) he
+  · exact (hl ⟨e, D.left.outNames e⟩
+      (List.mem_append_left _ (List.mem_append_right _ (List.mem_map_of_mem he₁))) he).mono
+      fun n hn => outNames_subset_glue_left (B₁ := D.left) (B₂ := D.right) hn
+  · exact (hr ⟨e, D.right.outNames e⟩
+      (List.mem_append_left _ (List.mem_append_right _ (List.mem_map_of_mem he₂))) he).mono
+      fun n hn => outNames_subset_glue_right (B₁ := D.left) (B₂ := D.right) hn
+  · exact hl _ (List.mem_append_right _ (List.mem_map_of_mem hs)) he
+  · exact hr _ (List.mem_append_right _ (List.mem_map_of_mem hs)) he
+
+/-- Data gluing for states that satisfy the keys: a state of the glued schema that
+satisfies the keys of the two schemas is a pair of states that satisfy their keys
+and have equal restrictions to the kernel. -/
+def keyedStateEquiv :
+    { X : D.glued.State K // X.KeysOf D.left ∧ X.KeysOf D.right } ≃
+      { P : D.left.State K × D.right.State K //
+        Translation.restrictState D.wf_left D.gluable.left P.1 =
+          Translation.restrictState D.wf_right D.gluable.right P.2 ∧ P.1.Keys ∧ P.2.Keys } :=
+  (D.stateEquiv.subtypeEquiv (q := fun P => P.1.1.Keys ∧ P.1.2.Keys) D.keysOf_iff).trans
+    (Equiv.subtypeSubtypeEquivSubtypeInter _
+      fun P : D.left.State K × D.right.State K => P.1.Keys ∧ P.2.Keys)
+
+end Gluing
+
+/-! ## Keys through the aggregates -/
+
+namespace Schema
+
+variable {S : Schema} {K : ValueType → Type}
+
+/-- Out of an entity type of an aggregate, the aggregate schema has the generators
+of `S`. -/
+theorem outNames_aggregateSchema {A : Aggregate} {e : String} (he : e ∈ A.entities) :
+    (S.aggregateSchema A).outNames e = S.outNames e := by
+  simp only [outNames, aggregateSchema, aggregateBase, aggRefs, aggAttrs, List.filter_filter]
+  congr 2
+  · refine List.filter_congr fun r _ => ?_
+    by_cases h : r.src = e
+    · subst h
+      simp [he]
+    · simp [h]
+  · refine List.filter_congr fun a _ => ?_
+    by_cases h : a.src = e
+    · subst h
+      simp [he]
+    · simp [h]
+
+variable (hS : S.WellFormed) (hne : S.entities ≠ [])
+
+/-- A state of the internal schema satisfies the keys of `S` exactly when it
+satisfies the keys of every aggregate schema. -/
+theorem keys_iff_keysOf_aggregates (Y : S.internalSchema.State K) :
+    Y.Keys ↔ ∀ A : S.Aggs, Y.KeysOf (S.aggregateSchema A.1) := by
+  constructor
+  · intro h A k hk he
+    simp only [allKeys, aggregateSchema, aggregateBase, List.mem_append, List.mem_map,
+      List.mem_filter, decide_eq_true_eq] at hk
+    rcases hk with (⟨hk, -⟩ | ⟨e, ⟨he₁, heA⟩, rfl⟩) | ⟨s, ⟨hs, -⟩, rfl⟩
+    · exact h k (List.mem_append_left _ (List.mem_append_left _ hk)) he
+    · have hk := h ⟨e, S.outNames e⟩
+        (List.mem_append_left _ (List.mem_append_right _ (List.mem_map_of_mem he₁))) he
+      change Y.KeyHolds e he ((S.aggregateSchema A.1).outNames e)
+      rw [outNames_aggregateSchema heA]
+      exact hk
+    · exact h _ (List.mem_append_right _ (List.mem_map_of_mem hs)) he
+  · intro h k hk he
+    obtain ⟨A, hA, heA⟩ := exists_aggregate (S := S) (show k.entity ∈ S.entities from he)
+    have hk' : k ∈ (S.aggregateSchema A).allKeys := by
+      change k ∈ S.allKeys at hk
+      simp only [allKeys, List.mem_append, List.mem_map] at hk
+      rcases hk with (hk | ⟨e, he₁, rfl⟩) | ⟨s, hs, rfl⟩
+      · exact List.mem_append_left _ (List.mem_append_left _
+          (List.mem_filter.mpr ⟨hk, decide_eq_true heA⟩))
+      · refine List.mem_append_left _ (List.mem_append_right _ (List.mem_map.mpr
+          ⟨e, List.mem_filter.mpr ⟨he₁, decide_eq_true heA⟩, ?_⟩))
+        rw [outNames_aggregateSchema heA]
+      · exact List.mem_append_right _ (List.mem_map.mpr
+          ⟨s, List.mem_filter.mpr ⟨hs, decide_eq_true heA⟩, rfl⟩)
+    exact h ⟨A, hA⟩ k hk' he
+
+include hS in
+/-- A state of the internal schema satisfies the keys exactly when each of its
+aggregate parts satisfies the keys of its aggregate schema. -/
+theorem keys_iff_parts (Y : S.internalSchema.State K) :
+    Y.Keys ↔ ∀ A : S.Aggs, (parts hS Y A).Keys :=
+  (keys_iff_keysOf_aggregates Y).trans (forall_congr' fun A =>
+    (Translation.keys_restrict_empty_iff (aggregateSchema_wellFormed hS A.2)
+      (internalSchema_wellFormed hS) (aggregate_valid hS A.2) Y).symm)
+
+/-- Consistency inside the aggregates, with keys: a state of the internal schema
+that satisfies the keys is a compatible family of states of the aggregate schemas,
+each of which satisfies the keys of its aggregate schema. -/
+noncomputable def keyedFamilyEquiv :
+    { Y : S.internalSchema.State K // Y.Keys } ≃
+      { X : ∀ A : S.Aggs, (S.aggregateSchema A.1).State K // Compatible X ∧ ∀ A, (X A).Keys } :=
+  ((familyEquiv hS hne).subtypeEquiv (q := fun X => ∀ A, (X.1 A).Keys) (keys_iff_parts hS)).trans
+    (Equiv.subtypeSubtypeEquivSubtypeInter _
+      fun X : ∀ A : S.Aggs, (S.aggregateSchema A.1).State K => ∀ A, (X A).Keys)
+
+end Schema
 
 end DDD

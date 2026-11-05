@@ -1,4 +1,4 @@
-import DDD.States
+import DDD.Keys
 import DDD.Examples.Integration
 import DDD.Examples.Values
 
@@ -19,7 +19,9 @@ the glued schema; with `decide +kernel`: strict non-interference, both legs are
 fully faithful (`orders_fullyFaithful`, `shipping_fullyFaithful`). In the glued
 schema the billing city of an order is still its customer's city. By the data
 gluing theorem, a state of the glued schema with values in `Values.K` is a pair
-of states of Orders and Shipping that agree on customers and addresses.
+of states of Orders and Shipping that agree on customers and addresses, and the
+states that satisfy the keys of both correspond to pairs of states that satisfy
+their keys (`Gluing.keyedStateEquiv`).
 
 A failing kernel, outside the map: both contexts give customers a delivery
 address besides their address, and Shipping assumes the two are equal while
@@ -73,6 +75,21 @@ example : gluing.glued.State Values.K ≃ { P : Orders.schema.State Values.K ×
       Translation.restrictState gluing.wf_left gluing.gluable.left P.1 =
         Translation.restrictState gluing.wf_right gluing.gluable.right P.2 } :=
   gluing.stateEquiv
+
+/-- Data gluing for the states that satisfy the keys: a state of the glued schema
+that satisfies the keys of Orders and of Shipping is a pair of states that satisfy
+their keys and agree on customers and addresses. -/
+example : { X : gluing.glued.State Values.K // X.KeysOf Orders.schema ∧ X.KeysOf Shipping.schema } ≃
+    { P : Orders.schema.State Values.K × Shipping.schema.State Values.K //
+      Translation.restrictState gluing.wf_left gluing.gluable.left P.1 =
+        Translation.restrictState gluing.wf_right gluing.gluable.right P.2 ∧
+      P.1.Keys ∧ P.2.Keys } :=
+  gluing.keyedStateEquiv
+
+/-- Such a state satisfies the keys of the glued schema. -/
+example (X : gluing.glued.State Values.K) (hl : X.KeysOf Orders.schema)
+    (hr : X.KeysOf Shipping.schema) : X.Keys :=
+  gluing.keys_of_keysOf hl hr
 
 /-! ## A failing kernel -/
 

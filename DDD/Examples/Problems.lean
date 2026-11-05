@@ -13,8 +13,9 @@ import DDD.Examples.Integration
   translation with wrong images has one problem per wrong image.
 - The report of a context map document with a broken list of value types, a
   broken context, a context with undeclared value types, a failing arrow, an
-  arrow that does not keep a key, and an arrow to a missing context (`brokenMap`). `cli/CsdExport.lean` writes
-  it to `cli/test/broken-map.json`, which CI checks with `csd-check --json`.
+  arrow that does not keep a key, and an arrow to a missing context
+  (`brokenMap`). `cli/CsdExport.lean` writes it to `cli/test/broken-map.json`,
+  which CI checks with `csd-check --json`.
 -/
 
 set_option linter.hashCommand false

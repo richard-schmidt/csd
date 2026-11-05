@@ -373,14 +373,50 @@ the identity functor (`functor_empty_self`). `checkSameFunctor` decides whether
 two translations between the same schemas induce the same functor, given a
 decision procedure for path equality in the target (`checkSameFunctor_iff`).
 
+A translation may also send an attribute to a path that ends in conversions:
+`Translation.VValid L T S S'` (`DDD/ValueCat.lean`) asks the image of each
+attribute to be a path of generators and conversions to its value type, and the
+image of each equation to hold in `S'.vcat L`; `checkVValid` decides it with
+`Schema.pathEqV`. A valid translation is valid with conversions (`Valid.vvalid`),
+and for a sound list an inclusion valid with conversions is valid
+(`VValid.valid_empty`), since `S.cat` is faithful in `S.vcat L`
+(`Schema.pathEq_of_vPathEq`). Such a translation induces a functor
+`vfunctor : S.vcat L ⥤ S'.vcat L`, `Δ_T` on states with conversions
+(`vrestrictState`), and `Δ_T` on finite states (`FinState.vrestrict`,
+isomorphic to it by `vrestrictIso`) and on literals (`FinState.vrestrictLit`,
+which Lean and the Julia side compute the same way). Composites and the check of
+equal functors carry over (`Translation.vcomp`, `vfunctor_vcomp`,
+`checkSameFunctor_vsound`, `DDD/VCompose.lean`).
+
+A translation that keeps the entity types apart and converts nothing has a
+normal form (`DDD/NormalForm.lean`): the definitional extension
+`Translation.ext T S S'`, which is `S'` with the image of each entity type of `S`
+renamed after it and a derived generator `g` with the equation `g = T g` for
+each generator of `S` whose image is another path. `S` includes into it, and
+when `checkNormalForm` passes, the extension presents a category isomorphic to
+that of `S'` and the functor of `T` is the inclusion followed by the isomorphism
+(`normalForm`). Gluing, open schemas and the roots-only check, which take
+inclusions, then apply. In `Examples/NormalForm.lean`, OrdersPL → Payments
+factors through Payments with payers named `Customer`, invoices named `Order`
+and four derived generators such as `billTo = payer.address`.
+
+A translation keeps the keys of its source (`Translation.KeysKept`) when each
+key has a field that goes to the empty path, or the target has a key on the image
+of its entity type whose fields are images of its fields. Restriction then sends
+states that satisfy the keys of the target to states that satisfy those of the
+source (`restrictState_keys`, `DDD/Keys.lean`), on data as well
+(`FinState.restrict_checkKeys`, `vrestrict_checkKeys`).
+
 ## 5. Context maps
 
 ### The structure
 
 A context map on a quiver of contexts `C` (`DDD/ContextMap.lean`) has:
 
-- a well-formed schema per context and a valid translation per arrow
-  `u ⟶ d`, from the upstream schema to the downstream one;
+- a sound list of value types, `valueTypes`, empty by default;
+- a well-formed schema per context and a translation per arrow `u ⟶ d`, from
+  the upstream schema to the downstream one, valid with the conversions of the
+  list (`Translation.VValid`);
 - declared equations between routes, `routeEqns : HomRel (Paths C)`, with the
   obligation `coherent` that two routes declared equal have the same composite
   functor;
@@ -392,8 +428,8 @@ obligations then hold by a default tactic.
 
 The category of contexts `J` is the free category on the arrows quotiented by
 the declared equations, `Quotient routeEqns`. The functor of the routes,
-`freeDiagram : Paths C ⥤ Cat`, sends each context to its schema category and
-each arrow to the functor of its translation. It respects the declared
+`freeDiagram : Paths C ⥤ Cat`, sends each context to its schema category with
+conversions and each arrow to the functor of its translation (`vfunctor`). It respects the declared
 equations by `coherent`, so it descends to the diagram `D : J ⥤ Cat`
 (`ContextMap.diagram`, by `Quotient.lift`). `ctx c`, `route p` and `arrow f`
 name the objects and morphisms of `J`; `diagram_map_arrow` states that `D` sends
@@ -405,7 +441,7 @@ The relationships of domain-driven design map to this structure:
 |---|---|
 | Conformist | an arrow with the empty translation: the upstream schema included |
 | Anti-corruption layer | an arrow with a general translation |
-| Published language | a context, included in its owner, translated into each consumer; roots only |
+| Published language | a context, translated into its owner, keeping entity types apart, and into each consumer; roots only |
 | Shared kernel | a context marked as a kernel, with an inclusion into each context that shares it |
 | Separate ways | no arrow |
 
@@ -508,13 +544,18 @@ contexts ends at a root of the owner.
 
 `Schema.RootsOnly P S` states that no entity type of `P` is a member of an
 aggregate of `S`; `checkRootsOnly` decides it (`checkRootsOnly_iff`).
-`ContextMap.Publishes f` states, for an arrow `f : p ⟶ o`, that `f` is the
-empty translation and that `p` contains roots of `o` only; it is decidable.
+`ContextMap.Publishes f` states, for an arrow `f : p ⟶ o`, that the translation
+of `f` keeps the entity types of `p` apart and sends them to roots of `o`
+(`Translation.RootsOnly`, which is `Schema.RootsOnly` for the empty translation,
+`rootsOnly_empty`); it is decidable. The translation may convert: OrdersPL
+publishes the date an order was placed, which Orders computes from the instant it
+records (`placedOn ↦ placedAt.date`, `Integration.ordersPublish`).
 
 ![OrdersPL contains roots of Orders only; adding OrderLine, a member of the Order aggregate, fails RootsOnly.](figures/published-language.svg)
 
-*Figure 8. OrdersPL is included in Orders by the empty translation; Customer,
-Address and Order are roots there (`Orders.published_rootsOnly`,
+*Figure 8. OrdersPL goes to Orders by a translation that keeps every name except
+`placedOn`, which goes to `placedAt.date`; Customer, Address and Order are roots
+there (`Orders.published_rootsOnly`,
 `orders_publishes`). `Orders.withLines` adds OrderLine, a member of the order
 aggregate, and fails the check (`withLines_not_rootsOnly`). In Catalog, Variant
 is an aggregate root, so CatalogPL can publish it; images stay inside the
@@ -564,10 +605,11 @@ schemas. `inl_desc`, `inr_desc` and `desc_unique` give the universal property.
 
 Two arrows `f₁ : k ⟶ d₁` and `f₂ : k ⟶ d₂` out of a kernel `k` give a gluing,
 `ContextMap.kernelGluing`, once the targets share no name outside the kernel
-and the glued schema is well formed; both conditions are decided. Its kernel
-legs are the images of the arrows under `D` (`kernelGluing_ι₁`,
-`kernelGluing_ι₂`), so the glued schema category is the pushout of the span of
-`D` out of the kernel (`isPushout_kernel`).
+and the glued schema is well formed; both conditions are decided. The arrows out
+of a kernel are inclusions, valid without conversions (`valid_empty`), and the
+glued schema category is the pushout of the span of their functors
+(`isPushout_kernel`); with conversions, the inclusions are the images of the
+arrows under `D` (`vinc_diagram_map`).
 
 ![The two arrows out of the Customers kernel and the legs into the glued schema form a pushout square in Cat; functors that agree on the kernel factor uniquely through it.](figures/pushout.svg)
 
@@ -785,17 +827,17 @@ faithful translation satisfies the condition, so a passing `checkFullyFaithful`
 proves it; a path of `S'` from the image of an entity type to a value type that
 no path of `S` from that entity type reaches refutes it (`not_attrBijective`).
 In `Examples/Sigma.lean`, `Σ_T` exists along Customers → Orders, Customers →
-Shipping and OrdersPL → Payments. It does not exist along OrdersPL → Orders, as
-an order of Orders has a status that the published language does not give, nor
-along CatalogPL → Orders, as a product of Orders has a list price.
+Shipping and OrdersPL → Payments. It does not exist along CatalogPL → Orders, as
+a product of Orders has a list price. OrdersPL → Orders converts, and `Σ_T` on
+attributed states is stated for translations without conversions.
 
 ![A pushout of states merges entities along a shared sub-state and keeps the values; Σ along a translation exists when the translation is bijective on paths into value types.](figures/states.svg)
 
 *Figure 13. Left: a pushout of states along a shared customer. The customers of
 the two states are merged; the values stay `K v`. Right: along Customers →
 Orders each path from a customer into a value type is the image of one path of
-the kernel, and `Σ_T` exists. Along OrdersPL → Orders the status of an order has
-no source path, and `Σ_T` does not exist.*
+the kernel, and `Σ_T` exists. Along CatalogPL → Orders the list price of a product
+has no source path, and `Σ_T` does not exist.*
 
 ## 10. Data, exchange and certificates
 
@@ -829,7 +871,14 @@ Restriction along a translation is computed on data: `FinState.restrict T S S' X
 keeps the entities of `T e` for each entity type `e` of `S`, and computes the
 column of each generator by following its image path in `X`. It passes the
 check (`restrict_check`), and its state is isomorphic to
-`Translation.restrictState` applied to the state of `X` (`restrictIso`).
+`Translation.restrictState` applied to the state of `X` (`restrictIso`). Along
+a translation that converts, the attribute columns follow the conversions of an
+interpretation (`FinState.vrestrict`, `vrestrictIso`), or of the literals
+(`FinState.vrestrictLit`, `DDD/LitData.lean`): when the literals of `X` fit their
+types, `X` is a finite state of the literal interpretation (`FinState.fit`), and
+`vrestrictLit` is its restriction (`mapVals_vrestrict`). When the translation
+keeps keys, the restriction of a state that passes the key check passes it
+(`restrict_checkKeys`).
 
 ### The exchange format
 
@@ -848,7 +897,9 @@ the examples, and `julia/test` tests them on the Julia side.
 and claims. Each kind of claim has a check and a meaning, and a claim that
 passes its check holds (`checkClaim_sound`):
 
-- a schema is well formed, or acyclic; a translation is valid;
+- a schema is well formed, or acyclic; a translation is valid with the
+  conversions of the list of value types; a translation keeps the keys of its
+  source (`keysKept`);
 - a gluing: the schema Julia computed equals `Schema.glue` up to the order of its
   lists (`checkSameUpToOrder`). Presentations that list the same things in
   another order present isomorphic categories (`Schema.isoOfPerm`), so the
@@ -859,7 +910,9 @@ passes its check holds (`checkClaim_sound`):
 - a finite state is a state of its schema, with literals of the declared types,
   that satisfies the keys of its schema;
 - a finite state is the restriction of another along a translation, so that its
-  state is isomorphic to `restrictState`;
+  state is isomorphic to `restrictState`; along a translation that converts, the
+  two are read in the literal interpretation and the restriction is
+  `vrestrictState` (`FinState.IsVRestriction`);
 - a homomorphism of finite states that is a morphism of their states;
 - two paths out of an object of a schema present the same morphism of the
   category with conversions, checked by `pathEqV`;
@@ -914,7 +967,8 @@ problems.
 - a schema that breaks every condition, ownership, keys and subtypes included;
 - the variants of Orders and Catalog that break the aggregate rule;
 - two translations into Payments;
-- the report of a map with a broken context, a failing arrow and an arrow to a
+- the report of a map with a broken context, a failing arrow, an arrow that does
+  not keep the key of a value object (problem `keyNotKept`), and an arrow to a
   missing context.
 
 `csd-export` writes that map to `cli/test/broken-map.json`, and CI checks the
@@ -932,22 +986,24 @@ context name (`Customer.createdAt` in Orders becomes `Customer.Orders.createdAt`
 with a translation to the renamed schema; entity types that clash are reported.
 States are the columns of `FinState`; homomorphisms are found by Catlab's search
 on their acsets. Restriction follows image paths, as `FinState.restrict` does,
-because Catlab's data migration does not accept acsets whose schema is built at
-run time. The Julia side glues the two targets of each kernel of the exchanged
+and after an attribute applies the conversions of the path with `conv_lit`, as
+`FinState.vrestrictLit` does, because Catlab's data migration does not accept
+acsets whose schema is built at run time. The Julia side glues the two targets of each kernel of the exchanged
 map; components (section 8) are merged in Lean only.
 
 On the example map, `julia/run.jl` claims: the seven contexts are well formed
-and the six translations valid; Orders and Shipping glued along Customers, with
+and the six translations valid and keep keys; Orders and Shipping glued along Customers, with
 both legs full and faithful; the failing delivery-address kernel, with the leg
 from Orders failing the check; the qualified `createdAt` scenario; sample states
 of Orders, Shipping, the glued schema, Payments and the kernel; the restrictions
 of data gluing (the glued state restricts to the states of Orders and Shipping,
-which restrict to the same kernel state) and of the anti-corruption layer from
-OrdersPL into Payments; and a homomorphism between two Shipping states. The
+which restrict to the same kernel state), of the published language of Orders,
+whose date of each order is the date of its instant, and of the anti-corruption
+layer from OrdersPL into Payments; and a homomorphism between two Shipping states. The
 workspace also carries three samples, each a schema and a state passed through
 (Deliveries, Sales and Billing, the last with a record value), the conversions
 of `Examples/Conversions.lean`, whose results `apply_lit` computes as
-`TypeList.applyLit` does, and its path equalities, passed on as claims. All 70
+`TypeList.applyLit` does, and its path equalities, passed on as claims. All 78
 claims pass `csd-check`.
 
 CI checks that the exported workspace and broken map equal the committed
@@ -1212,45 +1268,50 @@ are outside the library.*
 | `Schema.lean` | the presentation, keys and subtypes, `ownerIter`, `allKeys`, `WellFormed`, `checkWellFormed_iff`, `RootsOnly` |
 | `Semantics.lean` | `Schema.cat`, `PathEq`, the correspondence of deep and quiver paths |
 | `PathEq.lean` | `pathEqFree`, `Acyclic`, `Rewrite`, `classOf`, `pathEqAcyclic`, their iff lemmas |
-| `Translation.lean` | `Translation`, `Valid`, `checkValid_iff`, `functor`, `restrict` |
+| `Translation.lean` | `Translation`, `Valid`, `checkValid_iff`, `functor`, `restrict`, `RootsOnly`, `KeysKept` |
 | `Compose.lean` | `Translation.comp`, `functor_comp`, `checkSameFunctor_iff` |
 | `Glue.lean` | `glue`, `Gluable`, `Gluing`, the bridge theorem, `checkFullyFaithful_sound` |
 | `Open.lean` | `OpenSchema`, `Composable`, `comp`, `isPushout_comp`, `assocIso`, `compIdIso`, `idCompIso` |
 | `OpenMachine.lean` | `CheckedState`, `OpenMachine`, `OpenMachine.comp`, `split_agree`, `comp_view_split`, `conformist`, `serialAssoc` |
 | `Rename.lean` | `Schema.qualify`, `Translation.catIso`, `OpenSchema.Iso`, `checkQualify`, `qualifyIso` |
+| `NormalForm.lean` | `Translation.ext`, `toTarget`, `fromTarget`, `checkNormalForm`, `NormalForm`, `normalForm` |
 | `Events.lean` | `CSvc`, `emit`, `callAlong`, `Projection`, `toSvc` |
 | `Aggregates.lean` | `allAggregates`, `aggregateSchema`, `crossAggregateEqns`, `internalSchema`, `aggregateCover`, `Compatible`, `familyEquiv`, `crossEquiv`, `contextEquiv` |
 | `AggregateMachine.lean` | `Violation`, `FinState.violations`, `glueFamily`, `violations_glue`, `glue_parts`, `aggregateMachine`, `dispatch`, `contextMachine` |
-| `ContextMap.lean` | `ContextMap`, `J`, `diagram`, `coherent_of_check`, `Lax`, `nonInterference`, `Publishes`, `kernelGluing`, `isPushout_kernel` |
+| `ContextMap.lean` | `ContextMap`, `J`, `diagram` to the categories with conversions, `coherent_of_check`, `Lax`, `nonInterference`, `Publishes`, `valid_empty`, `kernelGluing`, `isPushout_kernel` |
 | `Union.lean` | `Schema.Cover`, `Agree`, `Cover.desc` with `leg_desc` and `desc_unique`, `glueAll`, `pairwise_of_checkSpanning` |
 | `Merge.lean` | `Component`, `checkComponent`, `Component.isColimit`, the merged map, `diagram_into`, `Component.nonInterference` |
 | `States.lean` | entity-only and attributed states, `Σ`, `Δ`, `Π`, data gluing |
 | `StateLimits.lean` | profiles, the terminal and initial states, `limitCone`, `colimitCocone`, connected limits and colimits pointwise, colimits pointwise at entity types |
 | `StateSigma.lean` | `AttrBijective`, `sigmaState`, `sigmaStateAdjunction`, `isRightAdjoint_restrictStateFunctor_iff`, `not_attrBijective` |
 | `Data.lean` | `FinState`, `check`, `toState`, keys (`checkKeys`, `State.Keys`, `toState_keys`), `FinHom`, `restrict`, `restrictIso` |
-| `ValueCat.lean` | `conv?`, `Basic`, `applyLit`, `Schema.vcat`, `TypeList.cat`, `vinc`, `vvals`, `VPathEq`, `Translation.vfunctor` |
+| `Keys.lean` | `restrictState_keys`, `restrict_checkKeys`, `vrestrict_checkKeys`, `State.KeysOf`, `keys_restrict_empty_iff`, `Gluing.keysOf_iff`, `keys_of_keysOf`, `keyedStateEquiv`, `keyedFamilyEquiv` |
+| `ValueCat.lean` | `conv?`, `Basic`, `applyLit`, `Schema.vcat`, `TypeList.cat`, `vinc`, `vvals`, `VPathEq`, `Translation.VValid`, `checkVValid_iff`, `Translation.vfunctor` |
+| `VCompose.lean` | `Translation.vcomp`, `vcomp_vvalid`, `vfunctor_vcomp`, `vfunctor_empty_self`, `checkSameFunctor_viff` |
 | `VStates.lean` | `Interp`, `RecordsAreProducts`, `VState`, `State.vext`, `VState.equivalence`, limits and colimits, `vsigmaStateAdjunction`, `isRightAdjoint_vrestrict_iff`, `Gluing.vstateEquiv` |
 | `ConvNF.lean` | `TypeList.nf`, `convEq_sound`, `Schema.pathEqV`, `pathEqV_sound` |
 | `ConvComplete.lean` | `TypeList.Red`, `push_congr`, `pushAll_basic`, `push_lift`, `nf_basic`, `convEq_complete`, `convEq_iff`, `pathEqV_iff_of_free`, `pathEqV_iff_of_acyclic` |
 | `LitInterp.lean` | `TypeList.Fits`, `convLit_fits`, `applyLit_basic`, `litInterp`, `applyLit_litInterp`, `applyLit_eq_of_vPathEq`, `fits_of_normalize` |
-| `VData.lean` | `FinState.evalV`, `evalV_vmor` |
+| `VData.lean` | `FinState.evalV`, `evalV_vmor`, `vrestrict`, `vrestrict_check`, `vrestrictIso` |
+| `LitData.lean` | `FinState.mapVals`, `fit`, `evalLit`, `vrestrictLit`, `mapVals_vrestrict`, `IsVRestriction`, `isVRestriction_vrestrictLit` |
 | `Json.lean` | the exchange format `csd-ddd/1` |
 | `Certificate.lean` | `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`, claims, `checkClaim_sound` |
-| `Problems.lean` | `Schema.problems`, `problems_eq_nil_iff`, `Translation.problems`, their sentences |
+| `Problems.lean` | `Schema.problems`, `problems_eq_nil_iff`, `Translation.problems`, `Translation.vproblems`, their sentences |
 | `Report.lean` | problems as JSON, `Certificate.explain`, `Certificate.report`, `MapDoc.certificate`, `MapDoc.report` |
 | `Examples/Catalog.lean` | a free schema with a cycle; CatalogPL |
 | `Examples/Orders.lean` | an acyclic schema with two equations; OrdersPL and a failing one |
 | `Examples/Payments.lean`, `Shipping.lean` | the other two contexts |
-| `Examples/Integration.lean` | the seven-context map, its projection onto the Showcase map, non-interference, references |
-| `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, the failing kernel |
+| `Examples/Integration.lean` | the seven-context map with a published field that converts, kept keys, its projection onto the Showcase map, non-interference, references |
+| `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, keyed data gluing, the failing kernel |
+| `Examples/NormalForm.lean` | the normal form of OrdersPL → Payments, its isomorphism and factorization, roots only, an open schema through it; none for CatalogPL → Orders |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
 | `Examples/Structure.lean` | a value object with references, a nested aggregate, intermediate entity types with the keys `{owner}` and `{owner, item}`, a subtype, states that keep and break each key, and a broken variant |
 | `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
 | `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, a qualified second ordering context, machines in series, aggregate machines and the report of the context, events of the example map |
-| `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along OrdersPL → Orders or CatalogPL → Orders |
+| `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along CatalogPL → Orders |
 | `Examples/Literals.lean` | literals in normal form, records, tables, and lists that break each condition |
 | `Examples/Conversions.lean` | each kind of conversion, a record, path equalities by `pathEqV` and by theorem, conversions of literals, a certificate |
-| `Examples/Exchange.lean` | the example map as a workspace document with three samples, conversions and path equalities, round trips, the `createdAt` clash |
+| `Examples/Exchange.lean` | the example map as a workspace document with three samples, conversions and path equalities, round trips, the `createdAt` clash, the restriction of a state of Orders through `placedAt.date` |
 | `Examples/Problems.lean` | the problems of broken schemas and translations, the report of `brokenMap` |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 

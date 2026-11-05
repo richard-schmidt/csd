@@ -303,7 +303,7 @@ def schema_orders():
     f.node("cust", 130, 80, "Customer", lines=["name : string"], w=150)
     f.node("addr", 130, 300, "Address", lines=["street : string", "city : string"], w=150,
            badge="value object", badge_kind="muted", badge_below=True)
-    f.node("order", 395, 195, "Order", lines=["id : uuid", "placedOn : date",
+    f.node("order", 395, 195, "Order", lines=["id : uuid", "placedAt : timestamp",
                                               "status : OrderStatus"], w=170)
     f.node("line", 660, 195, "OrderLine", lines=["quantity : int", "unitPrice : decimal",
                                                  "sku : string"], w=170)
@@ -516,13 +516,14 @@ def published():
     f.text(526, 196, "aggregate Order", "hl")
     f.arrow("ol", "oo", "order (owner)", "acl", lside=-1, loff=8, lanchor="start")
     f.arrow("ol", "op", "product", "acl", lside=-1, loff=10)
-    for a, b in [("pc", "oc"), ("pa", "oa"), ("po", "oo")]:
+    for a, b in [("pc", "oc"), ("pa", "oa")]:
         f.arrow(a, b, "", "incl")
+    f.arrow("po", "oo", "placedOn ↦ placedAt.date", "acl", lside=-1, loff=8)
     f.arrow("pl", "ol", "member: RootsOnly fails", "warn", lside=-1, loff=10)
-    f.text(556, 70, "RootsOnly P S:", "mono")
+    f.text(556, 70, "T.RootsOnly P S:", "mono")
     f.text(556, 86, "∀ e ∈ P.entities,", "mono")
     f.text(556, 102, "∀ A ∈ S.aggregates,", "mono")
-    f.text(556, 118, "e ∉ members of A", "mono")
+    f.text(556, 118, "T e ∉ members of A", "mono")
     return f
 
 
@@ -686,12 +687,12 @@ def states():
            lines=["name", "address.street", "address.city"])
     f.arrow("kc", "oc", "inclusion", "kern", lside=-1, loff=9)
     f.text(700, 158, "bijective into value types: Σ exists", "mono kern", "middle")
-    f.node("po", 570, 238, "Order · OrdersPL", "pl", w=160,
-           lines=["id, placedOn", "customer.name, …", "billTo…, shipTo…"])
-    f.node("oo", 830, 238, "Order · Orders", w=160,
-           lines=["id, placedOn", "customer.name, …", "billTo…, shipTo…", "status"])
-    f.arrow("po", "oo", "inclusion", "incl", lside=-1, loff=9)
-    f.text(700, 306, "status has no source path: no Σ", "mono warn", "middle")
+    f.node("po", 570, 238, "Product · CatalogPL", "pl", w=160,
+           lines=["name"])
+    f.node("oo", 830, 238, "Product · Orders", w=160,
+           lines=["sku", "name", "listPrice"])
+    f.arrow("po", "oo", "translation", "acl", lside=-1, loff=9)
+    f.text(700, 306, "listPrice has no source path: no Σ", "mono warn", "middle")
     f.text(24, 356, "isRightAdjoint_restrictStateFunctor_iff: Δ_T on attributed states has a left "
            "adjoint exactly when T is bijective", "note")
     f.text(24, 372, "on paths into value types, when each K v has two values; "
@@ -798,7 +799,7 @@ def aggregates():
 # 17. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1180, 628,
+    f = Fig("modules", 1180, 644,
             "Imports between the modules of the DDD library: a chain from value types to "
             "certificates and reports, context maps, states and open systems beside it, and the "
             "examples on top.")
@@ -852,6 +853,14 @@ def modules():
     f.node("LitInterp", 225, 308, "LitInterp", w=96, h=30)
     f.arrow("ConvNF", "ConvComplete", "", "acl")
     f.arrow("ConvComplete", "LitInterp", "", "acl")
+    f.node("VCompose", 330, 192, "VCompose", w=90, h=30)
+    f.arrow("Compose", "VCompose", "", "acl")
+    f.node("Keys", 330, 250, "Keys", w=70, h=30)
+    f.arrow("VData", "Keys", "", "acl")
+    f.node("LitData", 330, 308, "LitData", w=84, h=30)
+    f.arrow("LitInterp", "LitData", "", "acl")
+    f.node("NormalForm", 520, 250, "NormalForm", w=100, h=30)
+    f.arrow("Rename", "NormalForm", "", "acl")
     dy = 100
     f.region(20, 235 + dy, 1140, 220, "EXAMPLES")
     f.raw(f'<rect class="rg plain" x="38" y="{266 + dy}" width="358" height="44" rx="6"/>', "back")
@@ -876,6 +885,7 @@ def modules():
     f.poly([(521, 373 + dy), (833, 373 + dy)], "muted")
     f.poly([(885, 72), (885, 84), (1045, 84), (1045, 365 + dy), (939, 365 + dy)], "muted")
     f.node("xSigma", 978, 288 + dy, "Sigma", "pl", w=80, h=30)
+    f.node("xNormalForm", 874, 288 + dy, "NormalForm", w=104, h=30)
     f.poly([(978, 141), (978, 271 + dy)], "muted")
     f.poly([(600, 304 + dy), (600, 320 + dy), (978, 320 + dy), (978, 307 + dy)], "muted")
     f.poly([(470, 304 + dy), (470, 320 + dy), (600, 320 + dy), (600, 398 + dy)], "muted")
@@ -897,8 +907,11 @@ def modules():
     f.text(1160, 600, "ValueCat imports Literals, ConvNF imports PathEq, VStates imports "
            "StateSigma, VData imports Data, Certificate imports ConvNF, LitInterp imports "
            "VStates,", "note", "end")
-    f.text(1160, 616, "the example Conversions imports Report, VData and LitInterp", "note",
+    f.text(1160, 616, "the example Conversions imports Report, VData and LitInterp, VCompose "
+           "imports ConvComplete, ContextMap imports VCompose, Keys imports Aggregates,", "note",
            "end")
+    f.text(1160, 632, "LitData imports VData and Json, Certificate imports LitData and Keys, "
+           "the example NormalForm imports NormalForm and Integration", "note", "end")
     return f
 
 
