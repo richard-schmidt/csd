@@ -23,7 +23,8 @@ paths with the same normal form present the same morphism of `S.vcat L`.
 `Schema.pathEqV` splits a path of `S.vcat L` into its part in `S`, up to the first
 value type, and its conversions, and compares the first by `Schema.pathEq` and
 the second by normal forms (`pathEqV_sound`). Equations outside `Basic` are not
-used. The converse, that equal morphisms have equal normal forms, is not proved.
+used. For a sound list of value types, equal morphisms have equal normal forms
+(`ConvComplete.lean`).
 -/
 
 namespace DDD
