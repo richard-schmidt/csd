@@ -14,6 +14,9 @@ decided by `Certificate.checkClaim` alone, which is sound
 - acyclicity: those, and a path longer than the number of entity types;
 - translation: the problems of the target schema and of the translation with
   conversions (`Translation.vproblems`), none exactly when the check passes;
+- keys kept: each key of the source that the translation does not keep
+  (`Translation.keysNotKept`, problem `keyNotKept`), none exactly when the check
+  passes;
 - the list of value types: its problems (`TypeList.problems`), none exactly
   when it is sound;
 - declared value types: the attributes whose value types the list does not admit
@@ -32,8 +35,9 @@ A failing claim with no explanation reports that its check fails.
 
 A context map document (`MapDoc`) is checked through the certificate of its
 claims (`MapDoc.certificate`): its list of value types is sound, each context is
-well formed and declares its value types, and each arrow is a valid translation
-from the schema of its source to the schema of its target. `MapDoc.report` gives
+well formed and declares its value types, and each arrow is a translation from
+the schema of its source to the schema of its target, valid with conversions,
+that keeps the keys of its source (problem `keyNotKept`). `MapDoc.report` gives
 the results for the list, by context and by arrow.
 
 Every problem is a JSON object with a `kind`, the names it concerns, and a
@@ -164,6 +168,7 @@ def Claim.refFields : Claim → List (String × Json)
   | .wellFormed s => [("claim", .str "wellFormed"), ("schema", .str s)]
   | .acyclic s => [("claim", .str "acyclic"), ("schema", .str s)]
   | .translation s t _ => [("claim", .str "translation"), ("source", .str s), ("target", .str t)]
+  | .keysKept s t _ => [("claim", .str "keysKept"), ("source", .str s), ("target", .str t)]
   | .gluing k l r g _ => [("claim", .str "gluing"), ("kernel", .str k), ("left", .str l),
       ("right", .str r), ("glued", .str g)]
   | .state x => [("claim", .str "state"), ("state", .str x)]
@@ -214,6 +219,13 @@ def explain : Claim → List Json
     | some S, some S' =>
       c.schemaProblems t ++ (T.vproblems c.valueTypes S S' (S'.pathEqV c.valueTypes)).map
         (Translation.Problem.toJson s t)
+    | _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
+      (if (c.schema? t).isNone then [unknown "schema" t] else [])
+  | .keysKept s t T => match c.schema? s, c.schema? t with
+    | some S, some S' => (T.keysNotKept S S').map fun k => problemJson "keyNotKept"
+        [("entity", .str k.entity), ("key", Lean.toJson k.fields), ("image", .str (T.ent k.entity))]
+        s!"the key {keyText k.fields} of {k.entity} in {s} is not kept in {t}: no field goes to \
+          the empty path, and {T.ent k.entity} has no key whose fields are images of its fields"
     | _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
       (if (c.schema? t).isNone then [unknown "schema" t] else [])
   | .gluing k l r g ff => match c.schema? k, c.schema? l, c.schema? r, c.schema? g with
@@ -345,14 +357,16 @@ def schema? (n : String) : Option Schema := (M.contexts.lookup n).map (·.1)
 /-- The certificate of a context map document: its list of value types, its
 contexts as schemas, and the claims that the list is sound, that each context is
 well formed and declares its value types, and that each arrow is a valid
-translation: the list first, then the contexts, then the arrows, in their order. -/
+translation and keeps keys: the list first, then the contexts, then the arrows, in
+their order. -/
 def certificate : Certificate where
   producer := "map"
   valueTypes := M.valueTypes
   schemas := M.contexts.map fun ctx => (ctx.1, ctx.2.1)
   states := []
   claims := [.valueTypes] ++ M.contexts.flatMap (fun ctx => [.wellFormed ctx.1, .declared ctx.1]) ++
-    M.arrows.map fun a => .translation a.2.1 a.2.2.1 a.2.2.2
+    M.arrows.flatMap fun a =>
+      [.translation a.2.1 a.2.2.1 a.2.2.2, .keysKept a.2.1 a.2.2.1 a.2.2.2]
 
 /-- The report of a context map document: the list of value types, then each
 context, with the problems of its well-formedness and of its value types, and each
@@ -368,9 +382,11 @@ def report : Json :=
     Json.mkObj [("name", .str ctx.1), ("ok", .bool (ok₁ && ok₂)),
       ("problems", Json.arr (ps₁ ++ ps₂).toArray)]
   let arrows := M.arrows.map fun a =>
-    let (ok, ps) := c.result (.translation a.2.1 a.2.2.1 a.2.2.2)
+    let (ok₁, ps₁) := c.result (.translation a.2.1 a.2.2.1 a.2.2.2)
+    let (ok₂, ps₂) := c.result (.keysKept a.2.1 a.2.2.1 a.2.2.2)
     Json.mkObj [("name", .str a.1), ("source", .str a.2.1), ("target", .str a.2.2.1),
-      ("ok", .bool ok), ("problems", Json.arr ps.toArray)]
+      ("ok", .bool (ok₁ && ok₂)),
+      ("problems", Json.arr (ps₁ ++ ps₂.filter fun p => !ps₁.contains p).toArray)]
   let failed := (valueTypes :: contexts ++ arrows).filter fun j => j.getObjValD "ok" != .bool true
   Json.mkObj [("format", .str formatVersion), ("kind", .str "mapReport"),
     ("valueTypes", valueTypes), ("contexts", Json.arr contexts.toArray),

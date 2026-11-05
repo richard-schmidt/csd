@@ -26,7 +26,7 @@ EXPECTED_CONTEXTS = [("OrdersPL", True, []), ("Payments", True, []), ("Broken", 
                      ("Untyped", False, ["undeclaredValueType", "nestedOptional"])]
 EXPECTED_VALUE_TYPES = (False, ["emptyEnumeration", "builtinTypeName"])
 EXPECTED_ARROWS = [("billing", True, []), ("billingToShipping", False, ["equationImage"]),
-                   ("dangling", False, ["unknownSchema"])]
+                   ("streetToCity", False, ["keyNotKept"]), ("dangling", False, ["unknownSchema"])]
 
 
 def summary(entries):
@@ -45,8 +45,8 @@ def main(argv):
     report = json.loads(r.stdout)
     if report.get("kind") != "mapReport":
         errors.append(f"broken map: kind {report.get('kind')}, expected mapReport")
-    if report.get("failed") != 5:
-        errors.append(f"broken map: {report.get('failed')} failed, expected 5")
+    if report.get("failed") != 6:
+        errors.append(f"broken map: {report.get('failed')} failed, expected 6")
     types = report.get("valueTypes", {})
     if (types.get("ok"), [p["kind"] for p in types.get("problems", [])]) != EXPECTED_VALUE_TYPES:
         errors.append(f"broken map: value types {types}")

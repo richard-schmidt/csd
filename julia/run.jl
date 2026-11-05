@@ -39,6 +39,8 @@ for a in map["arrows"]
   translations[String(a["name"])] = T
   add_claim!(cert, "translation"; source=String(a["source"]), target=String(a["target"]),
     translation=write_translation(T))
+  add_claim!(cert, "keysKept"; source=String(a["source"]), target=String(a["target"]),
+    translation=write_translation(T))
 end
 
 expected(kernel) = begin

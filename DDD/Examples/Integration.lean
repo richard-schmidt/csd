@@ -34,6 +34,10 @@ arrows, with their translations checked valid with `decide`:
   the empty translation. `Customers` is marked as a kernel; `Gluing.lean` merges
   Orders and Shipping along it.
 
+Every arrow keeps the keys of its source (`keysKept`), so restriction along it
+sends states that satisfy the keys of the target to states that satisfy the keys
+of the source.
+
 Each context lies in a domain of `Showcase/ContextMapNotifications.lean`
 (`domain`): a published language in the domain of its owner, the kernel in
 Orders. Each arrow refines a route of the Showcase map (`domainRoute`): an
@@ -166,6 +170,13 @@ theorem valid : ∀ {u d : Context} (f : Arrow u d),
   | _, _, .customers_shipping =>
     (Translation.checkValid_sound (fun a _ _ h => Schema.pathEq_sound Shipping.wellFormed a h)
       (by decide)).vvalid
+
+/-- Every arrow keeps the keys of its source: the value object `Address`, identified
+by its street and city, goes to the value object `Address` of each target. -/
+theorem keysKept : ∀ {u d : Context} (f : Arrow u d),
+    (translation f).KeysKept (schema u) (schema d) := by
+  intro u d f
+  cases f <;> decide
 
 /-- OrdersPL → Payments with the billing address sent to the invoice's shipping
 address. It is not a translation: the equation `billTo = customer.address` goes

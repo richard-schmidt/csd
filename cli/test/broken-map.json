@@ -134,6 +134,19 @@
    "target": "Payments",
    "source": "OrdersPL",
    "name": "billingToShipping"},
+  {"translation":
+   {"generators":
+    [{"path": ["city"], "name": "Address.street"},
+     {"path": ["payer"], "name": "Order.customer"},
+     {"path": ["payer", "address"], "name": "Order.billTo"},
+     {"path": ["orderId"], "name": "Order.id"},
+     {"path": ["orderedOn"], "name": "Order.placedOn"}],
+    "entities":
+    [{"target": "Payer", "source": "Customer"},
+     {"target": "Invoice", "source": "Order"}]},
+   "target": "Payments",
+   "source": "OrdersPL",
+   "name": "streetToCity"},
   {"translation": {"generators": [], "entities": []},
    "target": "Nowhere",
    "source": "OrdersPL",

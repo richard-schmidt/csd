@@ -359,6 +359,7 @@ DDD/
                      context
   Data.lean          finite states, keys, homomorphisms and restriction as
                      data
+  Keys.lean          keys through restriction and gluing
   ValueCat.lean      conversions, their equations, the category of value
                      types, schemas with conversions, translations valid with
                      conversions
@@ -696,6 +697,16 @@ payers named `Customer`, invoices named `Order` and four derived generators; the
 published language contains roots only of the extension, which is an open schema
 with it as input. CatalogPL → Orders, which sends two entity types to one, fails
 the check.
+Keys through restriction (`Keys.lean`): `Translation.KeysKept T S S'`, decided,
+holds when each key of `S` has a field that goes to the empty path, or `S'` has a
+key on `T e` whose fields are images of fields of the key. `Δ_T` then sends states
+that satisfy the keys of `S'` to states that satisfy the keys of `S`
+(`restrictState_keys`), and the checks on data agree (`restrict_checkKeys`, and
+`vrestrict_checkKeys` along a translation that converts). The claim `keysKept`
+states it; a map document checks it for each arrow, and an arrow that fails it has
+the problem `keyNotKept`. Every arrow of the example map keeps keys
+(`Integration.keysKept`); the broken map has an arrow that sends the street of an
+address to its city, which loses the key of the value object `Address`.
 
 ## Next steps
 

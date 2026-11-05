@@ -1,5 +1,6 @@
 import DDD.Compose
 import DDD.LitData
+import DDD.Keys
 
 /-!
 # Certificates
@@ -19,6 +20,9 @@ claim that passes its check holds (`Certificate.checkClaim_sound`).
   inclusions as legs (`Gluing.isPushout_of_perm`). Optionally, the strict
   non-interference check is expected to give the stated results; a result `true`
   proves that the leg is full and faithful.
+- `keysKept`: a translation between two schemas keeps the keys of its source
+  (`Translation.KeysKept`), so restriction along it keeps keys
+  (`Translation.restrictState_keys`, `FinState.restrict_checkKeys`).
 - `valueTypes`: the list of value types of the certificate is sound
   (`TypeList.Sound`).
 - `declared`: the list of value types admits the value type of every attribute of
@@ -136,6 +140,7 @@ inductive Claim where
   | wellFormed (schema : String)
   | acyclic (schema : String)
   | translation (source target : String) (T : Translation)
+  | keysKept (source target : String) (T : Translation)
   | gluing (kernel left right glued : String) (fullyFaithful : Option (Bool × Bool))
   | state (state : String)
   | valueTypes
@@ -173,6 +178,9 @@ def checkClaim : Claim → Bool
   | .translation s t T => match c.schema? s, c.schema? t with
     | some S, some S' =>
       S'.checkWellFormed && T.checkVValid c.valueTypes S S' (S'.pathEqV c.valueTypes)
+    | _, _ => false
+  | .keysKept s t T => match c.schema? s, c.schema? t with
+    | some S, some S' => decide (T.KeysKept S S')
     | _, _ => false
   | .gluing k l r g ff => match c.schema? k, c.schema? l, c.schema? r, c.schema? g with
     | some K, some L, some R, some G =>
@@ -222,6 +230,8 @@ def Holds : Claim → Prop
   | .acyclic s => ∃ S, c.schema? s = some S ∧ S.WellFormed ∧ S.Acyclic
   | .translation s t T => ∃ S S', c.schema? s = some S ∧ c.schema? t = some S' ∧
       T.VValid c.valueTypes S S'
+  | .keysKept s t T => ∃ S S', c.schema? s = some S ∧ c.schema? t = some S' ∧
+      T.KeysKept S S'
   | .gluing k l r g ff => ∃ (D : Gluing) (G : Schema) (hG : G.WellFormed)
       (hl : ({} : Translation).Valid D.left G) (hr : ({} : Translation).Valid D.right G),
       c.schema? k = some D.kernel ∧ c.schema? l = some D.left ∧ c.schema? r = some D.right ∧
@@ -280,6 +290,16 @@ theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl 
       have hw := (Schema.checkWellFormed_iff S').mp h.1
       exact ⟨S, S', hs, ht, Translation.checkVValid_sound
         (fun a _ _ hp => Schema.pathEqV_sound hw a hp) h.2⟩
+  | keysKept s t T =>
+    simp only [checkClaim] at h
+    cases hs : c.schema? s with
+    | none => simp [hs] at h
+    | some S =>
+    cases ht : c.schema? t with
+    | none => simp [hs, ht] at h
+    | some S' =>
+      simp only [hs, ht, decide_eq_true_eq] at h
+      exact ⟨S, S', hs, ht, h⟩
   | gluing k l r g ff =>
     simp only [checkClaim] at h
     cases hK : c.schema? k with
@@ -442,6 +462,7 @@ def Claim.describe : Claim → String
   | .wellFormed s => s!"{s} is well formed"
   | .acyclic s => s!"{s} is acyclic"
   | .translation s t _ => s!"the translation {s} → {t} is valid"
+  | .keysKept s t _ => s!"the translation {s} → {t} keeps the keys of {s}"
   | .gluing k l r g ff =>
     let base := s!"{g} is {l} and {r} glued along {k}"
     match ff with
@@ -467,6 +488,11 @@ def Claim.fromJson (j : Json) : Except String Claim := do
     let t ← j.getObjValAs? String "target"
     let T ← Translation.fromJson (← j.getObjVal? "translation")
     pure (.translation s t T)
+  | "keysKept" => do
+    let s ← j.getObjValAs? String "source"
+    let t ← j.getObjValAs? String "target"
+    let T ← Translation.fromJson (← j.getObjVal? "translation")
+    pure (.keysKept s t T)
   | "gluing" => do
     let k ← j.getObjValAs? String "kernel"
     let l ← j.getObjValAs? String "left"

@@ -290,6 +290,38 @@ contains roots of `S` only. -/
 theorem rootsOnly_empty (P S : Schema) : ({} : Translation).RootsOnly P S ↔ P.RootsOnly S :=
   Iff.rfl
 
+/-! ## Keys -/
+
+variable (T) in
+/-- `T` keeps the key `k` of its source in `S'`: a field of `k` goes to the empty
+path, or `S'` has a key on the image of the entity type of `k` each of whose fields
+is the image of a field of `k`. -/
+def KeyKept (S' : Schema) (k : Key) : Prop :=
+  (∃ f ∈ k.fields, T.gen (.entity k.entity) f = []) ∨
+    ∃ k' ∈ S'.allKeys, k'.entity = T.ent k.entity ∧
+      ∀ f' ∈ k'.fields, ∃ f ∈ k.fields, T.gen (.entity k.entity) f = [f']
+
+variable (T) in
+/-- `T` keeps every key of `S` in `S'`: the declared keys, the value objects and the
+subtypes (`Schema.allKeys`). -/
+def KeysKept (S S' : Schema) : Prop := ∀ k ∈ S.allKeys, T.KeyKept S' k
+
+instance (T : Translation) (S' : Schema) (k : Key) : Decidable (T.KeyKept S' k) := by
+  unfold KeyKept
+  infer_instance
+
+instance (T : Translation) (S S' : Schema) : Decidable (T.KeysKept S S') := by
+  unfold KeysKept
+  infer_instance
+
+variable (T) in
+/-- The keys of `S` that `T` does not keep in `S'`. -/
+def keysNotKept (S S' : Schema) : List Key :=
+  S.allKeys.filter fun k => !decide (T.KeyKept S' k)
+
+theorem keysNotKept_eq_nil_iff : T.keysNotKept S S' = [] ↔ T.KeysKept S S' := by
+  simp [keysNotKept, KeysKept, List.filter_eq_nil_iff]
+
 end Translation
 
 end DDD
