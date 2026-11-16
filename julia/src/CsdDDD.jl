@@ -15,20 +15,22 @@ The Julia side of the DDD library. Catlab and ACSets compute; Lean checks.
   built-ins, coercions between a named type and its base, `string`, tables,
   fields of records, `some` and lifts to optional types.
 - Everything is read from and written to the exchange format of
-  `DDD/Json.lean` (`csd-ddd/1`).
+  `DDD/Json.lean` (`csd-ddd/2`).
 """
 module CsdDDD
 
 using Catlab
 using JSON3
 
-export FORMAT, DDDSchema, read_schema, write_schema, Translation, read_translation,
+export FORMAT, READABLE, DDDSchema, read_schema, write_schema, Translation, read_translation,
   write_translation, State, write_state, read_state, glue, clashes, qualify, restrict,
   check_state,
   homomorphism_search, Certificate, add_schema!, add_state!, add_claim!, write_certificate,
   read_type, write_type, read_types, read_lit, conv, apply_lit
 
-const FORMAT = "csd-ddd/1"
+"The format written, and the formats read: version 2 extends version 1."
+const FORMAT = "csd-ddd/2"
+const READABLE = ("csd-ddd/1", FORMAT)
 
 # ---------------------------------------------------------------------------
 # Schemas

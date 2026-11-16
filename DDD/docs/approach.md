@@ -335,7 +335,8 @@ dominant cost is the comparison of names as strings.
 A translation from `S` to `S'` maps entity types to entity types, value types
 to themselves, each reference to a path between the images of its endpoints,
 and each attribute to a path ending at the same value type; each equation of
-`S` must go to an equation that holds in `S'` (`DDD/Translation.lean`).
+`S` must go to an equation that holds in `S'` (`DDD/Translation.lean`). The path
+of an attribute may also end in conversions, as described below.
 
 The deep form lists the images of entity types and the images of generators.
 An entity type or generator that a translation does not list keeps its name.
@@ -398,14 +399,22 @@ that of `S'` and the functor of `T` is the inclusion followed by the isomorphism
 (`normalForm`). Gluing, open schemas and the roots-only check, which take
 inclusions, then apply. In `Examples/NormalForm.lean`, OrdersPL → Payments
 factors through Payments with payers named `Customer`, invoices named `Order`
-and four derived generators such as `billTo = payer.address`.
+and four derived generators such as `billTo = payer.address`. The normal form is
+what composes an owner and a consumer along a published language (section 11);
+validity, restriction and kept keys are computed on the translation itself.
 
 A translation keeps the keys of its source (`Translation.KeysKept`) when each
 key has a field that goes to the empty path, or the target has a key on the image
 of its entity type whose fields are images of its fields. Restriction then sends
 states that satisfy the keys of the target to states that satisfy those of the
 source (`restrictState_keys`, `DDD/Keys.lean`), on data as well
-(`FinState.restrict_checkKeys`, `vrestrict_checkKeys`).
+(`FinState.restrict_checkKeys`, `vrestrict_checkKeys`). Along a translation that
+converts, the same holds of states with conversions (`vrestrictState_keys`) and of
+the restriction computed on literals (`vrestrictLit_checkKeys`). The condition
+reads the names of the images: `catalogStorefront` of `Examples/NormalForm.lean`
+keeps the key of a variant by its SKU through the renamed field `code`, and
+CatalogPL → Orders keeps a key `{product, sku}` because `product` goes to the
+empty path.
 
 ## 5. Context maps
 
@@ -564,7 +573,29 @@ product aggregate.*
 The structure does not force consumers to read from published languages: an
 anti-corruption layer from an owner directly is a valid arrow. The example map
 routes every consumer through a published language, and `Publishes` checks
-each one.
+each one. In a context map document, the arrow from a published language into its
+owner is marked `publishes`, and the check of the document includes `Publishes`
+for each marked arrow (section 10).
+
+A state of the owner and a state of a consumer are related on the published
+language `P`, along the two translations out of it (`DDD/VStates.lean`):
+
+- they agree on `P` when their restrictions to `P` are isomorphic
+  (`Translation.Agree`);
+- the consumer's state conforms to the owner's when there is a morphism from its
+  restriction to the owner's (`Translation.Conforms`). A morphism of states is the
+  identity on values, so each order the consumer holds is an order the owner
+  publishes, with the same values and the corresponding customer and addresses.
+  States that agree conform both ways (`Agree.conforms`).
+
+Either translation may convert. When two states agree and the owner's translation
+keeps keys, the consumer's restriction satisfies the keys of `P`, whether or not
+the consumer's translation keeps them (`Translation.Agree.keys`). A functor on
+the lax integration gives a morphism of this kind along each arrow; that reading
+of conformance is not proved. In `Examples/Exchange.lean`, Payments with an
+invoice for the order agrees with Orders on OrdersPL, Payments before the invoice
+conforms without agreeing, and an invoice dated by the day in another time zone
+does neither, since the published date is the day in UTC.
 
 ## 8. Strict integration
 
@@ -745,7 +776,12 @@ first state.*
 
 Data gluing is proved twice: for entity-only states from the universal property
 in `Cat`, and for attributed states with their bijections, which the legs keep
-since they send value types to themselves.
+since they send value types to themselves. A glued state satisfies the keys of
+the two schemas exactly when its restrictions satisfy their keys
+(`Gluing.keysOf_iff`), so data gluing restricts to the states that satisfy the
+keys (`keyedStateEquiv`, and `keyedVStateEquiv` for states with conversions,
+`DDD/Keys.lean`). The two restrictions of a glued state agree on the kernel
+(`Gluing.agree`).
 
 Entity-only and attributed states are separate types. Attributed states carry a
 specified bijection at each value type rather than an equality of types, so
@@ -883,10 +919,13 @@ keeps keys, the restriction of a state that passes the key check passes it
 ### The exchange format
 
 `DDD/Json.lean` writes the deep data as JSON with the format identifier
-`csd-ddd/1`: schemas, with generators named `Entity.name`; translations;
-context maps (`MapDoc`), with contexts, named arrows, kernel flags and route
+`csd-ddd/2` and reads `csd-ddd/1` as well, which it extends: schemas, with
+generators named `Entity.name`; translations; context maps (`MapDoc`), with
+contexts, named arrows, kernel flags, the arrows marked as publishing and route
 equations; finite states, with literal values (`Lit`: integers, text and
-booleans); and homomorphisms. Reading back what was written gives the same data
+booleans); and homomorphisms. Version 2 adds translations that convert, the
+publishing mark and the claims `keysKept`, `agreement`, `conformance` and
+`normalForm`. Reading back what was written gives the same data
 for every schema whose entity type names contain no dot, and likewise for the
 other kinds. `Examples/Exchange.lean` tests the round trips through JSON text on
 the examples, and `julia/test` tests them on the Julia side.
@@ -909,10 +948,15 @@ passes its check holds (`checkClaim_sound`):
   the leg is full and faithful;
 - a finite state is a state of its schema, with literals of the declared types,
   that satisfies the keys of its schema;
-- a finite state is the restriction of another along a translation, so that its
-  state is isomorphic to `restrictState`; along a translation that converts, the
-  two are read in the literal interpretation and the restriction is
+- a finite state is the restriction of another along a translation, which may
+  convert: read in the literal interpretation, its state is isomorphic to
   `vrestrictState` (`FinState.IsVRestriction`);
+- two finite states of two schemas agree on a schema that translates into both:
+  their restrictions, computed on literals, are equal, so their states agree
+  (`FinState.Agrees`); or one conforms to the other, by a homomorphism between
+  the restrictions (`FinState.ConformsTo`);
+- a valid translation has a normal form (`Translation.NormalForm`), checked by
+  `checkNormalForm`;
 - a homomorphism of finite states that is a morphism of their states;
 - two paths out of an object of a schema present the same morphism of the
   category with conversions, checked by `pathEqV`;
@@ -924,7 +968,7 @@ built as an executable, the program compiled to native code together with the
 modules it imports (`lake build csd-check`, `lake exe csd-check`). The
 evaluation trusts the Lean compiler and runtime, as `native_decide` would.
 
-On the example certificate of 32 claims, on a four-core x86-64 machine, the
+On the example certificate of 32 claims of step 7, on a four-core x86-64 machine, the
 executable takes 0.3 s and 90 to 120 MB of memory across runs. The same program in the Lean
 interpreter (`lake env lean --run cli/CsdCheck.lean`) took 205 s and 1.8 GB:
 it loads the environment of every imported module and interprets the checkers.
@@ -954,13 +998,32 @@ equality in the target does not show equal.
 - every claim, by the parts of its check that fail.
 
 Whether a claim holds is still decided by `checkClaim`. A context map document
-(`MapDoc`) is checked as the certificate of its claims: each context is well
-formed and each arrow a valid translation (`MapDoc.certificate`).
+(`MapDoc`) is checked as the certificate of its claims, that each context is well
+formed and each arrow a valid translation that keeps keys (`MapDoc.certificate`),
+together with the conditions on the map (`DDD/MapCheck.lean`):
+
+- the names of the contexts are distinct, and so are those of the arrows;
+- every arrow out of a context marked as a kernel is the empty translation;
+- every arrow marked as publishing keeps the entity types of its source apart
+  and sends them to roots (`Publishes`);
+- the map has no cycle: ranks computed for the contexts increase along every
+  arrow;
+- each declared route equation names two routes between the same contexts whose
+  composite translations induce the same functor (`checkRouteEqn`).
+
+A document that passes all of them (`MapDoc.check`) is a context map on its
+contexts (`MapDoc.contextMap`), with its declared route equations and kernels;
+each of its contexts embeds into the lax integration fully faithfully
+(`MapDoc.nonInterference`), and each marked arrow presents a published language
+(`MapDoc.publishes`). The example document passes in the kernel
+(`Exchange.map_check`), and so does the diamond of `Examples/Routes.lean` with
+its declared equation.
+
 `csd-check --json` prints the report. It gives, for each claim of a
-certificate, or each context and arrow of a map, whether it holds and its
-problems: JSON objects with a `kind`, the names concerned and a `message`.
-Without `--json`, each failing claim is followed by the messages of its
-problems.
+certificate, or for the list of value types, each context, each arrow and the
+map of a document, whether it holds and its problems: JSON objects with a
+`kind`, the names concerned and a `message`. Without `--json`, each failing
+claim or condition is followed by the messages of its problems.
 
 `Examples/Problems.lean` states the problems of:
 
@@ -968,8 +1031,13 @@ problems.
 - the variants of Orders and Catalog that break the aggregate rule;
 - two translations into Payments;
 - the report of a map with a broken context, a failing arrow, an arrow that does
-  not keep the key of a value object (problem `keyNotKept`), and an arrow to a
-  missing context.
+  not keep the key of a value object (problem `keyNotKept`), an arrow to a
+  missing context, an arrow out of a kernel that renames (`kernelTranslation`), a
+  published language that reaches a member of an aggregate (`publishedMember`),
+  two contexts on a cycle (`cycle`) and two declared equations that do not hold
+  (`routeEquation`);
+- maps with a published language that merges entity types (`entitiesMerged`) and
+  with names declared twice (`duplicateContext`, `duplicateArrow`).
 
 `csd-export` writes that map to `cli/test/broken-map.json`, and CI checks the
 output of `csd-check --json` on it with `cli/test/check_report.py`.
@@ -999,17 +1067,20 @@ of Orders, Shipping, the glued schema, Payments and the kernel; the restrictions
 of data gluing (the glued state restricts to the states of Orders and Shipping,
 which restrict to the same kernel state), of the published language of Orders,
 whose date of each order is the date of its instant, and of the anti-corruption
-layer from OrdersPL into Payments; and a homomorphism between two Shipping states. The
+layer from OrdersPL into Payments; that this layer has a normal form; that a state
+of Payments with an invoice for each order agrees with the state of Orders on the
+published language, and that the state with one invoice conforms to it, by a
+homomorphism Catlab finds; and a homomorphism between two Shipping states. The
 workspace also carries three samples, each a schema and a state passed through
 (Deliveries, Sales and Billing, the last with a record value), the conversions
 of `Examples/Conversions.lean`, whose results `apply_lit` computes as
-`TypeList.applyLit` does, and its path equalities, passed on as claims. All 78
+`TypeList.applyLit` does, and its path equalities, passed on as claims. All 82
 claims pass `csd-check`.
 
 CI checks that the exported workspace and broken map equal the committed
 `julia/data/workspace.json` and `cli/test/broken-map.json`, runs `julia/run.jl`
-and the Julia tests, runs `csd-check` on the certificate, and checks its
-reports:
+and the Julia tests, checks that the certificate it writes equals the committed
+`julia/out/certificate.json`, runs `csd-check` on it, and checks its reports:
 
 ```sh
 lake env lean --run cli/CsdExport.lean
@@ -1043,6 +1114,17 @@ An open schema `X : I → O` is a structured cospan `I ⟶ S ⟵ O` of schemas
 (`OpenSchema`): a schema `S` with an input interface `I` and an output interface
 `O`, each included in `S` by the empty translation and containing roots only, as
 published languages do. Its legs are the functors of the two inclusions.
+
+A kernel is such an interface. A published language is one for its owner when
+the owner includes it, and for a consumer through the normal form of the
+consumer's translation (section 4): the definitional extension of the consumer
+includes the published language. In `Examples/NormalForm.lean`, Catalog is an
+open schema with its published language as output (`catalogOpen`), a storefront
+that renames products to listings and variants to offers is one with it as input
+(`storefrontOpen`), and the two compose (`catalogWithStorefront`): one schema
+with the entity types of Catalog, the generators of both, and equations such as
+`name = title`. The published language of Orders is not composed with Orders this
+way, since its translation into Orders converts.
 
 - Composition: `X : I → M` and `Y : M → O` compose when they share only the
   names of `M`, their glued schema is well-formed, and `I` and `O` contain roots
@@ -1285,34 +1367,35 @@ are outside the library.*
 | `StateLimits.lean` | profiles, the terminal and initial states, `limitCone`, `colimitCocone`, connected limits and colimits pointwise, colimits pointwise at entity types |
 | `StateSigma.lean` | `AttrBijective`, `sigmaState`, `sigmaStateAdjunction`, `isRightAdjoint_restrictStateFunctor_iff`, `not_attrBijective` |
 | `Data.lean` | `FinState`, `check`, `toState`, keys (`checkKeys`, `State.Keys`, `toState_keys`), `FinHom`, `restrict`, `restrictIso` |
-| `Keys.lean` | `restrictState_keys`, `restrict_checkKeys`, `vrestrict_checkKeys`, `State.KeysOf`, `keys_restrict_empty_iff`, `Gluing.keysOf_iff`, `keys_of_keysOf`, `keyedStateEquiv`, `keyedFamilyEquiv` |
+| `Keys.lean` | `restrictState_keys`, `restrict_checkKeys`, `vrestrict_checkKeys`, `State.KeysOf`, `keys_restrict_empty_iff`, `Gluing.keysOf_iff`, `keys_of_keysOf`, `keyedStateEquiv`, `keyedFamilyEquiv`, `VState.Keys`, `vrestrictState_keys`, `vrestrictLit_checkKeys`, `Agree.keys`, `keyedVStateEquiv` |
 | `ValueCat.lean` | `conv?`, `Basic`, `applyLit`, `Schema.vcat`, `TypeList.cat`, `vinc`, `vvals`, `VPathEq`, `Translation.VValid`, `checkVValid_iff`, `Translation.vfunctor` |
 | `VCompose.lean` | `Translation.vcomp`, `vcomp_vvalid`, `vfunctor_vcomp`, `vfunctor_empty_self`, `checkSameFunctor_viff` |
-| `VStates.lean` | `Interp`, `RecordsAreProducts`, `VState`, `State.vext`, `VState.equivalence`, limits and colimits, `vsigmaStateAdjunction`, `isRightAdjoint_vrestrict_iff`, `Gluing.vstateEquiv` |
+| `VStates.lean` | `Interp`, `RecordsAreProducts`, `VState`, `State.vext`, `VState.equivalence`, limits and colimits, `vsigmaStateAdjunction`, `isRightAdjoint_vrestrict_iff`, `Gluing.vstateEquiv`, `Translation.Agree`, `Conforms`, `Gluing.agree` |
 | `ConvNF.lean` | `TypeList.nf`, `convEq_sound`, `Schema.pathEqV`, `pathEqV_sound` |
 | `ConvComplete.lean` | `TypeList.Red`, `push_congr`, `pushAll_basic`, `push_lift`, `nf_basic`, `convEq_complete`, `convEq_iff`, `pathEqV_iff_of_free`, `pathEqV_iff_of_acyclic` |
 | `LitInterp.lean` | `TypeList.Fits`, `convLit_fits`, `applyLit_basic`, `litInterp`, `applyLit_litInterp`, `applyLit_eq_of_vPathEq`, `fits_of_normalize` |
 | `VData.lean` | `FinState.evalV`, `evalV_vmor`, `vrestrict`, `vrestrict_check`, `vrestrictIso` |
-| `LitData.lean` | `FinState.mapVals`, `fit`, `evalLit`, `vrestrictLit`, `mapVals_vrestrict`, `IsVRestriction`, `isVRestriction_vrestrictLit` |
-| `Json.lean` | the exchange format `csd-ddd/1` |
+| `LitData.lean` | `FinState.mapVals`, `fit`, `evalLit`, `vrestrictLit`, `mapVals_vrestrict`, `IsVRestriction`, `isVRestriction_vrestrictLit`, `Agrees`, `agrees_of_vrestrictLit_eq`, `ConformsTo`, `conformsTo_of_hom` |
+| `Json.lean` | the exchange format `csd-ddd/2` |
 | `Certificate.lean` | `Schema.isoOfPerm`, `Gluing.isPushout_of_perm`, claims, `checkClaim_sound` |
 | `Problems.lean` | `Schema.problems`, `problems_eq_nil_iff`, `Translation.problems`, `Translation.vproblems`, their sentences |
-| `Report.lean` | problems as JSON, `Certificate.explain`, `Certificate.report`, `MapDoc.certificate`, `MapDoc.report` |
+| `Report.lean` | problems as JSON, `Certificate.explain`, `Certificate.report`, `MapDoc.certificate` |
+| `MapCheck.lean` | the conditions on a document (`checkNames`, `checkKernels`, `checkPublished`, `checkAcyclic`, `checkRoutes`), `MapDoc.check`, `MapDoc.contextMap`, `nonInterference`, `publishes`, `MapDoc.report` |
 | `Examples/Catalog.lean` | a free schema with a cycle; CatalogPL |
 | `Examples/Orders.lean` | an acyclic schema with two equations; OrdersPL and a failing one |
 | `Examples/Payments.lean`, `Shipping.lean` | the other two contexts |
 | `Examples/Integration.lean` | the seven-context map with a published field that converts, kept keys, its projection onto the Showcase map, non-interference, references |
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, keyed data gluing, the failing kernel |
-| `Examples/NormalForm.lean` | the normal form of OrdersPL → Payments, its isomorphism and factorization, roots only, an open schema through it; none for CatalogPL → Orders |
-| `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one |
+| `Examples/NormalForm.lean` | the normal form of OrdersPL → Payments, its isomorphism and factorization, roots only, an open schema through it; none for CatalogPL → Orders; Catalog and a storefront composed along CatalogPL; keys kept through a renamed field and through the empty path |
+| `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one; the same as documents |
 | `Examples/Structure.lean` | a value object with references, a nested aggregate, intermediate entity types with the keys `{owner}` and `{owner, item}`, a subtype, states that keep and break each key, and a broken variant |
 | `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
 | `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, a qualified second ordering context, machines in series, aggregate machines and the report of the context, events of the example map |
 | `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along CatalogPL → Orders |
 | `Examples/Literals.lean` | literals in normal form, records, tables, and lists that break each condition |
 | `Examples/Conversions.lean` | each kind of conversion, a record, path equalities by `pathEqV` and by theorem, conversions of literals, a certificate |
-| `Examples/Exchange.lean` | the example map as a workspace document with three samples, conversions and path equalities, round trips, the `createdAt` clash, the restriction of a state of Orders through `placedAt.date` |
-| `Examples/Problems.lean` | the problems of broken schemas and translations, the report of `brokenMap` |
+| `Examples/Exchange.lean` | the example map as a workspace document with three samples, conversions and path equalities, round trips, the `createdAt` clash, the restriction of a state of Orders through `placedAt.date`, agreement and conformance of Orders and Payments on OrdersPL, the document as a context map |
+| `Examples/Problems.lean` | the problems of broken schemas and translations, the report of `brokenMap`, a published language that merges entity types, names declared twice |
 | `Examples/Values.lean` | the interpretation `K` of the examples |
 
 The core modules share the namespace `DDD`, with the operations on schemas in
@@ -1424,9 +1507,23 @@ The correspondence leaves out part of each side:
   kernel are reported, and the Julia side qualifies them; inclusions that rename
   are not covered.
 - Limits and colimits of attributed states do not consider the keys, which stay a
-  separate predicate (`State.Keys`). Restriction and gluing are not yet shown to
-  keep keys, and no construction identifies the entities that agree on a key
-  (items 14 and 15 of `DDD/README.md`). Machine steps do not check keys.
+  separate predicate (`State.Keys`). Restriction keeps keys under `KeysKept`,
+  which reads the names of the images and does not see a key kept through an
+  equation of the target; gluing keeps them. No construction identifies the
+  entities that agree on a key (item 15 of `DDD/README.md`). Machine steps do not
+  check keys.
+- A translation that converts has no normal form, so a published language whose
+  translation into its owner converts is not an interface of an open schema, and
+  the owner and a consumer are not composed along it. The normal form is checked
+  per translation; no theorem gives it for every translation that keeps entity
+  types apart.
+- That the glued category with conversions is the pushout of the categories with
+  conversions is not proved; strict integration is stated on the schema
+  categories.
+- Agreement of data is checked on equal restrictions, so the two states number
+  the shared entities alike; conformance takes a homomorphism. That a family of
+  states with a morphism along each arrow is a functor on the lax integration is
+  not proved.
 - That the ownership condition, which follows ownership references at most as
   many times as an aggregate has members, holds exactly when the references form
   a tree is stated, not proved.
@@ -1459,15 +1556,16 @@ The correspondence leaves out part of each side:
   map is unchanged, and the Julia side has no events.
 - `csd-check` trusts the Lean compiler and runtime. It links every module it
   imports, Mathlib's category theory among them, because the checkers share
-  modules with their soundness proofs; the stripped executable is 171 MB.
+  modules with their soundness proofs; the stripped executable is 172 MB.
 - Problems are proved to be none exactly when the check passes for
   well-formedness and translations. For the other claims the report lists the
   parts of the check that fail; a state that fails its check is not explained
   violation by violation, since `FinState.violations` lives with the aggregate
   machines.
-- A context map document is checked for well-formed contexts and valid
-  translations; its route equations, kernels and published languages are not
-  checked from the document.
+- A context map document marks a published language on its arrow into the owner;
+  unmarked arrows are not checked for it, and csd-editor and its import of
+  Context Mapper models do not write the mark. That a map without cycles passes
+  the rank check is not proved.
 - The checks compare names as strings in the kernel. The strict
   non-interference checks of the example take 14 to 22 seconds of kernel time
   each, which bounds the size of schemas checked with `decide`.

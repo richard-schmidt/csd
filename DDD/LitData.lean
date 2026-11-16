@@ -22,6 +22,13 @@ check (`check_fit`).
   to `Translation.vrestrictState` applied to the state of `X`
   (`vrestrictLit_iso`). `FinState.IsVRestriction` states it, and
   `isVRestriction_vrestrictLit` proves it.
+- `FinState.Agrees`, `FinState.ConformsTo`: two finite states of two schemas agree
+  on a schema that translates into both, or one conforms to the other, in the
+  literal interpretation (`Translation.Agree`, `Translation.Conforms`). Equal
+  restrictions computed on literals give agreement
+  (`agrees_of_vrestrictLit_eq`), and a homomorphism between them gives conformance
+  (`conformsTo_of_hom`); an injective map of values keeps the check of a
+  homomorphism (`FinHom.check_mapVals`).
 -/
 
 namespace DDD
@@ -136,6 +143,44 @@ theorem check_mapVals [∀ v, DecidableEq (K v)] [∀ v, DecidableEq (K' v)]
     congr 1
     funext i
     exact hq q i
+
+end FinState
+
+namespace FinHom
+
+variable {K K' : ValueType → Type} {f : ∀ v, K v → K' v}
+
+theorem mapElem_map (h : FinHom) (x : Elem K) : h.mapElem (x.map f) = (h.mapElem x).map f := by
+  cases x <;> rfl
+
+/-- An injective map of values keeps the check of a homomorphism. -/
+theorem check_mapVals [∀ v, DecidableEq (K v)] [∀ v, DecidableEq (K' v)]
+    (hf : ∀ v, Function.Injective (f v)) {h : FinHom} {S : Schema} {X Y : FinState K} :
+    h.check S (X.mapVals f) (Y.mapVals f) = h.check S X Y := by
+  have hq : ∀ (e n : String) (i : Nat),
+      decide ((Y.mapVals f).step S (h.mapElem (.ent e i)) n =
+          ((X.mapVals f).step S (.ent e i) n).map h.mapElem) =
+        decide (Y.step S (h.mapElem (.ent e i)) n = (X.step S (.ent e i) n).map h.mapElem) := by
+    intro e n i
+    have e₁ : (Y.mapVals f).step S (h.mapElem (.ent e i)) n =
+        (Y.step S (h.mapElem (.ent e i)) n).map (Elem.map f) :=
+      FinState.step_mapVals (X := Y) (f := f) S (h.mapElem (.ent e i)) n
+    have e₂ : (X.mapVals f).step S (.ent e i) n = (X.step S (.ent e i) n).map (Elem.map f) :=
+      FinState.step_mapVals (X := X) (f := f) S (.ent e i) n
+    have e₃ : ((X.step S (.ent e i) n).map (Elem.map f)).map h.mapElem =
+        ((X.step S (.ent e i) n).map h.mapElem).map (Elem.map f) := by
+      cases X.step S (.ent e i) n with
+      | none => rfl
+      | some z => exact congrArg some (mapElem_map h z)
+    rw [e₁, e₂, e₃]
+    exact decide_eq_decide.mpr (Option.map_injective (Elem.map_injective hf)).eq_iff
+  simp only [check, FinState.size_mapVals, hq]
+
+end FinHom
+
+namespace FinState
+
+variable {K K' : ValueType → Type} {f : ∀ v, K v → K' v} {X : FinState K}
 
 /-! ## Literals that fit -/
 
@@ -398,6 +443,83 @@ theorem isVRestriction_vrestrictLit (hL : L.Sound) (hS : S.WellFormed) (hS' : S'
   exact ⟨hL, hS, hS', hT, hfit, hX', hY, hY', e⟩
 
 end RestrictLit
+
+/-! ## Agreement on a shared schema, on literals -/
+
+section AgreeLit
+
+variable {L : TypeList}
+
+theorem fit_congr (hL : L.Sound) {X Y : FinState LitK} (h : X = Y) (hX : X.LitsFit L)
+    (hY : Y.LitsFit L) : X.fit hL hX = Y.fit hL hY := by
+  subst h
+  rfl
+
+variable (L) (T₁ T₂ : Translation) (P S₁ S₂ : Schema) in
+/-- The finite states `X₁` of `S₁` and `X₂` of `S₂` agree on `P`, along
+`T₁ : P ⟶ S₁` and `T₂ : P ⟶ S₂`: the literals of both fit their types, both pass
+the check, and their states in the literal interpretation agree on `P`
+(`Translation.Agree`). -/
+def Agrees (X₁ X₂ : FinState LitK) : Prop :=
+  ∃ (hL : L.Sound) (hP : P.WellFormed) (h₁ : S₁.WellFormed) (h₂ : S₂.WellFormed)
+    (hT₁ : T₁.VValid L P S₁) (hT₂ : T₂.VValid L P S₂)
+    (hf₁ : X₁.LitsFit L) (hX₁ : (X₁.fit hL hf₁).check S₁ = true)
+    (hf₂ : X₂.LitsFit L) (hX₂ : (X₂.fit hL hf₂).check S₂ = true),
+    Translation.Agree hP h₁ h₂ hT₁ hT₂
+      (((X₁.fit hL hf₁).toState hX₁).vext (L.litInterp hL) h₁)
+      (((X₂.fit hL hf₂).toState hX₂).vext (L.litInterp hL) h₂)
+
+variable {T₁ T₂ : Translation} {P S₁ S₂ : Schema} {X₁ X₂ : FinState LitK}
+
+/-- Two finite states whose restrictions to `P`, computed on literals, are equal
+agree on `P`. -/
+theorem agrees_of_vrestrictLit_eq (hL : L.Sound) (hP : P.WellFormed) (h₁ : S₁.WellFormed)
+    (h₂ : S₂.WellFormed) (hT₁ : T₁.VValid L P S₁) (hT₂ : T₂.VValid L P S₂)
+    (hf₁ : X₁.LitsFit L) (hX₁ : X₁.check S₁ = true) (hf₂ : X₂.LitsFit L)
+    (hX₂ : X₂.check S₂ = true)
+    (h : X₁.vrestrictLit L T₁ P S₁ = X₂.vrestrictLit L T₂ P S₂) :
+    Agrees L T₁ T₂ P S₁ S₂ X₁ X₂ := by
+  have hX₁' : (X₁.fit hL hf₁).check S₁ = true := (check_fit hL X₁ hf₁ S₁).trans hX₁
+  have hX₂' : (X₂.fit hL hf₂).check S₂ = true := (check_fit hL X₂ hf₂ S₂).trans hX₂
+  obtain ⟨hY₁, hY₁', ⟨i₁⟩⟩ := vrestrictLit_iso hL hP h₁ hT₁ hf₁ hX₁'
+  obtain ⟨hY₂, hY₂', ⟨i₂⟩⟩ := vrestrictLit_iso hL hP h₂ hT₂ hf₂ hX₂'
+  exact ⟨hL, hP, h₁, h₂, hT₁, hT₂, hf₁, hX₁', hf₂, hX₂',
+    .of_toState_iso (i₁.symm ≪≫ toStateIsoOfEq (fit_congr hL h hY₁ hY₂) hY₁' hY₂' ≪≫ i₂)⟩
+
+variable (L) (T₁ T₂ : Translation) (P S₁ S₂ : Schema) in
+/-- The finite state `X₂` of `S₂` conforms to the finite state `X₁` of `S₁` on `P`:
+the literals of both fit their types, both pass the check, and the state of `X₂` in
+the literal interpretation conforms to that of `X₁` on `P`
+(`Translation.Conforms`). -/
+def ConformsTo (X₁ X₂ : FinState LitK) : Prop :=
+  ∃ (hL : L.Sound) (hP : P.WellFormed) (h₁ : S₁.WellFormed) (h₂ : S₂.WellFormed)
+    (hT₁ : T₁.VValid L P S₁) (hT₂ : T₂.VValid L P S₂)
+    (hf₁ : X₁.LitsFit L) (hX₁ : (X₁.fit hL hf₁).check S₁ = true)
+    (hf₂ : X₂.LitsFit L) (hX₂ : (X₂.fit hL hf₂).check S₂ = true),
+    Translation.Conforms hP h₁ h₂ hT₁ hT₂
+      (((X₁.fit hL hf₁).toState hX₁).vext (L.litInterp hL) h₁)
+      (((X₂.fit hL hf₂).toState hX₂).vext (L.litInterp hL) h₂)
+
+/-- A homomorphism from the restriction of `X₂` to the restriction of `X₁`, computed
+on literals, shows that `X₂` conforms to `X₁` on `P`. -/
+theorem conformsTo_of_hom (hL : L.Sound) (hP : P.WellFormed) (h₁ : S₁.WellFormed)
+    (h₂ : S₂.WellFormed) (hT₁ : T₁.VValid L P S₁) (hT₂ : T₂.VValid L P S₂)
+    (hf₁ : X₁.LitsFit L) (hX₁ : X₁.check S₁ = true) (hf₂ : X₂.LitsFit L)
+    (hX₂ : X₂.check S₂ = true) (h : FinHom)
+    (hc : h.check P (X₂.vrestrictLit L T₂ P S₂) (X₁.vrestrictLit L T₁ P S₁) = true) :
+    ConformsTo L T₁ T₂ P S₁ S₂ X₁ X₂ := by
+  have hX₁' : (X₁.fit hL hf₁).check S₁ = true := (check_fit hL X₁ hf₁ S₁).trans hX₁
+  have hX₂' : (X₂.fit hL hf₂).check S₂ = true := (check_fit hL X₂ hf₂ S₂).trans hX₂
+  obtain ⟨hY₁, hY₁', ⟨i₁⟩⟩ := vrestrictLit_iso hL hP h₁ hT₁ hf₁ hX₁'
+  obtain ⟨hY₂, hY₂', ⟨i₂⟩⟩ := vrestrictLit_iso hL hP h₂ hT₂ hf₂ hX₂'
+  have hc' : h.check P ((X₂.vrestrictLit L T₂ P S₂).fit hL hY₂)
+      ((X₁.vrestrictLit L T₁ P S₁).fit hL hY₁) = true := by
+    rw [← FinHom.check_mapVals (litVal_injective hL), mapVals_fit, mapVals_fit]
+    exact hc
+  exact ⟨hL, hP, h₁, h₂, hT₁, hT₂, hf₁, hX₁', hf₂, hX₂',
+    .of_toState_hom (i₂.inv ≫ FinHom.toHom hP hY₂' hY₁' hc' ≫ i₁.hom)⟩
+
+end AgreeLit
 
 end FinState
 

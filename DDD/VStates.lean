@@ -28,6 +28,11 @@ A state of `S` with conversions (`Schema.VState I S`) is a functor out of
   `Translation.vsigmaStateAdjunction`, `Translation.isRightAdjoint_vrestrict_iff`),
   and data gluing (`Gluing.vstateEquiv`). Restriction to `S.cat` commutes with
   `Δ_T` (`Translation.toStateIso`).
+- `Translation.Agree`, `Translation.Conforms`: a state of `S₁` and a state of `S₂`
+  on a schema `P` that translates into both. They agree when their restrictions
+  to `P` are isomorphic, and the second conforms to the first when its restriction
+  has a morphism into that of the first. The two restrictions of a state of a
+  glued schema agree on the kernel (`Gluing.agree`).
 -/
 
 namespace DDD
@@ -548,6 +553,64 @@ noncomputable def vsigmaStateAdjunction (hS : S.WellFormed) (hS' : S'.WellFormed
       Functor.associator _ _ _ ≪≫ Functor.isoWhiskerLeft _ e.unitIso.symm ≪≫
       Functor.rightUnitor _)
 
+/-! ## Agreement on a shared schema -/
+
+section Agree
+
+variable {P S₁ S₂ : Schema} {T₁ T₂ : Translation}
+
+/-- A state of `S₁` and a state of `S₂` agree on `P`, along the translations
+`T₁ : P ⟶ S₁` and `T₂ : P ⟶ S₂`, which may convert: their restrictions to `P` are
+isomorphic. With `P` a published language, `S₁` its owner and `S₂` a consumer, the
+consumer holds what the owner publishes. -/
+def Agree (hP : P.WellFormed) (h₁ : S₁.WellFormed) (h₂ : S₂.WellFormed)
+    (hT₁ : T₁.VValid L P S₁) (hT₂ : T₂.VValid L P S₂) (Y₁ : S₁.VState I) (Y₂ : S₂.VState I) :
+    Prop :=
+  Nonempty (T₁.vrestrictState hP h₁ hT₁ Y₁ ≅ T₂.vrestrictState hP h₂ hT₂ Y₂)
+
+variable {hP : P.WellFormed} {h₁ : S₁.WellFormed} {h₂ : S₂.WellFormed}
+  {hT₁ : T₁.VValid L P S₁} {hT₂ : T₂.VValid L P S₂} {Y₁ : S₁.VState I} {Y₂ : S₂.VState I}
+
+/-- States with equal restrictions agree. -/
+theorem Agree.of_eq
+    (h : T₁.vrestrictState hP h₁ hT₁ Y₁ = T₂.vrestrictState hP h₂ hT₂ Y₂) :
+    Agree hP h₁ h₂ hT₁ hT₂ Y₁ Y₂ :=
+  ⟨eqToIso h⟩
+
+/-- States agree when their restrictions are isomorphic as attributed states. -/
+theorem Agree.of_toState_iso
+    (e : (T₁.vrestrictState hP h₁ hT₁ Y₁).toState ≅ (T₂.vrestrictState hP h₂ hT₂ Y₂).toState) :
+    Agree hP h₁ h₂ hT₁ hT₂ Y₁ Y₂ :=
+  ⟨(VState.toStateFunctor I P).preimageIso e⟩
+
+theorem Agree.symm (h : Agree hP h₁ h₂ hT₁ hT₂ Y₁ Y₂) : Agree hP h₂ h₁ hT₂ hT₁ Y₂ Y₁ :=
+  h.elim fun e => ⟨e.symm⟩
+
+/-- The state `Y₂` of `S₂` conforms to the state `Y₁` of `S₁` on `P`: there is a
+morphism from the restriction of `Y₂` to the restriction of `Y₁`. A morphism of
+states is the identity on values, so each entity of `P` that `Y₂` holds is one that
+`Y₁` holds, with the same values and the corresponding references. With `P` a
+published language, `S₁` its owner and `S₂` a consumer, the consumer holds part of
+what the owner publishes. -/
+def Conforms (hP : P.WellFormed) (h₁ : S₁.WellFormed) (h₂ : S₂.WellFormed)
+    (hT₁ : T₁.VValid L P S₁) (hT₂ : T₂.VValid L P S₂) (Y₁ : S₁.VState I) (Y₂ : S₂.VState I) :
+    Prop :=
+  Nonempty (T₂.vrestrictState hP h₂ hT₂ Y₂ ⟶ T₁.vrestrictState hP h₁ hT₁ Y₁)
+
+/-- States that agree conform to each other. -/
+theorem Agree.conforms (h : Agree hP h₁ h₂ hT₁ hT₂ Y₁ Y₂) :
+    Conforms hP h₁ h₂ hT₁ hT₂ Y₁ Y₂ :=
+  h.elim fun e => ⟨e.inv⟩
+
+/-- A state conforms to another when there is a morphism between their restrictions
+as attributed states. -/
+theorem Conforms.of_toState_hom
+    (f : (T₂.vrestrictState hP h₂ hT₂ Y₂).toState ⟶ (T₁.vrestrictState hP h₁ hT₁ Y₁).toState) :
+    Conforms hP h₁ h₂ hT₁ hT₂ Y₁ Y₂ :=
+  ⟨(VState.toStateFunctor I P).preimage f⟩
+
+end Agree
+
 end Translation
 
 /-! ## Data gluing -/
@@ -582,6 +645,16 @@ theorem vstateEquiv_apply (X : D.glued.VState I) :
   · change (Schema.VState.equivState I D.right D.wf_right).symm _ = _
     rw [Equiv.symm_apply_eq]
     exact (Translation.toState_vrestrict _ D.wf_right D.wf_glued D.inr_valid X).symm
+
+/-- The two restrictions of a state of the glued schema agree on the kernel. -/
+theorem agree (X : D.glued.VState I) :
+    Translation.Agree D.wf_kernel D.wf_left D.wf_right D.gluable.left.vvalid
+      D.gluable.right.vvalid
+      (Translation.vrestrictState {} D.wf_left D.wf_glued D.inl_valid.vvalid X)
+      (Translation.vrestrictState {} D.wf_right D.wf_glued D.inr_valid.vvalid X) := by
+  have h := (D.vstateEquiv X).2
+  rw [D.vstateEquiv_apply X] at h
+  exact .of_eq h
 
 end Gluing
 

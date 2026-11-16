@@ -1,4 +1,4 @@
-import DDD.VData
+import DDD.LitData
 import DDD.Aggregates
 
 /-!
@@ -13,6 +13,11 @@ has a key on `T e` each of whose fields is the image `T f` of a field `f` of `F`
   `FinState.restrict_checkKeys` states the same of the checks on data, and
   `FinState.vrestrict_checkKeys` of the restriction along a translation that
   converts.
+- States with conversions: `Schema.VState.Keys` is the condition on the restriction
+  to `S.cat`. `Translation.vrestrictState_keys` states that `Δ_T` along a
+  translation that converts keeps keys, `FinState.vrestrictLit_checkKeys` the same
+  of the restriction computed on literals, and `Gluing.keyedVStateEquiv` restricts
+  data gluing of states with conversions to the states that satisfy the keys.
 - `Schema.State.KeysOf Y B`: `Y` satisfies the keys of `B`. Along an inclusion, the
   restriction of a state satisfies the keys of the included schema exactly when
   the state satisfies them (`Translation.keys_restrict_empty_iff`).
@@ -485,5 +490,186 @@ noncomputable def keyedFamilyEquiv :
       fun X : ∀ A : S.Aggs, (S.aggregateSchema A.1).State K => ∀ A, (X A).Keys)
 
 end Schema
+
+/-! ## Keys of states with conversions -/
+
+namespace Schema
+
+variable {L : TypeList} {I : Interp L} {S : Schema}
+
+/-- A state with conversions satisfies the keys of its schema when its restriction
+to `S.cat` does. -/
+def VState.Keys (X : S.VState I) : Prop := X.toState.Keys
+
+/-- A functor applied to a path of generators and conversions with no names is
+injective: the path is empty. -/
+theorem vmap_injective_of_vnames_nil (F : S.vcat L ⥤ Type) {a : S.VObj L} :
+    ∀ {c : S.VObj L} (p : Quiver.Path a c), vnames p = [] → Function.Injective (F.map (vmor p))
+  | _, .nil, _ => by
+    erw [vmor_nil, CategoryTheory.Functor.map_id]
+    exact Function.injective_id
+  | _, .cons p e, h => by simp [vnames_cons] at h
+
+end Schema
+
+namespace Translation
+
+variable {T : Translation} {S S' : Schema} {L : TypeList} {I : Interp L}
+
+/-- `Δ_T` of a state with conversions that satisfies the keys of `S'` satisfies the
+keys of `S`, when `T`, which may convert, keeps them. -/
+theorem vrestrictState_keys (hS : S.WellFormed) (hS' : S'.WellFormed) (hT : T.VValid L S S')
+    (hK : T.KeysKept S S') {Y : S'.VState I} (hY : Y.Keys) :
+    (T.vrestrictState hS hS' hT Y).Keys := by
+  intro k hk he x y hxy
+  rcases hK k hk with ⟨f, hf, hf0⟩ | ⟨⟨e', fs'⟩, hk', hke, hk'f⟩
+  · obtain ⟨b, hb⟩ := hS.step?_of_key hk hf
+    have h := hxy f hf b hb
+    change Y.F.map (vmor (T.vfunctorPath hS' hT ((Paths.lift (S.vincPre L)).map
+        (S.genPath ⟨.entity k.entity, he⟩ b f hb)))) x =
+      Y.F.map (vmor (T.vfunctorPath hS' hT ((Paths.lift (S.vincPre L)).map
+        (S.genPath ⟨.entity k.entity, he⟩ b f hb)))) y at h
+    refine vmap_injective_of_vnames_nil Y.F _ ?_ h
+    rw [vnames_vfunctorPath, vnames_vincPath, names_toPath, vmapPath_singleton]
+    exact hf0
+  · simp only at hke hk'f
+    subst hke
+    have he' : T.ent k.entity ∈ S'.entities := hT.entity _ he
+    refine hY ⟨T.ent k.entity, fs'⟩ hk' he' x y fun n' hn' b' hb' => ?_
+    obtain ⟨f, hf, hfn⟩ := hk'f n' hn'
+    obtain ⟨b, hb⟩ := hS.step?_of_key hk hf
+    have h := hxy f hf b hb
+    change Y.F.map (vmor (T.vfunctorPath hS' hT ((Paths.lift (S.vincPre L)).map
+        (S.genPath ⟨.entity k.entity, he⟩ b f hb)))) x =
+      Y.F.map (vmor (T.vfunctorPath hS' hT ((Paths.lift (S.vincPre L)).map
+        (S.genPath ⟨.entity k.entity, he⟩ b f hb)))) y at h
+    have ht := hT.vtgt?_gen (vstep?_of_step? (L := L) hb)
+    rw [hfn] at ht
+    have hb'' := vstep?_of_step? (L := L) hb'
+    simp only [vtgt?_cons, vtgt?_nil] at ht
+    change (S'.vstep? L (.entity (T.ent k.entity)) n').bind _ = _ at ht
+    rw [hb''] at ht
+    obtain rfl : b' = T.vobj hT b := Subtype.ext (Option.some.inj ht)
+    have hp : T.vfunctorPath hS' hT ((Paths.lift (S.vincPre L)).map
+        (S.genPath ⟨.entity k.entity, he⟩ b f hb)) =
+        (Paths.lift (S'.vincPre L)).map
+          (S'.genPath ⟨.entity (T.ent k.entity), he'⟩ (T.vobj hT b) n' hb') :=
+      vnames_injective _ _ (by
+        rw [vnames_vfunctorPath, vnames_vincPath, vnames_vincPath, names_toPath,
+          vmapPath_singleton]
+        exact hfn)
+    rw [hp] at h
+    exact h
+
+/-- The keys are invariant under isomorphism of states. -/
+theorem _root_.DDD.Schema.State.Keys.of_iso {K : ValueType → Type} {X Y : S.State K}
+    (e : X ≅ Y) (h : X.Keys) : Y.Keys := by
+  intro k hk he x y hxy
+  have hinj : ∀ a (u v : Y.F.obj a), e.inv.α.app a u = e.inv.α.app a v → u = v := by
+    intro a u v huv
+    have h1 : ∀ w : Y.F.obj a, e.hom.α.app a (e.inv.α.app a w) = w := fun w =>
+      congrArg (fun φ : Y ⟶ Y => φ.α.app a w) e.inv_hom_id
+    rw [← h1 u, ← h1 v, huv]
+  refine hinj _ x y (h k hk he _ _ fun n hn b hb => ?_)
+  have nx := congrFun (e.inv.α.naturality (S.genMor (a := ⟨.entity k.entity, he⟩) n hb)) x
+  have ny := congrFun (e.inv.α.naturality (S.genMor (a := ⟨.entity k.entity, he⟩) n hb)) y
+  simp only [types_comp_apply] at nx ny
+  rw [← nx, ← ny, hxy n hn b hb]
+
+/-- When two states agree on `P`, the first satisfies the keys of its schema and
+its translation keeps the keys of `P`, the restriction of the second to `P`
+satisfies the keys of `P`, whether or not its translation keeps them. -/
+theorem Agree.keys {P S₁ S₂ : Schema} {T₁ T₂ : Translation} {hP : P.WellFormed}
+    {h₁ : S₁.WellFormed} {h₂ : S₂.WellFormed} {hT₁ : T₁.VValid L P S₁}
+    {hT₂ : T₂.VValid L P S₂} {Y₁ : S₁.VState I} {Y₂ : S₂.VState I}
+    (hA : Agree hP h₁ h₂ hT₁ hT₂ Y₁ Y₂) (hK : T₁.KeysKept P S₁) (hY : Y₁.Keys) :
+    (T₂.vrestrictState hP h₂ hT₂ Y₂).Keys := by
+  obtain ⟨e⟩ := hA
+  exact State.Keys.of_iso ((VState.toStateFunctor I P).mapIso e)
+    (vrestrictState_keys hP h₁ hT₁ hK hY)
+
+end Translation
+
+namespace FinState
+
+variable {K K' : ValueType → Type} {f : ∀ v, K v → K' v} {X : FinState K}
+
+/-- An injective map of values keeps the check of the keys. -/
+theorem checkKeys_mapVals [∀ v, DecidableEq (K v)] [∀ v, DecidableEq (K' v)]
+    (hf : ∀ v, Function.Injective (f v)) (S : Schema) :
+    (X.mapVals f).checkKeys S = X.checkKeys S := by
+  have ha : ∀ e fs i j, (X.mapVals f).agree S e fs i j = X.agree S e fs i j := by
+    intro e fs i j
+    simp only [agree]
+    congr 1
+    funext n
+    have e₁ := step_mapVals (X := X) (f := f) S (.ent e i) n
+    have e₂ := step_mapVals (X := X) (f := f) S (.ent e j) n
+    simp only [Elem.map] at e₁ e₂
+    rw [e₁, e₂]
+    exact decide_eq_decide.mpr (Option.map_injective (Elem.map_injective hf)).eq_iff
+  simp only [checkKeys]
+  congr 1
+  funext k
+  simp only [checkKey, size_mapVals, ha]
+
+variable {L : TypeList} {T : Translation} {S S' : Schema} {Z : FinState LitK}
+
+/-- The check of the keys of `S` passes on `Δ_T Z`, computed on literals along a
+translation that may convert, when it passes on `Z` for the keys of `S'` and `T`
+keeps them. -/
+theorem vrestrictLit_checkKeys (hL : L.Sound) (hS : S.WellFormed) (hT : T.VValid L S S')
+    (hK : T.KeysKept S S') (hfit : Z.LitsFit L) (hZ : Z.check S' = true)
+    (hk : Z.checkKeys S' = true) : (Z.vrestrictLit L T S S').checkKeys S = true := by
+  have e : Z.vrestrictLit L T S S' =
+      ((Z.fit hL hfit).vrestrict (L.litInterp hL) T S S').mapVals (litVal hL) := by
+    rw [mapVals_vrestrict, mapVals_fit]
+  have hZ' : (Z.fit hL hfit).check S' = true := (check_fit hL Z hfit S').trans hZ
+  have hk' : (Z.fit hL hfit).checkKeys S' = true := by
+    rw [← checkKeys_mapVals (litVal_injective hL), mapVals_fit]
+    exact hk
+  rw [e, checkKeys_mapVals (litVal_injective hL)]
+  exact vrestrict_checkKeys hS hZ' hT hK hk'
+
+end FinState
+
+/-! ## Keys through the gluing of states with conversions -/
+
+namespace Gluing
+
+variable (D : Gluing) {L : TypeList} {I : Interp L}
+
+/-- A state with conversions of the glued schema satisfies the keys of the two
+schemas when its restriction to `S.cat` does. -/
+def VKeysOf (X : D.glued.VState I) : Prop :=
+  X.toState.KeysOf D.left ∧ X.toState.KeysOf D.right
+
+/-- A state with conversions of the glued schema satisfies the keys of the two
+schemas exactly when its restrictions satisfy their keys. -/
+theorem vkeysOf_iff (X : D.glued.VState I) :
+    D.VKeysOf X ↔ ((D.vstateEquiv X).1.1.Keys ∧ (D.vstateEquiv X).1.2.Keys) := by
+  rw [D.vstateEquiv_apply X]
+  change _ ↔
+    (Translation.vrestrictState {} D.wf_left D.wf_glued D.inl_valid.vvalid X).toState.Keys ∧
+    (Translation.vrestrictState {} D.wf_right D.wf_glued D.inr_valid.vvalid X).toState.Keys
+  rw [Translation.toState_vrestrict _ D.wf_left D.wf_glued D.inl_valid X,
+    Translation.toState_vrestrict _ D.wf_right D.wf_glued D.inr_valid X]
+  exact and_congr
+    (Translation.keys_restrict_empty_iff D.wf_left D.wf_glued D.inl_valid X.toState).symm
+    (Translation.keys_restrict_empty_iff D.wf_right D.wf_glued D.inr_valid X.toState).symm
+
+/-- Data gluing for states with conversions that satisfy the keys. -/
+def keyedVStateEquiv :
+    { X : D.glued.VState I // D.VKeysOf X } ≃
+      { P : D.left.VState I × D.right.VState I //
+        Translation.vrestrictState {} D.wf_kernel D.wf_left D.gluable.left.vvalid P.1 =
+          Translation.vrestrictState {} D.wf_kernel D.wf_right D.gluable.right.vvalid P.2 ∧
+        P.1.Keys ∧ P.2.Keys } :=
+  ((D.vstateEquiv (I := I)).subtypeEquiv (q := fun P => P.1.1.Keys ∧ P.1.2.Keys)
+    D.vkeysOf_iff).trans
+    (Equiv.subtypeSubtypeEquivSubtypeInter _
+      fun P : D.left.VState I × D.right.VState I => P.1.Keys ∧ P.2.Keys)
+
+end Gluing
 
 end DDD

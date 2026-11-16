@@ -5,8 +5,13 @@ import Lean.Data.Json
 /-!
 # The exchange format
 
-JSON for the deep data, shared with the Julia side. Every document carries the
-format identifier `formatVersion`.
+JSON for the deep data, shared with the Julia side. Every document carries a
+format identifier: `formatVersion`, `csd-ddd/2`, is written, and the readers also
+accept `csd-ddd/1` (`readableFormats`), of which it is an extension. Version 2
+adds translations that send an attribute to a path ending in conversions, arrows
+marked as publishing, and the claims `keysKept`, `agreement` and `normalForm`; a
+reader of version 1 refuses a document of version 2 instead of reporting its
+arrows as invalid.
 
 - Value types: `"int"`, `"decimal"`, `"string"`, `"date"`, `"uuid"`, `"bool"`,
   `"datetime"`, `"timestamp"`, `"time"`, `"duration"`, `{"named": n}` and
@@ -24,7 +29,8 @@ format identifier `formatVersion`.
   `reference`, the name of the is-a reference). Lists keep their order.
 - A translation: `entities` (`source`, `target`) and `generators` (`name`, `path`).
 - A context map (`MapDoc`): `valueTypes`, `contexts` (`name`, `schema`,
-  `kernel`), `arrows` (`name`, `source`, `target`, `translation`), and
+  `kernel`), `arrows` (`name`, `source`, `target`, `translation`, and
+  `publishes`, true when the source is a published language of the target), and
   `routeEquations` (`lhs`, `rhs`, lists of arrow names).
 - A finite state, relative to its schema: `entities` (`type`, `count`),
   `references` and `attributes` (`name`, `column`). Entities are numbered from 0.
@@ -45,7 +51,10 @@ namespace DDD
 open Lean
 
 /-- The format identifier of the documents. -/
-def formatVersion : String := "csd-ddd/1"
+def formatVersion : String := "csd-ddd/2"
+
+/-- The format identifiers the readers accept. -/
+def readableFormats : List String := ["csd-ddd/1", "csd-ddd/2"]
 
 /-! ## Value types and literals -/
 
@@ -237,12 +246,14 @@ instance : FromJson Translation := ⟨Translation.fromJson⟩
 /-! ## Context maps -/
 
 /-- A context map as data: the list of value types, contexts with their schemas
-and kernel flags, named arrows with their translations, and equations between
+and kernel flags, named arrows with their translations, the names of the arrows
+whose source is a published language of their target, and equations between
 routes, as lists of arrow names. -/
 structure MapDoc where
   valueTypes : TypeList := {}
   contexts : List (String × Schema × Bool)
   arrows : List (String × String × String × Translation)
+  published : List String := []
   routeEqns : List (List String × List String) := []
 deriving DecidableEq
 
@@ -253,7 +264,7 @@ def MapDoc.toJson (M : MapDoc) : Json := Json.mkObj [
     Json.mkObj [("name", .str c.1), ("schema", c.2.1.toJson), ("kernel", .bool c.2.2)]).toArray),
   ("arrows", Json.arr (M.arrows.map fun a =>
     Json.mkObj [("name", .str a.1), ("source", .str a.2.1), ("target", .str a.2.2.1),
-      ("translation", a.2.2.2.toJson)]).toArray),
+      ("translation", a.2.2.2.toJson), ("publishes", .bool (M.published.contains a.1))]).toArray),
   ("routeEquations", Json.arr (M.routeEqns.map fun e =>
     Json.mkObj [("lhs", Lean.toJson e.1), ("rhs", Lean.toJson e.2)]).toArray)]
 
@@ -267,9 +278,14 @@ def MapDoc.fromJson (j : Json) : Except String MapDoc := do
   let arrows ← (← getList j "arrows").mapM fun a => do
     pure (← a.getObjValAs? String "name", ← a.getObjValAs? String "source",
       ← a.getObjValAs? String "target", ← Translation.fromJson (← a.getObjVal? "translation"))
+  let published := arrows.filterMap fun a =>
+    if (j.getObjValD "arrows").getArr?.toOption.getD #[] |>.any fun x =>
+      (x.getObjValAs? String "name").toOption == some a.1 &&
+        (x.getObjValAs? Bool "publishes").toOption.getD false
+    then some a.1 else none
   let routeEqns ← (← getList j "routeEquations").mapM fun e => do
     pure (← e.getObjValAs? (List String) "lhs", ← e.getObjValAs? (List String) "rhs")
-  pure { valueTypes, contexts, arrows, routeEqns }
+  pure { valueTypes, contexts, arrows, published, routeEqns }
 
 /-! ## Finite states and homomorphisms -/
 

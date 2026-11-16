@@ -2,9 +2,11 @@
  [{"values": ["card", "invoice", "transfer"], "name": "PaymentMethod"},
   {"values": [], "name": "Size"},
   {"name": "string", "base": "string"}],
- "routeEquations": [],
+ "routeEquations":
+ [{"rhs": ["streetToCity"], "lhs": ["billing"]},
+  {"rhs": ["nowhere"], "lhs": ["billing"]}],
  "kind": "map",
- "format": "csd-ddd/1",
+ "format": "csd-ddd/2",
  "contexts":
  [{"schema":
    {"valueObjects": ["Address"],
@@ -107,6 +109,54 @@
      {"type": {"optional": {"optional": "int"}}, "name": "Tag.weight"}],
     "aggregates": []},
    "name": "Untyped",
+   "kernel": false},
+  {"schema":
+   {"valueObjects": ["Address"],
+    "subtypes": [],
+    "references": [{"target": "Address", "name": "Customer.address"}],
+    "keys": [],
+    "equations": [],
+    "entities": ["Customer", "Address"],
+    "attributes":
+    [{"type": "string", "name": "Customer.name"},
+     {"type": "string", "name": "Address.street"},
+     {"type": "string", "name": "Address.city"}],
+    "aggregates":
+    [{"root": "Customer", "members": []}, {"root": "Address", "members": []}]},
+   "name": "Customers",
+   "kernel": true},
+  {"schema":
+   {"valueObjects": [],
+    "subtypes": [],
+    "references": [],
+    "keys": [],
+    "equations": [],
+    "entities": ["InvoiceLine"],
+    "attributes": [{"type": "int", "name": "InvoiceLine.quantity"}],
+    "aggregates": []},
+   "name": "Lines",
+   "kernel": false},
+  {"schema":
+   {"valueObjects": [],
+    "subtypes": [],
+    "references": [],
+    "keys": [],
+    "equations": [],
+    "entities": ["Thing"],
+    "attributes": [],
+    "aggregates": []},
+   "name": "Ping",
+   "kernel": false},
+  {"schema":
+   {"valueObjects": [],
+    "subtypes": [],
+    "references": [],
+    "keys": [],
+    "equations": [],
+    "entities": ["Thing"],
+    "attributes": [],
+    "aggregates": []},
+   "name": "Pong",
    "kernel": false}],
  "arrows":
  [{"translation":
@@ -120,6 +170,7 @@
      {"target": "Invoice", "source": "Order"}]},
    "target": "Payments",
    "source": "OrdersPL",
+   "publishes": false,
    "name": "billing"},
   {"translation":
    {"generators":
@@ -133,6 +184,7 @@
      {"target": "Invoice", "source": "Order"}]},
    "target": "Payments",
    "source": "OrdersPL",
+   "publishes": false,
    "name": "billingToShipping"},
   {"translation":
    {"generators":
@@ -146,8 +198,31 @@
      {"target": "Invoice", "source": "Order"}]},
    "target": "Payments",
    "source": "OrdersPL",
+   "publishes": false,
    "name": "streetToCity"},
   {"translation": {"generators": [], "entities": []},
    "target": "Nowhere",
    "source": "OrdersPL",
-   "name": "dangling"}]}
+   "publishes": false,
+   "name": "dangling"},
+  {"translation":
+   {"generators": [], "entities": [{"target": "Payer", "source": "Customer"}]},
+   "target": "Payments",
+   "source": "Customers",
+   "publishes": false,
+   "name": "payers"},
+  {"translation": {"generators": [], "entities": []},
+   "target": "Payments",
+   "source": "Lines",
+   "publishes": true,
+   "name": "publishLines"},
+  {"translation": {"generators": [], "entities": []},
+   "target": "Pong",
+   "source": "Ping",
+   "publishes": false,
+   "name": "ping"},
+  {"translation": {"generators": [], "entities": []},
+   "target": "Ping",
+   "source": "Pong",
+   "publishes": false,
+   "name": "pong"}]}

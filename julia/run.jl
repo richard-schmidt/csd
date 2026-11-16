@@ -14,7 +14,7 @@ const IN = get(ARGS, 1, joinpath(@__DIR__, "data", "workspace.json"))
 const OUT = get(ARGS, 2, joinpath(@__DIR__, "out", "certificate.json"))
 
 ws = JSON3.read(read(IN, String))
-ws["format"] == FORMAT || error("unsupported format $(ws["format"])")
+ws["format"] in READABLE || error("unsupported format $(ws["format"])")
 map = ws["map"]
 
 cert = Certificate("csd-julia 0.1, Catlab $(pkgversion(CsdDDD.Catlab))")
@@ -42,6 +42,11 @@ for a in map["arrows"]
   add_claim!(cert, "keysKept"; source=String(a["source"]), target=String(a["target"]),
     translation=write_translation(T))
 end
+
+# The anti-corruption layer into Payments keeps the entity types of the published
+# language of Orders apart; Lean checks that it has a normal form.
+add_claim!(cert, "normalForm"; source="OrdersPL", target="Payments",
+  translation=write_translation(translations["ordersPL_payments"]))
 
 expected(kernel) = begin
   i = findfirst(e -> e["kernel"] == kernel, get(ws, "expectations", []))
@@ -164,22 +169,41 @@ XG = State(
   [(s, n) => pick(XO.refs, XS.refs, (s, n), (s, n) in lrefs) for (s, n, _) in CsdDDD.refs(G)],
   [(s, n) => pick(XO.attrs, XS.attrs, (s, n), (s, n) in lattrs) for (s, n, _) in CsdDDD.attrs(G)])
 
+# Payments invoices the first order, shipped to the second address.
 XP = make_state(schemas["Payments"],
-  Dict("Payer" => 1, "Address" => 1, "Invoice" => 1, "InvoiceLine" => 2, "Payment" => 1,
+  Dict("Payer" => 1, "Address" => 2, "Invoice" => 1, "InvoiceLine" => 2, "Payment" => 1,
     "Refund" => 1),
-  Dict(("Payer", "address") => [1], ("Invoice", "payer") => [1], ("Invoice", "shipTo") => [1],
+  Dict(("Payer", "address") => [1], ("Invoice", "payer") => [1], ("Invoice", "shipTo") => [2],
     ("InvoiceLine", "invoice") => [1, 1], ("Payment", "invoice") => [1],
     ("Refund", "payment") => [1], ("Refund", "invoice") => [1]),
-  Dict(("Payer", "name") => ["Ada"], ("Address", "street") => ["Bahnhofstrasse 1"],
-    ("Address", "city") => ["Bern"], ("Invoice", "orderId") => ORDER_IDS[1:1],
+  Dict(("Payer", "name") => ["Ada"], ("Address", "street") => customers_attrs[("Address", "street")],
+    ("Address", "city") => customers_attrs[("Address", "city")],
+    ("Invoice", "orderId") => ORDER_IDS[1:1],
     ("Invoice", "orderedOn") => ["2026-10-01"], ("InvoiceLine", "quantity") => [2, 1],
     ("InvoiceLine", "unitPrice") => ["12.50", "8.00"],
     ("InvoiceLine", "description") => ["Mug", "Plate"], ("Payment", "amount") => ["33.00"],
     ("Payment", "paidOn") => ["2026-10-01"], ("Payment", "method") => ["card"],
     ("Refund", "amount") => ["8.00"], ("Refund", "issuedOn") => ["2026-10-05"]))
 
+# Payments with an invoice for each of the two orders, and nothing paid.
+XPA = make_state(schemas["Payments"],
+  Dict("Payer" => 2, "Address" => 2, "Invoice" => 2, "InvoiceLine" => 0, "Payment" => 0,
+    "Refund" => 0),
+  Dict(("Payer", "address") => [1, 2], ("Invoice", "payer") => [1, 2],
+    ("Invoice", "shipTo") => [2, 2], ("InvoiceLine", "invoice") => Int[],
+    ("Payment", "invoice") => Int[], ("Refund", "payment") => Int[],
+    ("Refund", "invoice") => Int[]),
+  Dict(("Payer", "name") => customers_attrs[("Customer", "name")],
+    ("Address", "street") => customers_attrs[("Address", "street")],
+    ("Address", "city") => customers_attrs[("Address", "city")],
+    ("Invoice", "orderId") => ORDER_IDS, ("Invoice", "orderedOn") => ["2026-10-01", "2026-10-02"],
+    ("InvoiceLine", "quantity") => [], ("InvoiceLine", "unitPrice") => [],
+    ("InvoiceLine", "description") => [], ("Payment", "amount") => [],
+    ("Payment", "paidOn") => [], ("Payment", "method") => [], ("Refund", "amount") => [],
+    ("Refund", "issuedOn") => []))
+
 states = [("XO", "Orders", XO), ("XS", "Shipping", XS), ("XS2", "Shipping", XS2),
-  ("XG", "Orders+Shipping", XG), ("XP", "Payments", XP)]
+  ("XG", "Orders+Shipping", XG), ("XP", "Payments", XP), ("XPA", "Payments", XPA)]
 for (x, s, X) in states
   check_state(schemas[s], X) || error("$x violates an equation of $s")
 end
@@ -211,6 +235,21 @@ restriction("Customers", "Orders", empty, "XO", "XK")
 restriction("Customers", "Shipping", empty, "XS", "XK")
 restriction("OrdersPL", "Orders", translations["ordersPL_orders"], "XO", "XOPL")
 restriction("OrdersPL", "Payments", translations["ordersPL_payments"], "XP", "XPL")
+
+# Owner and consumer on the published language of Orders. With an invoice for each
+# order, Payments holds what Orders publishes: the two restrictions are equal. With
+# one invoice it holds part of it: Catlab finds a homomorphism from its restriction
+# into that of Orders.
+on_published(; kw...) = (shared="OrdersPL", left="Orders", right="Payments",
+  leftTranslation=write_translation(translations["ordersPL_orders"]),
+  rightTranslation=write_translation(translations["ordersPL_payments"]), kw...)
+restrict(translations["ordersPL_payments"], schemas["OrdersPL"], schemas["Payments"], XPA) ==
+  XOPL || error("XPA and XO disagree on the published language")
+add_claim!(cert, "agreement"; on_published(leftState="XO", rightState="XPA")...)
+hpl = homomorphism_search(schemas["OrdersPL"], XPL, XOPL)
+hpl === nothing && error("XP does not conform to XO on the published language")
+add_claim!(cert, "conformance"; on_published(leftState="XO", rightState="XP",
+  homomorphism=Dict("components" => [Dict("type" => e, "column" => c .- 1) for (e, c) in hpl]))...)
 
 # Samples: a schema and a state read from the workspace and passed on, with
 # their literals as written.

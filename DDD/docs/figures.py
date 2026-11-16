@@ -799,7 +799,7 @@ def aggregates():
 # 17. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1180, 644,
+    f = Fig("modules", 1180, 660,
             "Imports between the modules of the DDD library: a chain from value types to "
             "certificates and reports, context maps, states and open systems beside it, and the "
             "examples on top.")
@@ -861,6 +861,8 @@ def modules():
     f.arrow("LitInterp", "LitData", "", "acl")
     f.node("NormalForm", 520, 250, "NormalForm", w=100, h=30)
     f.arrow("Rename", "NormalForm", "", "acl")
+    f.node("MapCheck", 1108, 192, "MapCheck", w=92, h=30)
+    f.poly([(1170, 192), (1156, 192)], "muted")
     dy = 100
     f.region(20, 235 + dy, 1140, 220, "EXAMPLES")
     f.raw(f'<rect class="rg plain" x="38" y="{266 + dy}" width="358" height="44" rx="6"/>', "back")
@@ -910,8 +912,11 @@ def modules():
     f.text(1160, 616, "the example Conversions imports Report, VData and LitInterp, VCompose "
            "imports ConvComplete, ContextMap imports VCompose, Keys imports Aggregates,", "note",
            "end")
-    f.text(1160, 632, "LitData imports VData and Json, Certificate imports LitData and Keys, "
-           "the example NormalForm imports NormalForm and Integration", "note", "end")
+    f.text(1160, 632, "LitData imports VData and Json, Certificate imports LitData, Keys and "
+           "NormalForm, the example NormalForm imports NormalForm and Integration, Keys imports "
+           "LitData,", "note", "end")
+    f.text(1160, 648, "MapCheck imports Report and ContextMap, and the examples Exchange, "
+           "Routes and Problems import MapCheck", "note", "end")
     return f
 
 

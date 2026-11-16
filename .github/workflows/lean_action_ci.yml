@@ -33,6 +33,10 @@ jobs:
           julia --project=julia -e 'using Pkg; Pkg.instantiate()'
           julia --project=julia julia/run.jl
           julia --project=julia julia/test/runtests.jl
+      # The committed certificate, which the aarch64 workflow checks, is the one
+      # the Julia side writes.
+      - name: The committed certificate is up to date
+        run: git diff --exit-code julia/out/certificate.json
       # csd-check is a default target, built natively by lean-action.
       - name: Check the certificate with csd-check
         run: lake exe csd-check julia/out/certificate.json

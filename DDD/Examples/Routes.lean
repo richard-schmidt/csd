@@ -1,4 +1,4 @@
-import DDD.ContextMap
+import DDD.MapCheck
 
 /-!
 # Example: a declared diamond
@@ -17,6 +17,11 @@ to Reporting form a diamond.
   to `query` along the other; the check fails, and since Reporting is free, the
   two routes have different functors (`routes_ne`). Such a diamond stays free: a
   row refers to a variant through each route separately.
+- `document`: the same map as a context map document, with the equation as two
+  lists of arrow names. It passes `MapDoc.check` (`document_check`), so it is a
+  context map with the diamond declared (`documentMap`); with Search reporting the
+  SKU as the query, the check of the declared equation fails
+  (`documentByQuery_check`).
 -/
 
 namespace DDD.Examples.Routes
@@ -157,5 +162,42 @@ def searchByQuery : ContextMap Context where
   translation := translationByQuery
   wellFormed := wellFormed
   valid := validByQuery
+
+/-! ## The diamond as a document -/
+
+/-- The four contexts as a context map document that declares the diamond: the
+equation is two lists of arrow names. -/
+def document : MapDoc where
+  contexts := [("Catalog", schema .Catalog, false), ("Sales", schema .Sales, false),
+    ("Search", schema .Search, false), ("Reporting", schema .Reporting, false)]
+  arrows := [("catalog_sales", "Catalog", "Sales", translation Arrow.catalog_sales),
+    ("catalog_search", "Catalog", "Search", translation Arrow.catalog_search),
+    ("sales_reporting", "Sales", "Reporting", translation Arrow.sales_reporting),
+    ("search_reporting", "Search", "Reporting", translation Arrow.search_reporting)]
+  routeEqns := [(["catalog_sales", "sales_reporting"], ["catalog_search", "search_reporting"])]
+
+/-- The document passes its check, the declared equation included. -/
+theorem document_check : document.check = true := by decide +kernel
+
+/-- The document as a context map, with the diamond declared. -/
+def documentMap : ContextMap document.Ctx := MapDoc.contextMap document_check
+
+/-- The document with Search reporting the SKU as the query: the declared equation
+fails, and the report names it. -/
+def documentByQuery : MapDoc :=
+  { document with
+    arrows := document.arrows.map fun a =>
+      if a.1 = "search_reporting" then
+        (a.1, a.2.1, a.2.2.1, translationByQuery Arrow.search_reporting) else a }
+
+theorem documentByQuery_check : documentByQuery.check = false := by decide +kernel
+
+example : documentByQuery.checkRoutes = false ∧ documentByQuery.certificate.check = true := by
+  decide +kernel
+
+/-- An equation whose sides are not routes between the same contexts fails. -/
+example : ({ document with routeEqns := [(["catalog_sales"], ["catalog_search"])] } :
+    MapDoc).checkRoutes = false := by
+  decide +kernel
 
 end DDD.Examples.Routes

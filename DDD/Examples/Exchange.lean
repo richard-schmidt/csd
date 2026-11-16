@@ -1,5 +1,5 @@
 import DDD.Json
-import DDD.Report
+import DDD.MapCheck
 import DDD.Examples.Integration
 import DDD.Examples.Gluing
 import DDD.Examples.Structure
@@ -31,6 +31,15 @@ the literals in normal form and checks the keys.
 OrdersPL → Orders, whose translation sends the date an order was placed to the
 date of its instant (`Integration.ordersPublish`); Lean computes it with
 `FinState.vrestrictLit`, and the date is that of the instant in UTC.
+
+`agreementCertificate` relates a state of Orders and states of Payments on the
+published language: with an invoice for the order the two agree (claim
+`agreement`), before the invoice Payments conforms to Orders without agreeing
+(claim `conformance`), and an invoice dated in another time zone does neither.
+
+`map` passes its claims and the conditions on the map (`map_check`, in the
+kernel), so it is a context map on its contexts (`documentMap`), and each context
+embeds into its lax integration (`document_nonInterference`).
 
 `conversions` lists paths of conversions and literals in normal form; the Julia
 side applies the conversions and claims the results, which Lean checks with
@@ -74,11 +83,13 @@ def arrows : List (String × String × String × Translation) :=
 /-- The value types of the example map and of the samples. -/
 def valueTypes : TypeList := Conversions.types
 
-/-- The context map as data. -/
+/-- The context map as data. The arrows from the two published languages into
+their owners are marked as publishing. -/
 def map : MapDoc where
   valueTypes := valueTypes
   contexts := contexts.map fun c => (contextName c, schema c, kernel c)
   arrows := arrows
+  published := ["catalogPL_catalog", "ordersPL_orders"]
 
 /-- Orders, with the date each customer was created. -/
 def ordersCreated : Schema :=
@@ -251,6 +262,108 @@ def publishCertificate : Certificate where
     .restriction "OrdersPL" "Orders" Integration.ordersPublish "XO" "XOPL"]
 
 #guard publishCertificate.check
+
+/-! ## Owner and consumer on the published language of Orders -/
+
+/-- A state of Payments: the payer Ada at her address, and an invoice for the order
+of `ordersState`, dated by the day the order was placed, in UTC. -/
+def paymentsState : FinState LitK where
+  sizes := [("Payer", 1), ("Address", 1), ("Invoice", 1), ("InvoiceLine", 0), ("Payment", 0),
+    ("Refund", 0)]
+  refs := [(("Payer", "address"), [0]), (("Invoice", "payer"), [0]), (("Invoice", "shipTo"), [0]),
+    (("InvoiceLine", "invoice"), []), (("Payment", "invoice"), []), (("Refund", "payment"), []),
+    (("Refund", "invoice"), [])]
+  attrs := [(("Payer", "name"), col .string [.text "Ada"]),
+    (("Address", "street"), col .string [.text "Bahnhofstrasse 1"]),
+    (("Address", "city"), col .string [.text "Bern"]),
+    (("Invoice", "orderId"), col .uuid [.text "7c9e6679-7425-40de-944b-e07fc1f90ae7"]),
+    (("Invoice", "orderedOn"), col .date [.text "2026-09-30"]),
+    (("InvoiceLine", "quantity"), []), (("InvoiceLine", "unitPrice"), []),
+    (("InvoiceLine", "description"), []), (("Payment", "amount"), []),
+    (("Payment", "paidOn"), []), (("Payment", "method"), []), (("Refund", "amount"), []),
+    (("Refund", "issuedOn"), [])]
+
+/-- The same payer and address, before the order is invoiced. -/
+def paymentsNoInvoice : FinState LitK :=
+  { paymentsState with
+    sizes := paymentsState.sizes.map fun (p : String × Nat) =>
+      if p.1 = "Invoice" then (p.1, 0) else p
+    refs := paymentsState.refs.map fun (c : (String × String) × List Nat) =>
+      if c.1.1 = "Invoice" then (c.1, []) else c
+    attrs := paymentsState.attrs.map fun (c : (String × String) × List (Σ v, LitK v)) =>
+      if c.1.1 = "Invoice" then (c.1, []) else c }
+
+/-- The invoice dated by the day of the instant in its own offset. -/
+def paymentsWrongDate : FinState LitK :=
+  { paymentsState with
+    attrs := paymentsState.attrs.map fun (c : (String × String) × List (Σ v, LitK v)) =>
+      if c.1 = ("Invoice", "orderedOn") then (c.1, col .date [.text "2026-10-01"]) else c }
+
+/-- The claim that a state of Orders and a state of Payments agree on the published
+language of Orders. -/
+def agrees (x y : String) : Claim :=
+  .agreement "OrdersPL" "Orders" "Payments" Integration.ordersPublish Integration.ordersPayments
+    x y
+
+/-- The claim that a state of Payments conforms to a state of Orders on the
+published language of Orders, with the components of the homomorphism. -/
+def conforms (x y : String) (orders : List Nat) : Claim :=
+  .conformance "OrdersPL" "Orders" "Payments" Integration.ordersPublish
+    Integration.ordersPayments x y ⟨[("Customer", [0]), ("Address", [0]), ("Order", orders)]⟩
+
+/-- Orders and Payments on the published language of Orders. With the invoice,
+Payments holds what Orders publishes: the two states agree, and Payments conforms.
+Before the invoice, Payments holds part of it: it conforms, and the two do not
+agree. -/
+def agreementCertificate : Certificate where
+  valueTypes := valueTypes
+  schemas := [("Orders", Orders.schema), ("OrdersPL", Orders.published),
+    ("Payments", Payments.schema)]
+  states := [("XO", "Orders", ordersState.normalize valueTypes),
+    ("XP", "Payments", paymentsState.normalize valueTypes),
+    ("XP0", "Payments", paymentsNoInvoice.normalize valueTypes),
+    ("XP1", "Payments", paymentsWrongDate.normalize valueTypes)]
+  claims := [.valueTypes, .state "XO", .state "XP", .state "XP0", agrees "XO" "XP",
+    conforms "XO" "XP" [0], conforms "XO" "XP0" []]
+
+#guard agreementCertificate.check
+
+-- Before the invoice, the two states differ on the orders of the published language.
+#guard !agreementCertificate.checkClaim (agrees "XO" "XP0")
+#guard ((agreementCertificate.explain (agrees "XO" "XP0")).map fun p =>
+    (p.getObjValD "kind", (p.getObjVal? "entity").toOption.getD (p.getObjValD "generator"))) ==
+  [(.str "disagree", .str "Order"), (.str "disagree", .str "Order.customer"),
+   (.str "disagree", .str "Order.billTo"), (.str "disagree", .str "Order.shipTo"),
+   (.str "disagree", .str "Order.id"), (.str "disagree", .str "Order.placedOn")]
+
+-- An invoice dated in the offset of the instant neither agrees nor conforms: a
+-- morphism of states keeps values.
+#guard !agreementCertificate.checkClaim (agrees "XO" "XP1")
+#guard ((agreementCertificate.explain (agrees "XO" "XP1")).map fun p =>
+    (p.getObjValD "kind", p.getObjValD "generator")) ==
+  [(.str "disagree", .str "Order.placedOn")]
+#guard !agreementCertificate.checkClaim (conforms "XO" "XP1" [0])
+#guard ((agreementCertificate.explain (conforms "XO" "XP1" [0])).map (·.getObjValD "kind")) ==
+  [.str "homomorphism"]
+
+/-! ## The document as a context map -/
+
+/-- The example document passes its claims and the conditions on the map: distinct
+names, the arrows out of the kernel are inclusions, the two published languages go
+to roots, and the map has no cycle. -/
+theorem map_check : map.check = true := by decide +kernel
+
+#guard map.conditions.all (·.2.1)
+
+/-- The example document as a context map on its contexts. -/
+def documentMap : ContextMap map.Ctx := MapDoc.contextMap map_check
+
+/-- Lax non-interference for the document: each of its contexts embeds into the lax
+integration fully faithfully and injectively on objects. -/
+theorem document_nonInterference (c : map.Ctx) :
+    (documentMap.embed c).Full ∧ (documentMap.embed c).Faithful ∧
+      Function.Injective (documentMap.embed c).obj :=
+  MapDoc.nonInterference map_check c
 
 /-- The published state with the date of the instant in its own offset, which is
 not the date in UTC. -/

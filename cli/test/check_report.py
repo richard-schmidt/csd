@@ -23,10 +23,16 @@ SCHEMA_KINDS = ["duplicateEntity", "duplicateGenerator", "referenceTarget", "ref
                 "subtypeEntity", "subtypeReference"]
 
 EXPECTED_CONTEXTS = [("OrdersPL", True, []), ("Payments", True, []), ("Broken", False, SCHEMA_KINDS),
-                     ("Untyped", False, ["undeclaredValueType", "nestedOptional"])]
+                     ("Untyped", False, ["undeclaredValueType", "nestedOptional"]),
+                     ("Customers", True, []), ("Lines", True, []), ("Ping", True, []),
+                     ("Pong", True, [])]
 EXPECTED_VALUE_TYPES = (False, ["emptyEnumeration", "builtinTypeName"])
 EXPECTED_ARROWS = [("billing", True, []), ("billingToShipping", False, ["equationImage"]),
-                   ("streetToCity", False, ["keyNotKept"]), ("dangling", False, ["unknownSchema"])]
+                   ("streetToCity", False, ["keyNotKept"]), ("dangling", False, ["unknownSchema"]),
+                   ("payers", False, ["kernelTranslation"]),
+                   ("publishLines", False, ["publishedMember"]), ("ping", True, []),
+                   ("pong", True, [])]
+EXPECTED_MAP = (False, ["cycle", "routeEquation", "routeEquation"])
 
 
 def summary(entries):
@@ -45,8 +51,11 @@ def main(argv):
     report = json.loads(r.stdout)
     if report.get("kind") != "mapReport":
         errors.append(f"broken map: kind {report.get('kind')}, expected mapReport")
-    if report.get("failed") != 6:
-        errors.append(f"broken map: {report.get('failed')} failed, expected 6")
+    if report.get("failed") != 9:
+        errors.append(f"broken map: {report.get('failed')} failed, expected 9")
+    whole = report.get("map", {})
+    if (whole.get("ok"), [p["kind"] for p in whole.get("problems", [])]) != EXPECTED_MAP:
+        errors.append(f"broken map: map {whole}")
     types = report.get("valueTypes", {})
     if (types.get("ok"), [p["kind"] for p in types.get("problems", [])]) != EXPECTED_VALUE_TYPES:
         errors.append(f"broken map: value types {types}")
@@ -54,7 +63,8 @@ def main(argv):
         errors.append(f"broken map: contexts {summary(report['contexts'])}")
     if summary(report["arrows"]) != EXPECTED_ARROWS:
         errors.append(f"broken map: arrows {summary(report['arrows'])}")
-    for entry in [dict(types, name="valueTypes")] + report["contexts"] + report["arrows"]:
+    for entry in ([dict(types, name="valueTypes"), dict(whole, name="map")] + report["contexts"]
+                  + report["arrows"]):
         for p in entry["problems"]:
             if not p.get("message"):
                 errors.append(f"broken map: a problem of {entry['name']} has no message")
@@ -63,6 +73,8 @@ def main(argv):
     if r.returncode != 1 or "is declared more than once" not in r.stdout:
         errors.append(f"broken map, text output: exit code {r.returncode}, "
                       "or no problem message in the output")
+    if "FAILED the map has no cycle" not in r.stdout:
+        errors.append("broken map, text output: the cycle is not reported")
 
     r = subprocess.run([exe, "--json", certificate], capture_output=True, text=True)
     report = json.loads(r.stdout)

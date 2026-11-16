@@ -1,4 +1,4 @@
-import DDD.Report
+import DDD.MapCheck
 
 /-!
 `csd-check`: checks a certificate or a context map document.
@@ -9,8 +9,13 @@ import DDD.Report
 The file is a certificate (`"kind": "certificate"`) or a context map document
 (`"kind": "map"`). The claims of a context map document are that its list of
 value types is sound, that each context is well formed and declares its value
-types, and that each arrow is a valid translation (`DDD.MapDoc.certificate`).
-The literals of the states of a certificate are read in normal form.
+types, and that each arrow is a valid translation that keeps keys
+(`DDD.MapDoc.certificate`). A context map document also has the conditions on the
+map as a whole (`DDD.MapDoc.conditions`): distinct names, arrows out of kernels
+that keep names, published languages that go to roots, no cycle, and declared
+route equations that hold. A document that passes all of them is a context map
+(`DDD.MapDoc.contextMap`). The literals of the states of a certificate are read in
+normal form.
 
 The executable `csd-check` (`lakefile.toml`) is this program compiled to native
 code, with the modules it imports. Each claim is checked by its checker
@@ -19,10 +24,11 @@ code, with the modules it imports. Each claim is checked by its checker
 runtime, as `native_decide` does. A failing claim is explained by its problems
 (`DDD.Report`).
 
-The output is one line per claim, followed for a failing claim by its problems.
-With `--json` it is the report as JSON instead: `DDD.Certificate.report` for a
-certificate, `DDD.MapDoc.report` for a context map document. The exit code is 0
-when every claim passes, 1 when one fails, and 2 when the file cannot be read.
+The output is one line per claim and per condition of the map, followed for a
+failing one by its problems. With `--json` it is the report as JSON instead:
+`DDD.Certificate.report` for a certificate, `DDD.MapDoc.report` for a context map
+document. The exit code is 0 when every claim and condition passes, 1 when one
+fails, and 2 when the file cannot be read.
 
 `lake env lean --run cli/CsdCheck.lean file.json` runs the same program in the
 interpreter.
@@ -60,20 +66,28 @@ def main (args : List String) : IO UInt32 := do
     pure 2
   | .ok (c, map?) =>
     let rs := c.claims.map fun cl => (cl, c.result cl)
-    let failed := (rs.filter fun r => !r.2.1).length
+    let conds := match map? with
+      | some M => M.conditions
+      | none => []
+    let failed := (rs.filter fun r => !r.2.1).length + (conds.filter fun r => !r.2.1).length
+    let total := c.claims.length + conds.length
     if json then
       IO.println (match map? with
         | some M => M.report
         | none => c.report).pretty
     else
-      IO.println s!"csd-check: {path}: {c.claims.length} claims from {c.producer}"
+      IO.println s!"csd-check: {path}: {total} claims from {c.producer}"
       IO.println "csd-check: checkers evaluated outside the kernel (trusts the Lean compiler)"
       for (cl, ok, ps) in rs do
         IO.println s!"{if ok then "ok    " else "FAILED"} {cl.describe}"
         for p in ps do
           IO.println s!"       {message p}"
+      for (d, ok, ps) in conds do
+        IO.println s!"{if ok then "ok    " else "FAILED"} {d}"
+        for p in ps do
+          IO.println s!"       {message p}"
       if failed == 0 then
-        IO.println s!"csd-check: all {c.claims.length} claims hold"
+        IO.println s!"csd-check: all {total} claims hold"
       else
-        IO.println s!"csd-check: {failed} of {c.claims.length} claims failed"
+        IO.println s!"csd-check: {failed} of {total} claims failed"
     pure (if failed == 0 then 0 else 1)

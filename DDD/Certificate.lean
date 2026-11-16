@@ -1,6 +1,7 @@
 import DDD.Compose
 import DDD.LitData
 import DDD.Keys
+import DDD.NormalForm
 
 /-!
 # Certificates
@@ -34,11 +35,24 @@ claim that passes its check holds (`Certificate.checkClaim_sound`).
   literal written in another form passes, and one that is not a value of its
   type fails.
 - `restriction`: a finite state is the restriction of another along a
-  translation. Along a valid translation, its state is isomorphic to
-  `Translation.restrictState` (`FinState.IsRestriction`); along a translation
-  that converts, for a sound list, its state in the literal interpretation is
-  isomorphic to `Translation.vrestrictState` (`FinState.IsVRestriction`), and the
-  check computes it with `FinState.vrestrictLit`.
+  translation, which may convert. For a sound list of value types, its state in
+  the literal interpretation is isomorphic to `Translation.vrestrictState`
+  (`FinState.IsVRestriction`); the check computes it with `FinState.vrestrictLit`.
+- `agreement`: a state of one schema and a state of another agree on a schema that
+  translates into both, such as an owner and a consumer on a published language:
+  their states in the literal interpretation have isomorphic restrictions
+  (`FinState.Agrees`, `Translation.Agree`). The check compares the two
+  restrictions computed on literals, so the two states number the entities of the
+  shared schema alike.
+- `conformance`: a state of one schema conforms to a state of another on a schema
+  that translates into both: a homomorphism of finite states from the restriction
+  of the first to the restriction of the second is a morphism of their states
+  (`FinState.ConformsTo`, `Translation.Conforms`). A consumer that holds part of
+  what its upstream publishes conforms to it; the entities need not be numbered
+  alike.
+- `normalForm`: a valid translation factors as an inclusion into a definitional
+  extension of its target, which presents a category isomorphic to that of the
+  target (`Translation.NormalForm`), checked by `Translation.checkNormalForm`.
 - `homomorphism`: a homomorphism of finite states that is a morphism of their
   states.
 - `pathEquality`: two paths out of an object of a schema present the same
@@ -127,12 +141,6 @@ theorem Gluing.isPushout_of_perm (D : Gluing) {G : Schema} (hG : G.WellFormed)
       rw [Iso.refl_hom, Category.id_comp]
       exact Translation.functor_empty_comp_empty D.wf_glued hG _ _ _)
 
-/-- `Y` is the restriction of `X` along the valid translation `T`: both pass the
-check, and the state of `Y` is isomorphic to `Δ_T` applied to the state of `X`. -/
-def FinState.IsRestriction (T : Translation) (S S' : Schema) (X Y : FinState LitK) : Prop :=
-  ∃ (hS' : S'.WellFormed) (hT : T.Valid S S') (hX : X.check S' = true) (hY : Y.check S = true),
-    Nonempty (Y.toState hY ≅ Translation.restrictState hS' hT (X.toState hX))
-
 /-! ## Certificates -/
 
 /-- A claim of a certificate, about named schemas and named states. -/
@@ -146,6 +154,10 @@ inductive Claim where
   | valueTypes
   | declared (schema : String)
   | restriction (source target : String) (T : Translation) (state result : String)
+  | agreement (shared left right : String) (T₁ T₂ : Translation) (leftState rightState : String)
+  | conformance (shared left right : String) (T₁ T₂ : Translation)
+      (leftState rightState : String) (h : FinHom)
+  | normalForm (source target : String) (T : Translation)
   | homomorphism (source target : String) (h : FinHom)
   | pathEquality (schema : String) (src : Ob) (lhs rhs : List String)
   | conversion (type : ValueType) (path : List String) (value result : Lit)
@@ -206,12 +218,35 @@ def checkClaim : Claim → Bool
     | none => false
   | .restriction s t T x y => match c.schema? s, c.schema? t, c.state? x, c.state? y with
     | some S, some S', some (sx, X), some (sy, Y) =>
-      sx == t && sy == s && S.checkWellFormed && S'.checkWellFormed && X.check S' &&
-        ((T.checkValid S S' S'.pathEq && decide (Y = X.restrict T S S')) ||
-          (c.valueTypes.checkSound &&
-            T.checkVValid c.valueTypes S S' (S'.pathEqV c.valueTypes) &&
-            X.litsFit c.valueTypes && decide (Y = X.vrestrictLit c.valueTypes T S S')))
+      sx == t && sy == s && c.valueTypes.checkSound && S.checkWellFormed &&
+        S'.checkWellFormed && X.check S' &&
+        T.checkVValid c.valueTypes S S' (S'.pathEqV c.valueTypes) &&
+        X.litsFit c.valueTypes && decide (Y = X.vrestrictLit c.valueTypes T S S')
     | _, _, _, _ => false
+  | .agreement p l r T₁ T₂ x y =>
+    match c.schema? p, c.schema? l, c.schema? r, c.state? x, c.state? y with
+    | some P, some S₁, some S₂, some (sx, X), some (sy, Y) =>
+      sx == l && sy == r && c.valueTypes.checkSound && P.checkWellFormed &&
+        S₁.checkWellFormed && S₂.checkWellFormed && X.check S₁ && Y.check S₂ &&
+        T₁.checkVValid c.valueTypes P S₁ (S₁.pathEqV c.valueTypes) &&
+        T₂.checkVValid c.valueTypes P S₂ (S₂.pathEqV c.valueTypes) &&
+        X.litsFit c.valueTypes && Y.litsFit c.valueTypes &&
+        decide (X.vrestrictLit c.valueTypes T₁ P S₁ = Y.vrestrictLit c.valueTypes T₂ P S₂)
+    | _, _, _, _, _ => false
+  | .conformance p l r T₁ T₂ x y h =>
+    match c.schema? p, c.schema? l, c.schema? r, c.state? x, c.state? y with
+    | some P, some S₁, some S₂, some (sx, X), some (sy, Y) =>
+      sx == l && sy == r && c.valueTypes.checkSound && P.checkWellFormed &&
+        S₁.checkWellFormed && S₂.checkWellFormed && X.check S₁ && Y.check S₂ &&
+        T₁.checkVValid c.valueTypes P S₁ (S₁.pathEqV c.valueTypes) &&
+        T₂.checkVValid c.valueTypes P S₂ (S₂.pathEqV c.valueTypes) &&
+        X.litsFit c.valueTypes && Y.litsFit c.valueTypes &&
+        h.check P (Y.vrestrictLit c.valueTypes T₂ P S₂) (X.vrestrictLit c.valueTypes T₁ P S₁)
+    | _, _, _, _, _ => false
+  | .normalForm s t T => match c.schema? s, c.schema? t with
+    | some S, some S' => S.checkWellFormed && S'.checkWellFormed &&
+        T.checkValid S S' S'.pathEq && T.checkNormalForm S S'
+    | _, _ => false
   | .homomorphism x y h => match c.state? x, c.state? y with
     | some (sx, X), some (sy, Y) => sx == sy && match c.schema? sx with
       | some S => S.checkWellFormed && X.check S && Y.check S && h.check S X Y
@@ -250,8 +285,17 @@ def Holds : Claim → Prop
     ∃ S, c.schema? s = some S ∧ ∀ a ∈ S.attrs, c.valueTypes.admits a.tgt = true
   | .restriction s t T x y => ∃ (S S' : Schema) (X Y : FinState LitK),
       c.schema? s = some S ∧ c.schema? t = some S' ∧ c.state? x = some (t, X) ∧
-      c.state? y = some (s, Y) ∧
-      (FinState.IsRestriction T S S' X Y ∨ FinState.IsVRestriction c.valueTypes T S S' X Y)
+      c.state? y = some (s, Y) ∧ FinState.IsVRestriction c.valueTypes T S S' X Y
+  | .agreement p l r T₁ T₂ x y => ∃ (P S₁ S₂ : Schema) (X Y : FinState LitK),
+      c.schema? p = some P ∧ c.schema? l = some S₁ ∧ c.schema? r = some S₂ ∧
+      c.state? x = some (l, X) ∧ c.state? y = some (r, Y) ∧
+      FinState.Agrees c.valueTypes T₁ T₂ P S₁ S₂ X Y
+  | .conformance p l r T₁ T₂ x y _ => ∃ (P S₁ S₂ : Schema) (X Y : FinState LitK),
+      c.schema? p = some P ∧ c.schema? l = some S₁ ∧ c.schema? r = some S₂ ∧
+      c.state? x = some (l, X) ∧ c.state? y = some (r, Y) ∧
+      FinState.ConformsTo c.valueTypes T₁ T₂ P S₁ S₂ X Y
+  | .normalForm s t T => ∃ (S S' : Schema) (hS' : S'.WellFormed) (hT : T.Valid S S'),
+      c.schema? s = some S ∧ c.schema? t = some S' ∧ Nonempty (T.NormalForm hS' hT)
   | .homomorphism x y _ => ∃ (s : String) (S : Schema) (X Y : FinState LitK)
       (hX : X.check S = true) (hY : Y.check S = true),
       c.state? x = some (s, X) ∧ c.state? y = some (s, Y) ∧ c.schema? s = some S ∧
@@ -390,21 +434,87 @@ theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl 
     | none => simp [hs, ht, hx, hy] at h
     | some q =>
     obtain ⟨sy, Y⟩ := q
-    simp only [hs, ht, hx, hy, Bool.and_eq_true, Bool.or_eq_true, beq_iff_eq,
-      decide_eq_true_eq] at h
-    obtain ⟨⟨⟨⟨⟨rfl, rfl⟩, wS⟩, wS'⟩, hX⟩, h⟩ := h
+    simp only [hs, ht, hx, hy, Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
+    obtain ⟨⟨⟨⟨⟨⟨⟨⟨rfl, rfl⟩, hL⟩, wS⟩, wS'⟩, hX⟩, hT⟩, hfit⟩, rfl⟩ := h
     have wS₁ := (Schema.checkWellFormed_iff S).mp wS
     have wS'₁ := (Schema.checkWellFormed_iff S').mp wS'
-    refine ⟨S, S', X, Y, hs, ht, hx, hy, ?_⟩
-    rcases h with ⟨hT, rfl⟩ | ⟨⟨⟨hL, hT⟩, hfit⟩, rfl⟩
-    · have hT' := Translation.checkValid_sound (fun a _ _ hp => Schema.pathEq_sound wS'₁ a hp) hT
-      exact Or.inl ⟨wS'₁, hT', hX, FinState.restrict_check wS₁ hX hT',
-        ⟨FinState.restrictIso wS₁ wS'₁ hX hT'⟩⟩
-    · have hT' := Translation.checkVValid_sound
-        (fun a _ _ hp => Schema.pathEqV_sound wS'₁ a hp) hT
-      have hL' := (TypeList.checkSound_iff _).mp hL
-      exact Or.inr (FinState.isVRestriction_vrestrictLit hL' wS₁ wS'₁ hT'
-        (FinState.litsFit_of_check hL' hfit) hX)
+    have hT' := Translation.checkVValid_sound
+      (fun a _ _ hp => Schema.pathEqV_sound wS'₁ a hp) hT
+    have hL' := (TypeList.checkSound_iff _).mp hL
+    exact ⟨S, S', X, _, hs, ht, hx, hy, FinState.isVRestriction_vrestrictLit hL' wS₁ wS'₁ hT'
+      (FinState.litsFit_of_check hL' hfit) hX⟩
+  | agreement p l r T₁ T₂ x y =>
+    simp only [checkClaim] at h
+    cases hp : c.schema? p with
+    | none => simp [hp] at h
+    | some P =>
+    cases hl : c.schema? l with
+    | none => simp [hp, hl] at h
+    | some S₁ =>
+    cases hr : c.schema? r with
+    | none => simp [hp, hl, hr] at h
+    | some S₂ =>
+    cases hx : c.state? x with
+    | none => simp [hp, hl, hr, hx] at h
+    | some u =>
+    obtain ⟨sx, X⟩ := u
+    cases hy : c.state? y with
+    | none => simp [hp, hl, hr, hx, hy] at h
+    | some v =>
+    obtain ⟨sy, Y⟩ := v
+    simp only [hp, hl, hr, hx, hy, Bool.and_eq_true, beq_iff_eq, decide_eq_true_eq] at h
+    obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨rfl, rfl⟩, hL⟩, wP⟩, w₁⟩, w₂⟩, hX⟩, hY⟩, hT₁⟩, hT₂⟩, hfX⟩, hfY⟩, he⟩ := h
+    have wP' := (Schema.checkWellFormed_iff P).mp wP
+    have w₁' := (Schema.checkWellFormed_iff S₁).mp w₁
+    have w₂' := (Schema.checkWellFormed_iff S₂).mp w₂
+    have hL' := (TypeList.checkSound_iff _).mp hL
+    exact ⟨P, S₁, S₂, X, Y, hp, hl, hr, hx, hy, FinState.agrees_of_vrestrictLit_eq hL' wP' w₁' w₂'
+      (Translation.checkVValid_sound (fun a _ _ hq => Schema.pathEqV_sound w₁' a hq) hT₁)
+      (Translation.checkVValid_sound (fun a _ _ hq => Schema.pathEqV_sound w₂' a hq) hT₂)
+      (FinState.litsFit_of_check hL' hfX) hX (FinState.litsFit_of_check hL' hfY) hY he⟩
+  | conformance p l r T₁ T₂ x y hh =>
+    simp only [checkClaim] at h
+    cases hp : c.schema? p with
+    | none => simp [hp] at h
+    | some P =>
+    cases hl : c.schema? l with
+    | none => simp [hp, hl] at h
+    | some S₁ =>
+    cases hr : c.schema? r with
+    | none => simp [hp, hl, hr] at h
+    | some S₂ =>
+    cases hx : c.state? x with
+    | none => simp [hp, hl, hr, hx] at h
+    | some u =>
+    obtain ⟨sx, X⟩ := u
+    cases hy : c.state? y with
+    | none => simp [hp, hl, hr, hx, hy] at h
+    | some v =>
+    obtain ⟨sy, Y⟩ := v
+    simp only [hp, hl, hr, hx, hy, Bool.and_eq_true, beq_iff_eq] at h
+    obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨rfl, rfl⟩, hL⟩, wP⟩, w₁⟩, w₂⟩, hX⟩, hY⟩, hT₁⟩, hT₂⟩, hfX⟩, hfY⟩, he⟩ := h
+    have wP' := (Schema.checkWellFormed_iff P).mp wP
+    have w₁' := (Schema.checkWellFormed_iff S₁).mp w₁
+    have w₂' := (Schema.checkWellFormed_iff S₂).mp w₂
+    have hL' := (TypeList.checkSound_iff _).mp hL
+    exact ⟨P, S₁, S₂, X, Y, hp, hl, hr, hx, hy, FinState.conformsTo_of_hom hL' wP' w₁' w₂'
+      (Translation.checkVValid_sound (fun a _ _ hq => Schema.pathEqV_sound w₁' a hq) hT₁)
+      (Translation.checkVValid_sound (fun a _ _ hq => Schema.pathEqV_sound w₂' a hq) hT₂)
+      (FinState.litsFit_of_check hL' hfX) hX (FinState.litsFit_of_check hL' hfY) hY hh he⟩
+  | normalForm s t T =>
+    simp only [checkClaim] at h
+    cases hs : c.schema? s with
+    | none => simp [hs] at h
+    | some S =>
+    cases ht : c.schema? t with
+    | none => simp [hs, ht] at h
+    | some S' =>
+      simp only [hs, ht, Bool.and_eq_true] at h
+      obtain ⟨⟨⟨wS, wS'⟩, hT⟩, hn⟩ := h
+      have wS₁ := (Schema.checkWellFormed_iff S).mp wS
+      have wS'₁ := (Schema.checkWellFormed_iff S').mp wS'
+      have hT' := Translation.checkValid_sound (fun a _ _ hp => Schema.pathEq_sound wS'₁ a hp) hT
+      exact ⟨S, S', wS'₁, hT', hs, ht, ⟨Translation.normalForm wS₁ wS'₁ hT' hn⟩⟩
   | homomorphism x y hh =>
     simp only [checkClaim] at h
     cases hx : c.state? x with
@@ -472,6 +582,9 @@ def Claim.describe : Claim → String
   | .valueTypes => "the list of value types is sound"
   | .declared s => s!"the value types of {s} are declared"
   | .restriction s t _ x y => s!"{y} is the restriction of {x} along {s} → {t}"
+  | .agreement p l r _ _ x y => s!"{x} of {l} and {y} of {r} agree on {p}"
+  | .conformance p l r _ _ x y _ => s!"{y} of {r} conforms to {x} of {l} on {p}"
+  | .normalForm s t _ => s!"the translation {s} → {t} has a normal form"
   | .homomorphism x y _ => s!"a homomorphism {x} → {y}"
   | .pathEquality s o l r =>
     s!"in {s}, the paths {String.intercalate "." l} and {String.intercalate "." r} out of \
@@ -516,6 +629,30 @@ def Claim.fromJson (j : Json) : Except String Claim := do
     let x ← j.getObjValAs? String "state"
     let y ← j.getObjValAs? String "result"
     pure (.restriction s t T x y)
+  | "agreement" => do
+    let p ← j.getObjValAs? String "shared"
+    let l ← j.getObjValAs? String "left"
+    let r ← j.getObjValAs? String "right"
+    let T₁ ← Translation.fromJson (← j.getObjVal? "leftTranslation")
+    let T₂ ← Translation.fromJson (← j.getObjVal? "rightTranslation")
+    let x ← j.getObjValAs? String "leftState"
+    let y ← j.getObjValAs? String "rightState"
+    pure (.agreement p l r T₁ T₂ x y)
+  | "conformance" => do
+    let p ← j.getObjValAs? String "shared"
+    let l ← j.getObjValAs? String "left"
+    let r ← j.getObjValAs? String "right"
+    let T₁ ← Translation.fromJson (← j.getObjVal? "leftTranslation")
+    let T₂ ← Translation.fromJson (← j.getObjVal? "rightTranslation")
+    let x ← j.getObjValAs? String "leftState"
+    let y ← j.getObjValAs? String "rightState"
+    let h ← FinHom.fromJson (← j.getObjVal? "homomorphism")
+    pure (.conformance p l r T₁ T₂ x y h)
+  | "normalForm" => do
+    let s ← j.getObjValAs? String "source"
+    let t ← j.getObjValAs? String "target"
+    let T ← Translation.fromJson (← j.getObjVal? "translation")
+    pure (.normalForm s t T)
   | "homomorphism" => do
     let x ← j.getObjValAs? String "from"
     let y ← j.getObjValAs? String "to"
@@ -541,7 +678,7 @@ def Claim.fromJson (j : Json) : Except String Claim := do
 
 def Certificate.fromJson (j : Json) : Except String Certificate := do
   let fmt ← j.getObjValAs? String "format"
-  unless fmt == formatVersion do throw s!"unsupported format {fmt}"
+  unless readableFormats.contains fmt do throw s!"unsupported format {fmt}"
   let kind ← j.getObjValAs? String "kind"
   unless kind == "certificate" do throw s!"expected a certificate, found {kind}"
   let producer := (j.getObjValAs? String "producer").toOption.getD ""

@@ -404,7 +404,7 @@
     "from": {"named": "OrderStatus"}}],
   "routeEquations": [],
   "kind": "map",
-  "format": "csd-ddd/1",
+  "format": "csd-ddd/2",
   "contexts":
   [{"schema":
     {"valueObjects": [],
@@ -597,6 +597,7 @@
   [{"translation": {"generators": [], "entities": []},
     "target": "Catalog",
     "source": "CatalogPL",
+    "publishes": true,
     "name": "catalogPL_catalog"},
    {"translation":
     {"generators":
@@ -605,12 +606,14 @@
      "entities": [{"target": "Product", "source": "Variant"}]},
     "target": "Orders",
     "source": "CatalogPL",
+    "publishes": false,
     "name": "catalogPL_orders"},
    {"translation":
     {"generators": [{"path": ["placedAt", "date"], "name": "Order.placedOn"}],
      "entities": []},
     "target": "Orders",
     "source": "OrdersPL",
+    "publishes": true,
     "name": "ordersPL_orders"},
    {"translation":
     {"generators":
@@ -623,17 +626,20 @@
       {"target": "Invoice", "source": "Order"}]},
     "target": "Payments",
     "source": "OrdersPL",
+    "publishes": false,
     "name": "ordersPL_payments"},
    {"translation": {"generators": [], "entities": []},
     "target": "Orders",
     "source": "Customers",
+    "publishes": false,
     "name": "customers_orders"},
    {"translation": {"generators": [], "entities": []},
     "target": "Shipping",
     "source": "Customers",
+    "publishes": false,
     "name": "customers_shipping"}]},
  "kind": "workspace",
- "format": "csd-ddd/1",
+ "format": "csd-ddd/2",
  "expectations": [{"kernel": "Customers", "fullyFaithful": [true, true]}],
  "conversions":
  [{"value": "2026-11-04T08:30:00Z",

@@ -26,6 +26,13 @@ decided by `Certificate.checkClaim` alone, which is sound
 - gluing, restriction, homomorphism: the parts of the check that fail, with
   the problems of the schemas and translations involved and the names that two
   schemas share outside a kernel;
+- agreement: those parts, and each entity type and generator of the shared
+  schema on which the two restrictions differ (problem `disagree`);
+- conformance: those parts, and components that are not a homomorphism between
+  the two restrictions;
+- normal form: the problems of the schemas and of the translation, the entity
+  types the translation does not keep apart (`entitiesMerged`), and the problems
+  of the definitional extension;
 - path equality: the problems of the schema, a path that does not exist, two
   paths that do not end at the same object, and normal forms that differ;
 - conversion: a path of conversions that does not exist, a literal that is not
@@ -37,8 +44,8 @@ A context map document (`MapDoc`) is checked through the certificate of its
 claims (`MapDoc.certificate`): its list of value types is sound, each context is
 well formed and declares its value types, and each arrow is a translation from
 the schema of its source to the schema of its target, valid with conversions,
-that keeps the keys of its source (problem `keyNotKept`). `MapDoc.report` gives
-the results for the list, by context and by arrow.
+that keeps the keys of its source (problem `keyNotKept`). The conditions on the
+map as a whole, and `MapDoc.report`, are in `MapCheck.lean`.
 
 Every problem is a JSON object with a `kind`, the names it concerns, and a
 `message`. `Certificate.report` and `MapDoc.report` are the output of
@@ -176,6 +183,11 @@ def Claim.refFields : Claim → List (String × Json)
   | .declared s => [("claim", .str "declared"), ("schema", .str s)]
   | .restriction s t _ x y => [("claim", .str "restriction"), ("source", .str s),
       ("target", .str t), ("state", .str x), ("result", .str y)]
+  | .agreement p l r _ _ x y => [("claim", .str "agreement"), ("shared", .str p),
+      ("left", .str l), ("right", .str r), ("leftState", .str x), ("rightState", .str y)]
+  | .conformance p l r _ _ x y _ => [("claim", .str "conformance"), ("shared", .str p),
+      ("left", .str l), ("right", .str r), ("leftState", .str x), ("rightState", .str y)]
+  | .normalForm s t _ => [("claim", .str "normalForm"), ("source", .str s), ("target", .str t)]
   | .homomorphism x y _ => [("claim", .str "homomorphism"), ("from", .str x), ("to", .str y)]
   | .pathEquality s o l r => [("claim", .str "pathEquality"), ("schema", .str s),
       ("from", o.toJson), ("lhs", Lean.toJson l), ("rhs", Lean.toJson r)]
@@ -277,21 +289,80 @@ def explain : Claim → List Json
       c.schemaProblems s ++ c.schemaProblems t ++
       (T.vproblems c.valueTypes S S' (S'.pathEqV c.valueTypes)).map
         (Translation.Problem.toJson s t) ++
-      failing [(X.check S', "stateCheck", s!"{x} does not pass the check of {t}")] ++
-      (if T.checkValid S S' S'.pathEq then
-        failing [(decide (Y = X.restrict T S S'), "restriction",
+      failing [(X.check S', "stateCheck", s!"{x} does not pass the check of {t}"),
+        (c.valueTypes.checkSound, "valueTypesUnsound", "the list of value types is not sound"),
+        (X.litsFit c.valueTypes, "literals",
+          s!"the literals of {x} are not values of their types in normal form"),
+        (decide (Y = X.vrestrictLit c.valueTypes T S S'), "restriction",
           s!"{y} is not the restriction of {x} along {s} → {t}")]
-      else
-        failing [(c.valueTypes.checkSound, "valueTypesUnsound",
-            "the list of value types is not sound"),
-          (X.litsFit c.valueTypes, "literals",
-            s!"the literals of {x} are not values of their types in normal form"),
-          (decide (Y = X.vrestrictLit c.valueTypes T S S'), "restriction",
-            s!"{y} is not the restriction of {x} along {s} → {t} with conversions")])
     | _, _, _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
       (if (c.schema? t).isNone then [unknown "schema" t] else []) ++
       (if (c.state? x).isNone then [unknown "state" x] else []) ++
       (if (c.state? y).isNone then [unknown "state" y] else [])
+  | .agreement p l r T₁ T₂ x y =>
+    match c.schema? p, c.schema? l, c.schema? r, c.state? x, c.state? y with
+    | some P, some S₁, some S₂, some (sx, X), some (sy, Y) =>
+      let A := X.vrestrictLit c.valueTypes T₁ P S₁
+      let B := Y.vrestrictLit c.valueTypes T₂ P S₂
+      failing [(sx == l, "stateSchema", s!"{x} is a state of {sx}, not of {l}"),
+        (sy == r, "stateSchema", s!"{y} is a state of {sy}, not of {r}")] ++
+      c.schemaProblems p ++ c.schemaProblems l ++ c.schemaProblems r ++
+      (T₁.vproblems c.valueTypes P S₁ (S₁.pathEqV c.valueTypes)).map
+        (Translation.Problem.toJson p l) ++
+      (T₂.vproblems c.valueTypes P S₂ (S₂.pathEqV c.valueTypes)).map
+        (Translation.Problem.toJson p r) ++
+      failing [(X.check S₁, "stateCheck", s!"{x} does not pass the check of {l}"),
+        (Y.check S₂, "stateCheck", s!"{y} does not pass the check of {r}"),
+        (c.valueTypes.checkSound, "valueTypesUnsound", "the list of value types is not sound"),
+        (X.litsFit c.valueTypes, "literals",
+          s!"the literals of {x} are not values of their types in normal form"),
+        (Y.litsFit c.valueTypes, "literals",
+          s!"the literals of {y} are not values of their types in normal form")] ++
+      (P.entities.filter fun e => A.size e != B.size e).map (fun e =>
+        problemJson "disagree" [("shared", .str p), ("entity", .str e)]
+          s!"{x} gives {p} {A.size e} entities of {e} and {y} gives it {B.size e}") ++
+      (P.refs.filter fun g => A.refCol g.src g.name != B.refCol g.src g.name).map (fun g =>
+        problemJson "disagree" [("shared", .str p), ("generator", .str s!"{g.src}.{g.name}")]
+          s!"{x} and {y} give {p} different values of {g.src}.{g.name}") ++
+      (P.attrs.filter fun g => A.attrCol g.src g.name != B.attrCol g.src g.name).map (fun g =>
+        problemJson "disagree" [("shared", .str p), ("generator", .str s!"{g.src}.{g.name}")]
+          s!"{x} and {y} give {p} different values of {g.src}.{g.name}")
+    | _, _, _, _, _ => ([p, l, r].filterMap fun n =>
+        if (c.schema? n).isNone then some (unknown "schema" n) else none) ++
+      ([x, y].filterMap fun n => if (c.state? n).isNone then some (unknown "state" n) else none)
+  | .conformance p l r T₁ T₂ x y h =>
+    match c.schema? p, c.schema? l, c.schema? r, c.state? x, c.state? y with
+    | some P, some S₁, some S₂, some (sx, X), some (sy, Y) =>
+      failing [(sx == l, "stateSchema", s!"{x} is a state of {sx}, not of {l}"),
+        (sy == r, "stateSchema", s!"{y} is a state of {sy}, not of {r}")] ++
+      c.schemaProblems p ++ c.schemaProblems l ++ c.schemaProblems r ++
+      (T₁.vproblems c.valueTypes P S₁ (S₁.pathEqV c.valueTypes)).map
+        (Translation.Problem.toJson p l) ++
+      (T₂.vproblems c.valueTypes P S₂ (S₂.pathEqV c.valueTypes)).map
+        (Translation.Problem.toJson p r) ++
+      failing [(X.check S₁, "stateCheck", s!"{x} does not pass the check of {l}"),
+        (Y.check S₂, "stateCheck", s!"{y} does not pass the check of {r}"),
+        (c.valueTypes.checkSound, "valueTypesUnsound", "the list of value types is not sound"),
+        (X.litsFit c.valueTypes, "literals",
+          s!"the literals of {x} are not values of their types in normal form"),
+        (Y.litsFit c.valueTypes, "literals",
+          s!"the literals of {y} are not values of their types in normal form"),
+        (h.check P (Y.vrestrictLit c.valueTypes T₂ P S₂) (X.vrestrictLit c.valueTypes T₁ P S₁),
+          "homomorphism", s!"the components do not form a homomorphism from the restriction \
+            of {y} to the restriction of {x} on {p}")]
+    | _, _, _, _, _ => ([p, l, r].filterMap fun n =>
+        if (c.schema? n).isNone then some (unknown "schema" n) else none) ++
+      ([x, y].filterMap fun n => if (c.state? n).isNone then some (unknown "state" n) else none)
+  | .normalForm s t T => match c.schema? s, c.schema? t with
+    | some S, some S' =>
+      c.schemaProblems s ++ c.schemaProblems t ++
+      (T.problems S S' S'.pathEq).map (Translation.Problem.toJson s t) ++
+      (S.entities.filter fun e => (S.entities.filter fun e' => T.ent e' == T.ent e).length > 1).map
+        (fun e => problemJson "entitiesMerged" [("entity", .str e), ("image", .str (T.ent e))]
+          s!"{e} and another entity type of {s} both go to {T.ent e} in {t}") ++
+      (T.ext S S').problems.map (Schema.Problem.toJson s!"the extension of {t} along {s} → {t}")
+    | _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
+      (if (c.schema? t).isNone then [unknown "schema" t] else [])
   | .homomorphism x y h => match c.state? x, c.state? y with
     | some (sx, X), some (sy, Y) =>
       failing [(sx == sy, "stateSchema", s!"{x} is a state of {sx} and {y} a state of {sy}")] ++
@@ -368,35 +439,10 @@ def certificate : Certificate where
     M.arrows.flatMap fun a =>
       [.translation a.2.1 a.2.2.1 a.2.2.2, .keysKept a.2.1 a.2.2.1 a.2.2.2]
 
-/-- The report of a context map document: the list of value types, then each
-context, with the problems of its well-formedness and of its value types, and each
-arrow. -/
-def report : Json :=
-  let c := M.certificate
-  let (typesOk, typeProblems) := c.result .valueTypes
-  let valueTypes := Json.mkObj [("ok", .bool typesOk),
-    ("problems", Json.arr typeProblems.toArray)]
-  let contexts := M.contexts.map fun ctx =>
-    let (ok₁, ps₁) := c.result (.wellFormed ctx.1)
-    let (ok₂, ps₂) := c.result (.declared ctx.1)
-    Json.mkObj [("name", .str ctx.1), ("ok", .bool (ok₁ && ok₂)),
-      ("problems", Json.arr (ps₁ ++ ps₂).toArray)]
-  let arrows := M.arrows.map fun a =>
-    let (ok₁, ps₁) := c.result (.translation a.2.1 a.2.2.1 a.2.2.2)
-    let (ok₂, ps₂) := c.result (.keysKept a.2.1 a.2.2.1 a.2.2.2)
-    Json.mkObj [("name", .str a.1), ("source", .str a.2.1), ("target", .str a.2.2.1),
-      ("ok", .bool (ok₁ && ok₂)),
-      ("problems", Json.arr (ps₁ ++ ps₂.filter fun p => !ps₁.contains p).toArray)]
-  let failed := (valueTypes :: contexts ++ arrows).filter fun j => j.getObjValD "ok" != .bool true
-  Json.mkObj [("format", .str formatVersion), ("kind", .str "mapReport"),
-    ("valueTypes", valueTypes), ("contexts", Json.arr contexts.toArray),
-    ("arrows", Json.arr arrows.toArray),
-    ("failed", (failed.length : Nat))]
-
 /-- A context map document, read from JSON with its format and kind checked. -/
 def ofJson (j : Json) : Except String MapDoc := do
   let fmt ← j.getObjValAs? String "format"
-  unless fmt == formatVersion do throw s!"unsupported format {fmt}"
+  unless readableFormats.contains fmt do throw s!"unsupported format {fmt}"
   let kind ← j.getObjValAs? String "kind"
   unless kind == "map" do throw s!"expected a map, found {kind}"
   MapDoc.fromJson j

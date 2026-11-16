@@ -1,4 +1,4 @@
-import DDD.Report
+import DDD.MapCheck
 import DDD.Examples.Integration
 
 /-!
@@ -13,9 +13,13 @@ import DDD.Examples.Integration
   translation with wrong images has one problem per wrong image.
 - The report of a context map document with a broken list of value types, a
   broken context, a context with undeclared value types, a failing arrow, an
-  arrow that does not keep a key, and an arrow to a missing context
-  (`brokenMap`). `cli/CsdExport.lean` writes it to `cli/test/broken-map.json`,
-  which CI checks with `csd-check --json`.
+  arrow that does not keep a key, an arrow to a missing context, an arrow out of
+  a kernel that renames, a published language that reaches a member of an
+  aggregate, two contexts on a cycle, and two declared route equations that do
+  not hold (`brokenMap`). `cli/CsdExport.lean` writes it to
+  `cli/test/broken-map.json`, which CI checks with `csd-check --json`.
+- Documents with a published language that merges entity types (`mergedMap`) and
+  with names declared twice (`twiceMap`).
 -/
 
 set_option linter.hashCommand false
@@ -120,19 +124,39 @@ def streetToCity : Translation :=
 example : streetToCity.keysNotKept Orders.published Payments.schema =
     [⟨"Address", ["street", "city"]⟩] := by decide
 
-/-- A list of value types with an empty enumeration and a built-in name, four
-contexts, one of them broken and one with undeclared value types, and four
-arrows: the valid translation into Payments, the failing one, one that does not
-keep a key, and one to a context the document does not have. -/
+/-- The lines of invoices, as a schema of its own. -/
+def lines : Schema where
+  entities := ["InvoiceLine"]
+  attrs := [⟨"quantity", "InvoiceLine", .int⟩]
+
+/-- A schema with one entity type. -/
+def thing : Schema where
+  entities := ["Thing"]
+
+/-- A list of value types with an empty enumeration and a built-in name; contexts,
+one of them broken, one with undeclared value types and one marked as a kernel;
+and arrows: the valid translation into Payments, the failing one, one that does
+not keep a key, one to a context the document does not have, one out of the
+kernel that renames customers to payers, one marked as publishing that sends its
+entity type to a member of the invoice aggregate, and two that form a cycle. Two
+route equations are declared: one between two routes with different translations,
+one whose right side names no arrow. -/
 def brokenMap : MapDoc where
   valueTypes := { decls := [("PaymentMethod", .enum ["card", "invoice", "transfer"]),
     ("Size", .enum []), ("string", .over .string)] }
   contexts := [("OrdersPL", Orders.published, false), ("Payments", Payments.schema, false),
-    ("Broken", broken, false), ("Untyped", untyped, false)]
+    ("Broken", broken, false), ("Untyped", untyped, false),
+    ("Customers", Integration.customers, true), ("Lines", lines, false),
+    ("Ping", thing, false), ("Pong", thing, false)]
   arrows := [("billing", "OrdersPL", "Payments", Integration.ordersPayments),
     ("billingToShipping", "OrdersPL", "Payments", Integration.ordersPaymentsBillToShipTo),
     ("streetToCity", "OrdersPL", "Payments", streetToCity),
-    ("dangling", "OrdersPL", "Nowhere", {})]
+    ("dangling", "OrdersPL", "Nowhere", {}),
+    ("payers", "Customers", "Payments", { entities := [("Customer", "Payer")] }),
+    ("publishLines", "Lines", "Payments", {}),
+    ("ping", "Ping", "Pong", {}), ("pong", "Pong", "Ping", {})]
+  published := ["publishLines"]
+  routeEqns := [(["billing"], ["streetToCity"]), (["billing"], ["nowhere"])]
 
 /-- The kinds of the problems of the entries of a report, with their names and
 results. -/
@@ -153,16 +177,45 @@ def summary (entries : Json) : List (String × Bool × List String) :=
      "aggregateEntity", "aggregateOverlap", "missingOwner", "ownerCycle", "aggregateBoundary",
      "valueObjectFields", "valueObjectEntity", "keyEntity", "keyEmpty", "keyField",
      "subtypeEntity", "subtypeReference"]),
-   ("Untyped", false, ["undeclaredValueType", "nestedOptional"])]
+   ("Untyped", false, ["undeclaredValueType", "nestedOptional"]),
+   ("Customers", true, []), ("Lines", true, []), ("Ping", true, []), ("Pong", true, [])]
 
 #guard summary (Json.arr #[(brokenMap.report.getObjValD "valueTypes").setObjVal! "name" ""]) ==
   [("", false, ["emptyEnumeration", "builtinTypeName"])]
 
 #guard summary (brokenMap.report.getObjValD "arrows") ==
   [("billing", true, []), ("billingToShipping", false, ["equationImage"]),
-   ("streetToCity", false, ["keyNotKept"]), ("dangling", false, ["unknownSchema"])]
+   ("streetToCity", false, ["keyNotKept"]), ("dangling", false, ["unknownSchema"]),
+   ("payers", false, ["kernelTranslation"]), ("publishLines", false, ["publishedMember"]),
+   ("ping", true, []), ("pong", true, [])]
 
-#guard brokenMap.report.getObjValD "failed" == (6 : Nat)
+-- The map as a whole: the cycle, and the two declared equations.
+#guard summary (Json.arr #[(brokenMap.report.getObjValD "map").setObjVal! "name" ""]) ==
+  [("", false, ["cycle", "routeEquation", "routeEquation"])]
+
+#guard brokenMap.report.getObjValD "failed" == (9 : Nat)
+
+-- The conditions on the map: the names are distinct, and the other four fail.
+#guard brokenMap.conditions.map (·.2.1) == [true, false, false, false, false]
+#guard !brokenMap.check
+
+/-- The published language of Catalog marked as published by Orders: its two entity
+types go to one. -/
+def mergedMap : MapDoc where
+  contexts := [("CatalogPL", Catalog.published, false), ("Orders", Orders.schema, false)]
+  arrows := [("catalogPL_orders", "CatalogPL", "Orders", Integration.catalogOrders)]
+  published := ["catalogPL_orders"]
+
+#guard summary (mergedMap.report.getObjValD "arrows") ==
+  [("catalogPL_orders", false, ["entitiesMerged", "entitiesMerged"])]
+
+/-- A context and an arrow declared twice. -/
+def twiceMap : MapDoc where
+  contexts := [("Ping", thing, false), ("Pong", thing, false), ("Ping", thing, false)]
+  arrows := [("ping", "Ping", "Pong", {}), ("ping", "Ping", "Pong", {})]
+
+#guard summary (Json.arr #[(twiceMap.report.getObjValD "map").setObjVal! "name" ""]) ==
+  [("", false, ["duplicateContext", "duplicateArrow"])]
 
 -- The document round-trips through its JSON text.
 #guard match Json.parse brokenMap.toJson.compress >>= MapDoc.ofJson with
