@@ -869,6 +869,19 @@ two lists among the states that satisfy the keys (`merge`); a list that names a
 product differently does not merge (`no_merge`); the checks run in the kernel.
 `Examples/Sigma.lean` has the adjunction with keys along OrdersPL → Payments.
 
+The editor follows the format of the revision after step 14 (csd-editor 4b87d3f,
+on its branch `claude/format-2`, not yet on `main` nor on the A52): it writes
+`csd-ddd/2` and reads `csd-ddd/1`, marks an arrow as a published language from
+its menu, completes the image of an attribute with the conversions out of its
+value type, and lists the problems of the map with the context map. The import
+of Context Mapper models marks the arrow from a published language into its
+upstream, and gives the entity types it adds to a downstream context the
+published keys: without them the arrow into the downstream context failed
+`keyNotKept`, which the editor's browser test shows on a model of two contexts.
+The 55 example models hold 213 of their 218 results as before. The `csd-check`
+on the A52 is the one of step 13, which refuses `csd-ddd/2`; the editor and the
+checker are deployed together.
+
 ## Next steps
 
 In order. Each item states what it defines and proves, and when it is done.
@@ -1885,3 +1898,8 @@ Next step 15:
   proof uses the terminal state, has no counterpart for them.
 - The Julia side and `csd-check` do not compute the closure; it is a function and
   theorems of the library, used with `decide` in the examples.
+- The import of Context Mapper models gives the entity types it adds to a
+  downstream context the keys of the published language, on the published fields
+  it also adds. Such an entity type stands for the published one, so it is
+  identified the same way; with `keyNotKept` a failure on every arrow, an import
+  without the keys does not pass.
