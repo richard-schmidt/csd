@@ -1,4 +1,4 @@
-import DDD.StateSigma
+import DDD.Closure
 import DDD.Examples.Integration
 import DDD.Examples.Values
 
@@ -23,6 +23,11 @@ has two values, `nontrivial`).
 
 States of each schema have all limits and colimits; pushouts, which merge two
 states along a shared sub-state, are computed pointwise.
+
+With keys (`DDD/Closure.lean`): along OrdersPL → Payments the closure of `Σ_T` is
+left adjoint to `Δ_T` from the states of Payments that satisfy the keys
+(`ordersInvoicesKeyed`), and `Δ_T` of such a state satisfies the keys of OrdersPL,
+since the translation keeps them (`ordersInvoices_keys`).
 -/
 
 namespace DDD.Examples.Sigma
@@ -86,6 +91,21 @@ noncomputable def ordersInvoices :
     sigmaStateFunctor (K := K) ordersPayments_attrBijective ⊣
       restrictStateFunctor Payments.wellFormed ordersPayments_valid :=
   sigmaStateAdjunction ordersPayments_attrBijective
+
+/-- With keys: the closure of `Σ_T` along OrdersPL → Payments is left adjoint to
+`Δ_T` from the states of Payments that satisfy the keys, on the states of OrdersPL
+whose `Σ_T` is consistent. -/
+noncomputable def ordersInvoicesKeyed :
+    keyedSigma (K := K) ordersPayments_attrBijective ⊣
+      keyedRestrict ordersPayments_attrBijective :=
+  keyedSigmaAdjunction ordersPayments_attrBijective
+
+/-- OrdersPL → Payments keeps keys, so `Δ_T` of a state of Payments that satisfies
+the keys satisfies the keys of OrdersPL. -/
+theorem ordersInvoices_keys {Y : Payments.schema.State K} (hY : Y.Keys) :
+    (restrictState Payments.wellFormed ordersPayments_valid Y).Keys :=
+  restrictState_keys Orders.published_wellFormed Payments.wellFormed ordersPayments_valid
+    (Integration.keysKept Arrow.ordersPL_payments) hY
 
 /-! ## Arrows without `Σ_T` -/
 

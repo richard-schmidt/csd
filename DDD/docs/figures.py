@@ -861,6 +861,10 @@ def modules():
     f.arrow("LitInterp", "LitData", "", "acl")
     f.node("NormalForm", 520, 250, "NormalForm", w=100, h=30)
     f.arrow("Rename", "NormalForm", "", "acl")
+    f.node("Closure", 418, 250, "Closure", w=76, h=30)
+    f.arrow("Keys", "Closure", "", "acl")
+    f.node("ClosureData", 426, 308, "ClosureData", w=96, h=30)
+    f.arrow("Closure", "ClosureData", "", "acl")
     f.node("MapCheck", 1108, 192, "MapCheck", w=92, h=30)
     f.poly([(1170, 192), (1156, 192)], "muted")
     dy = 100
@@ -888,6 +892,7 @@ def modules():
     f.poly([(885, 72), (885, 84), (1045, 84), (1045, 365 + dy), (939, 365 + dy)], "muted")
     f.node("xSigma", 978, 288 + dy, "Sigma", "pl", w=80, h=30)
     f.node("xNormalForm", 874, 288 + dy, "NormalForm", w=104, h=30)
+    f.node("xClosure", 1105, 415 + dy, "Closure", w=84, h=30)
     f.poly([(978, 141), (978, 271 + dy)], "muted")
     f.poly([(600, 304 + dy), (600, 320 + dy), (978, 320 + dy), (978, 307 + dy)], "muted")
     f.poly([(470, 304 + dy), (470, 320 + dy), (600, 320 + dy), (600, 398 + dy)], "muted")
@@ -915,8 +920,9 @@ def modules():
     f.text(1160, 632, "LitData imports VData and Json, Certificate imports LitData, Keys and "
            "NormalForm, the example NormalForm imports NormalForm and Integration, Keys imports "
            "LitData,", "note", "end")
-    f.text(1160, 648, "MapCheck imports Report and ContextMap, and the examples Exchange, "
-           "Routes and Problems import MapCheck", "note", "end")
+    f.text(1160, 648, "MapCheck imports Report and ContextMap, the examples Exchange, "
+           "Routes and Problems import MapCheck, the example Closure imports ClosureData and "
+           "Json, the example Sigma imports Closure", "note", "end")
     return f
 
 

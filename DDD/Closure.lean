@@ -35,6 +35,12 @@ the entities that the keys force to be equal, and then what they reference.
   satisfies the keys of the source (`Translation.restrictState_keys`).
 - Limits: the limit of a non-empty diagram of states that satisfy the keys
   satisfies them (`limitState_keys`, `keys_of_isLimit`).
+- Colimits of states are detected at the entity types (`isColimitOfEntities`), and
+  a morphism of states that is a bijection at each entity type is an isomorphism
+  (`isoOfBijectiveEntities`).
+- States with conversions: the closure of the restriction to `S.cat`, extended to
+  the conversions (`VState.closure`), with the same universal property
+  (`VState.closureHomEquiv`).
 -/
 
 namespace DDD
@@ -308,6 +314,78 @@ theorem isPushout_closure (hX : X.Keys) (hY : Y.Keys) (hZ : Z.Keys)
     · rw [hP.inr_desc, ← Category.assoc]
       exact h₂
 
+/-! ## Isomorphisms and colimits, pointwise -/
+
+/-- A morphism of states is a bijection at each value type. -/
+theorem app_value_bijective (m : X ⟶ Y) (v : ValueType) :
+    Function.Bijective (m.α.app (S.valueObj v)) := by
+  have h : m.α.app (S.valueObj v) = (Y.values v).symm ∘ X.values v :=
+    funext fun x => m.app_value x
+  rw [h]
+  exact (Y.values v).symm.bijective.comp (X.values v).bijective
+
+/-- A morphism of states that is a bijection at every object is an isomorphism. -/
+noncomputable def isoOfBijective (m : X ⟶ Y) (h : ∀ a, Function.Bijective (m.α.app a)) :
+    X ≅ Y where
+  hom := m
+  inv :=
+    { α := (NatIso.ofComponents (fun a => (Equiv.ofBijective _ (h a)).toIso)
+        fun f => m.α.naturality f).inv
+      values := fun v y => by
+        obtain ⟨x, rfl⟩ := (h (S.valueObj v)).2 y
+        rw [m.values v x]
+        exact congrArg (X.values v) ((Equiv.ofBijective _ (h (S.valueObj v))).symm_apply_apply x) }
+  hom_inv_id := State.Hom.ext
+    (NatIso.ofComponents (fun a => (Equiv.ofBijective _ (h a)).toIso)
+      fun f => m.α.naturality f).hom_inv_id
+  inv_hom_id := State.Hom.ext
+    (NatIso.ofComponents (fun a => (Equiv.ofBijective _ (h a)).toIso)
+      fun f => m.α.naturality f).inv_hom_id
+
+/-- A morphism of states that is a bijection at every entity type is an
+isomorphism. -/
+noncomputable def isoOfBijectiveEntities (m : X ⟶ Y)
+    (h : ∀ (e : String) (he : S.IsOb (.entity e)),
+      Function.Bijective (m.α.app (S.obj ⟨.entity e, he⟩))) : X ≅ Y :=
+  isoOfBijective m fun a => by
+    obtain ⟨⟨o, ho⟩, rfl⟩ := S.obj_surjective a
+    cases o with
+    | entity e => exact h e ho
+    | value v => exact app_value_bijective m v
+
+/-- The initial state has no entities, so it satisfies the keys. -/
+theorem initial_keys : (initial S K).Keys := fun k _ he x =>
+  isEmptyElim (show (S.valueFunctor K).obj (S.obj ⟨.entity k.entity, he⟩) from x)
+
+section Colimits
+
+variable {J : Type} [SmallCategory J] {F : J ⥤ S.State K}
+
+/-- Colimits of states are detected at the entity types: a cocone whose image at
+each entity type is a colimit of sets is a colimit. -/
+noncomputable def isColimitOfEntities (c : Cocone F)
+    (h : ∀ (e : String) (he : S.IsOb (.entity e)), IsColimit
+      ((toEntity (S := S) (K := K) ⋙ (evaluation S.cat Type).obj (S.obj ⟨.entity e, he⟩)).mapCocone
+        c)) : IsColimit c := by
+  let d := (colimitCoconeIsColimit F).desc c
+  have hb : ∀ (e : String) (he : S.IsOb (.entity e)),
+      Function.Bijective (d.α.app (S.obj ⟨.entity e, he⟩)) := by
+    intro e he
+    let G := toEntity (S := S) (K := K) ⋙ (evaluation S.cat Type).obj (S.obj ⟨.entity e, he⟩)
+    have hG : IsColimit (G.mapCocone (colimitCocone F)) :=
+      isColimitOfPreserves G (colimitCoconeIsColimit F)
+    have hd : G.map d = (hG.coconePointUniqueUpToIso (h e he)).hom :=
+      hG.hom_ext fun j => by
+        rw [IsColimit.comp_coconePointUniqueUpToIso_hom]
+        change G.map ((colimitCocone F).ι.app j) ≫ G.map d = G.map (c.ι.app j)
+        rw [← G.map_comp, (colimitCoconeIsColimit F).fac]
+    have : IsIso (G.map d) := hd ▸ inferInstance
+    exact (isIso_iff_bijective (G.map d)).mp this
+  have : IsIso d := (isoOfBijectiveEntities d hb).isIso_hom
+  exact IsColimit.ofPointIso (colimitCoconeIsColimit F)
+
+end Colimits
+
 /-! ## Limits -/
 
 section Limits
@@ -336,6 +414,33 @@ theorem keys_of_isLimit [Nonempty J] {c : Cone F} (hc : IsLimit c)
 end Limits
 
 end State
+
+/-! ## States with conversions -/
+
+variable {S} {L : TypeList} {I : Interp L}
+
+/-- A state with conversions is consistent when its restriction to `S.cat` is. -/
+def VState.Consistent (X : S.VState I) : Prop := X.toState.Consistent
+
+/-- The closure of a consistent state with conversions: the closure of its
+restriction to `S.cat`, extended to the conversions. -/
+def VState.closure (hS : S.WellFormed) (X : S.VState I) (h : X.Consistent) : S.VState I :=
+  (X.toState.closure h).vext I hS
+
+theorem VState.closure_keys (hS : S.WellFormed) (X : S.VState I) (h : X.Consistent) :
+    (X.closure hS h).Keys := by
+  change ((X.toState.closure h).vext I hS).toState.Keys
+  rw [toState_vext]
+  exact State.closure_keys h
+
+/-- The universal property of the closure, for states with conversions: it is that
+of attributed states, through the equivalence of the two. -/
+noncomputable def VState.closureHomEquiv (hS : S.WellFormed) {X Y : S.VState I}
+    (h : X.Consistent) (hY : Y.Keys) : (X.closure hS h ⟶ Y) ≃ (X ⟶ Y) :=
+  (Functor.FullyFaithful.ofFullyFaithful (VState.toStateFunctor I S)).homEquiv.trans <|
+    (Iso.homCongr (eqToIso (toState_vext hS (X.toState.closure h))) (Iso.refl _)).trans <|
+      (State.closureHomEquiv h hY).trans
+        (Functor.FullyFaithful.ofFullyFaithful (VState.toStateFunctor I S)).homEquiv.symm
 
 end Schema
 

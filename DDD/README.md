@@ -257,6 +257,15 @@ kernel is a context with an inclusion into each context that shares it.
 - Theorem (data gluing): the states of `B₁ ⊔_K B₂` correspond to pairs of
   states of `B₁` and `B₂` with equal restrictions to `K`. A glued state satisfies
   the keys of the two schemas exactly when its restrictions satisfy their keys.
+- The closure (`Closure.lean`): the keys force some entities of a state to be
+  equal, namely those that agree on a key, and then what they reference. A state
+  is consistent when this identifies no two distinct values, which holds exactly
+  when the state has a morphism into a state that satisfies the keys. The closure
+  of a consistent state is its quotient, and the states that satisfy the keys are
+  reflective in the consistent states. A merge of two states is the closure of
+  their pushout: the pushout among the states that satisfy the keys when it is
+  consistent, and otherwise no such state receives both. `FinState.closure`
+  computes it on data (`ClosureData.lean`).
 - Along the arrows that are not glued, two relations between a state of one
   context and a state of another, on a schema `P` that translates into both
   (`VStates.lean`). They agree on `P` when their restrictions to `P` are
@@ -384,6 +393,10 @@ DDD/
   States.lean        states, migrations, gluing
   StateLimits.lean   limits and colimits of attributed states
   StateSigma.lean    Σ on attributed states, the condition for it
+  Closure.lean       the closure of a state under its keys, reflection, merges,
+                     Σ on states that satisfy the keys, limits and keys
+  ClosureData.lean   the closure and the sum of finite states, merges by keys
+                     on data
   Open.lean          open schemas, their composition and its laws
   Rename.lean        qualified names, isomorphisms of open schemas
   NormalForm.lean    the normal form of a translation: an inclusion into a
@@ -425,7 +438,7 @@ DDD/
                      of a document that passes, its report
   Examples/          Values, Literals, Catalog, Orders, Payments, Shipping,
                      Integration, Gluing, Routes, Structure, Conversions,
-                     Exchange, Merge, Sigma, Open, NormalForm, Problems
+                     Exchange, Merge, Sigma, Closure, Open, NormalForm, Problems
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check, a native executable (lake exe csd-check), and
                      csd-export, run with lake env lean --run;
@@ -814,6 +827,47 @@ Revision after the review of step 14 (see Decisions), complete, with no `sorry`:
 csd-editor at 65e95f0 passes its tests with this `csd-check`. It writes
 `csd-ddd/1`, does not mark publishing arrows and does not show the entry `map` of
 a report; the `csd-check` on the A52 is the one of step 13.
+
+Next step 15, the closure, is complete, with no `sorry`.
+The closure of a state (`Closure.lean`): `State.KeyRel` is the least family of
+equivalence relations on the elements of a state that the morphisms of the schema
+respect and that relates two entities whose fields of a key are related; a
+morphism into a state that satisfies the keys identifies related elements
+(`KeyRel.app_eq`). A state is consistent when the relation identifies no two
+distinct values, which holds exactly when it has a morphism into a state that
+satisfies the keys (`consistent_iff`). The closure of a consistent state is its
+quotient (`State.closure`); it satisfies the keys, and a morphism into a state
+that satisfies the keys factors through it in one way (`closureHomEquiv`), so the
+states that satisfy the keys are reflective in the consistent states
+(`closureAdjunction`, `keyedReflective`).
+Merges: the closure of a pushout of states that satisfy the keys is their pushout
+among such states (`isPushout_closure`, `merge_existsUnique`), and a pushout that
+is not consistent has no compatible pair of morphisms into such a state
+(`not_consistent_of_isPushout`).
+`Σ_T`: under `AttrBijective`, the closure of `Σ_T X` is left adjoint to `Δ_T` from
+the states that satisfy the keys, on the states whose `Σ_T X` is consistent
+(`Translation.keyedSigmaAdjunction`); `Σ_T X` is consistent exactly when `X` has a
+morphism into the restriction of a state that satisfies the keys
+(`sigmaConsistent_iff`). The adjunction does not use `KeysKept`; with it, `Δ_T`
+of a state that satisfies the keys satisfies the keys of the source.
+Limits: the limit of a non-empty diagram of states that satisfy the keys
+satisfies them (`keys_of_isLimit`); the terminal state does not in general
+(`Examples.Closure.terminal_not_keys`).
+States with conversions: `VState.closure` and `VState.closureHomEquiv`, through
+the equivalence with attributed states.
+On data (`ClosureData.lean`): `FinState.closure` merges the classes of entities
+that agree on a key or that two entities of one class refer to, builds the state
+of the classes, and checks it; `closure_closed` states that a result `closed` is
+the closure of the state, `closure_inconsistent` that a result `inconsistent`
+shows that the state is not consistent. `FinState.sum` puts two finite states side
+by side, and its state is their coproduct (`sumIsColimit`, from
+`State.isColimitOfEntities`: colimits of states are detected at the entity types).
+`merge_closed` and `merge_inconsistent` are the two cases of a merge by keys.
+`Examples/Closure.lean`: two lists of products and variants merge by SKU, and then
+by product and size, into three products and four variants, the coproduct of the
+two lists among the states that satisfy the keys (`merge`); a list that names a
+product differently does not merge (`no_merge`); the checks run in the kernel.
+`Examples/Sigma.lean` has the adjunction with keys along OrdersPL → Payments.
 
 ## Next steps
 
@@ -1331,7 +1385,13 @@ types.
 - Agreement up to renumbering, from two inverse homomorphisms, if data of two
   contexts must agree without numbering the shared entities alike.
 - The closure on the Julia side, with a certificate claim for merges, if merging
-  data across contexts happens in Julia or states grow large.
+  data across contexts happens in Julia or states grow large. `FinState.closure`
+  compares every pair of entities of a type at each step.
+- That `FinState.closure` never answers `undetermined`, if a tool depends on the
+  answer: the merges stop at a fixed point within as many steps as there are
+  entities, and the quotient then passes its checks.
+- Pushouts of finite states along a shared state, if two data sets must be merged
+  along entities that no key identifies.
 
 Dependencies: item 3 uses the composite translations of item 1; phase 5 uses
 the gluing along a kernel and the finite states of phase 4; item 6 uses the
@@ -1790,3 +1850,38 @@ of step 14 and of the design review:
   document. The readers accept version 1, which version 2 extends.
 - `csd-check` imports `ContextMap.lean`, with Mathlib's Grothendieck construction,
   for the check of route equations; its stripped executable stays at 172 MB.
+
+Next step 15:
+
+- The closure is a quotient by a relation defined inductively, on any state, not
+  an iteration on finite states. Consistency, the universal property and the
+  reflection are proved once for all states; the computation on data is related to
+  it afterwards.
+- Consistent means that the keys identify no two distinct values, and it is
+  equivalent to having a morphism into a state that satisfies the keys. The
+  reflection is from the consistent states, which is the largest class on which
+  it can exist.
+- A merge is stated for pushouts of states along any shared state. On data only
+  the sum is computed: with keys, the shared entities are those the keys
+  identify.
+- `Σ_T` with keys is the closure of `Σ_T`, a partial left adjoint: its domain is
+  the states whose `Σ_T` is consistent. The adjunction needs `AttrBijective` and
+  not `KeysKept`. `KeysKept` says where `Δ_T` lands: without it, `Δ_T` of a state
+  that satisfies the keys is a state of the source that may break a key of the
+  source. So an arrow that fails `keyNotKept` still carries data downstream with
+  the closure; what it loses is that the downstream data, read back through the
+  arrow, satisfies the keys of the upstream schema.
+- The computation on data is verified by an invariant and by checks at run time,
+  not by a proof of the algorithm: each merge is justified by a key or by a
+  reference, so the classes are contained in the relation of the keys
+  (`inv_reps`); that the quotient is a state that satisfies the keys and that the
+  map onto it is a homomorphism is checked on the result (`closedOk`). A result
+  is therefore always right, and `undetermined` is not excluded.
+- The sum of two finite states is shown to be their coproduct through a criterion
+  for all colimits of states, at the entity types, and a check of the sum
+  (`checkSum`).
+- Limits: non-empty limits keep keys. The states that satisfy the keys have no
+  terminal object in general, so `isRightAdjoint_restrictStateFunctor_iff`, whose
+  proof uses the terminal state, has no counterpart for them.
+- The Julia side and `csd-check` do not compute the closure; it is a function and
+  theorems of the library, used with `decide` in the examples.

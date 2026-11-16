@@ -875,6 +875,62 @@ Orders each path from a customer into a value type is the image of one path of
 the kernel, and `Σ_T` exists. Along CatalogPL → Orders the list price of a product
 has no source path, and `Σ_T` does not exist.*
 
+### Keys: the closure and merges
+
+A state need not satisfy the keys of its schema, and neither do the pushout of two
+states that do, nor `Σ_T` of one. `DDD/Closure.lean` makes a state satisfy them.
+
+`State.KeyRel X` is the least family of equivalence relations on the elements of
+`X`, one per object, that every morphism of the schema respects and that relates
+two entities whose fields of a key are related. It is what the keys force: two
+entities that agree on a key, then the entities and values they reference, and so
+on. A morphism from `X` into a state that satisfies the keys sends related
+elements to one element (`KeyRel.app_eq`).
+
+- `X` is consistent when the relation identifies no two distinct values
+  (`State.Consistent`). This holds exactly when `X` has a morphism into some state
+  that satisfies the keys (`consistent_iff`), since a morphism is the identity on
+  values.
+- The closure of a consistent state is its quotient by the relation
+  (`State.closure`), with the values of `X`. It satisfies the keys
+  (`closure_keys`), and morphisms from the closure into a state that satisfies the
+  keys are the morphisms from `X` (`closureHomEquiv`). The states that satisfy the
+  keys are therefore reflective in the consistent states (`closureAdjunction`).
+- A merge of two states along a shared state is the closure of their pushout. When
+  the pushout is consistent, its closure is the pushout among the states that
+  satisfy the keys (`isPushout_closure`); when it is not, no state that satisfies
+  the keys receives the two sides compatibly (`not_consistent_of_isPushout`).
+- Under `AttrBijective`, the closure of `Σ_T X` is left adjoint to `Δ_T` from the
+  states that satisfy the keys, on the states whose `Σ_T X` is consistent
+  (`Translation.keyedSigmaAdjunction`). The adjunction does not use `KeysKept`,
+  which states that `Δ_T` of such a state satisfies the keys of the source.
+- The limit of a non-empty diagram of states that satisfy the keys satisfies them
+  (`keys_of_isLimit`). The terminal state has every profile, so it breaks a key
+  whenever two profiles agree on it (`Examples.Closure.terminal_not_keys`).
+
+On data (`DDD/ClosureData.lean`), `FinState.closure S X` keeps a representative
+for each entity and merges two classes when two entities agree on every field of
+a key, up to the classes so far, or when two entities of one class refer to them.
+It then builds the finite state of the classes and checks it: it is a state that
+satisfies the keys, the map onto it is a homomorphism and onto, and it identifies
+entities of one class only. Each merge is justified, so the classes are contained
+in `KeyRel` (`inv_reps`), and a result `closed Y h` is the closure of the state of
+`X` up to isomorphism (`closure_closed`). A result `inconsistent e n i j` names two
+entities of one class with different values of an attribute, and the state is then
+not consistent (`closure_inconsistent`). `FinState.sum` puts two finite states
+side by side; its state is their coproduct (`sumIsColimit`), by a criterion for
+all colimits of states: a cocone is a colimit when it is one at each entity type
+(`State.isColimitOfEntities`). The closure of the sum is the merge by keys
+(`merge_closed`, `merge_inconsistent`).
+
+In `Examples/Closure.lean` a shop identifies products by SKU and variants by
+product and size. Two lists that both have the product `A` and its variant of size
+`S` merge into three products and four variants: the two entries of `A` become
+one, and then the two variants, which now have the same product. The merged list
+is the coproduct of the two among the states that satisfy the keys (`merge`). A
+list that gives the product `A` another name does not merge with the first
+(`no_merge`).
+
 ## 10. Data, exchange and certificates
 
 Lean exports the example map as JSON, Julia computes with Catlab and writes a
@@ -1367,6 +1423,8 @@ are outside the library.*
 | `StateLimits.lean` | profiles, the terminal and initial states, `limitCone`, `colimitCocone`, connected limits and colimits pointwise, colimits pointwise at entity types |
 | `StateSigma.lean` | `AttrBijective`, `sigmaState`, `sigmaStateAdjunction`, `isRightAdjoint_restrictStateFunctor_iff`, `not_attrBijective` |
 | `Data.lean` | `FinState`, `check`, `toState`, keys (`checkKeys`, `State.Keys`, `toState_keys`), `FinHom`, `restrict`, `restrictIso` |
+| `Closure.lean` | `State.KeyRel`, `Consistent`, `closure`, `closureHomEquiv`, `closureAdjunction`, `isPushout_closure`, `keyedSigmaAdjunction`, `keys_of_isLimit`, `isColimitOfEntities`, `VState.closure` |
+| `ClosureData.lean` | `FinState.reps`, `inv_reps`, `closure`, `closure_closed`, `closure_inconsistent`, `sum`, `sumIsColimit`, `merge_closed`, `merge_inconsistent` |
 | `Keys.lean` | `restrictState_keys`, `restrict_checkKeys`, `vrestrict_checkKeys`, `State.KeysOf`, `keys_restrict_empty_iff`, `Gluing.keysOf_iff`, `keys_of_keysOf`, `keyedStateEquiv`, `keyedFamilyEquiv`, `VState.Keys`, `vrestrictState_keys`, `vrestrictLit_checkKeys`, `Agree.keys`, `keyedVStateEquiv` |
 | `ValueCat.lean` | `conv?`, `Basic`, `applyLit`, `Schema.vcat`, `TypeList.cat`, `vinc`, `vvals`, `VPathEq`, `Translation.VValid`, `checkVValid_iff`, `Translation.vfunctor` |
 | `VCompose.lean` | `Translation.vcomp`, `vcomp_vvalid`, `vfunctor_vcomp`, `vfunctor_empty_self`, `checkSameFunctor_viff` |
@@ -1387,11 +1445,12 @@ are outside the library.*
 | `Examples/Integration.lean` | the seven-context map with a published field that converts, kept keys, its projection onto the Showcase map, non-interference, references |
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, keyed data gluing, the failing kernel |
 | `Examples/NormalForm.lean` | the normal form of OrdersPL → Payments, its isomorphism and factorization, roots only, an open schema through it; none for CatalogPL → Orders; Catalog and a storefront composed along CatalogPL; keys kept through a renamed field and through the empty path |
+| `Examples/Closure.lean` | two lists of products and variants merged by their keys, a merge that fails on two names, a list with a product twice, the terminal state |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one; the same as documents |
 | `Examples/Structure.lean` | a value object with references, a nested aggregate, intermediate entity types with the keys `{owner}` and `{owner, item}`, a subtype, states that keep and break each key, and a broken variant |
 | `Examples/Merge.lean` | the map with the Addresses kernel, the merge of its component, strict and lax non-interference |
 | `Examples/Open.lean` | Orders, Shipping and Payments as open schemas, associativity, a qualified second ordering context, machines in series, aggregate machines and the report of the context, events of the example map |
-| `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments; none along CatalogPL → Orders |
+| `Examples/Sigma.lean` | `Σ_T` along the kernel inclusions and OrdersPL → Payments, there also with keys; none along CatalogPL → Orders |
 | `Examples/Literals.lean` | literals in normal form, records, tables, and lists that break each condition |
 | `Examples/Conversions.lean` | each kind of conversion, a record, path equalities by `pathEqV` and by theorem, conversions of literals, a certificate |
 | `Examples/Exchange.lean` | the example map as a workspace document with three samples, conversions and path equalities, round trips, the `createdAt` clash, the restriction of a state of Orders through `placedAt.date`, agreement and conformance of Orders and Payments on OrdersPL, the document as a context map |
@@ -1509,9 +1568,12 @@ The correspondence leaves out part of each side:
 - Limits and colimits of attributed states do not consider the keys, which stay a
   separate predicate (`State.Keys`). Restriction keeps keys under `KeysKept`,
   which reads the names of the images and does not see a key kept through an
-  equation of the target; gluing keeps them. No construction identifies the
-  entities that agree on a key (item 15 of `DDD/README.md`). Machine steps do not
-  check keys.
+  equation of the target; gluing keeps them. Machine steps do not check keys.
+- The closure on data is right when it answers `closed` or `inconsistent`; that it
+  never answers `undetermined` is not proved. It compares every pair of entities
+  of a type at each step. Pushouts of finite states along a shared state are not
+  computed, only sums. The Julia side and `csd-check` do not compute the
+  closure.
 - A translation that converts has no normal form, so a published language whose
   translation into its owner converts is not an interface of an open schema, and
   the owner and a consumer are not composed along it. The normal form is checked
