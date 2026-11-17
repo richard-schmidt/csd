@@ -303,9 +303,9 @@ that may repeat a value.
 
 An event type is structure (`EventType.lean`): a name, references to entity types
 of a published language, and attributes. Over the published language `P` it is the
-event schema, `P` with one more entity type, a value object and an aggregate of its
-own, so that an occurrence is identified by all its fields and its references go
-to roots. An occurrence is dynamics: an entity for each reference and a value for
+event schema, `P` with one more entity type, an aggregate of its own and, when the
+event type has a field, a value object, so that an occurrence is identified by all
+its fields and its references go to roots. An occurrence is dynamics: an entity for each reference and a value for
 each attribute. Over a state of `P` it is that state with one entity of the event
 type, a state of the event schema; states do not store occurrences. A context,
 owner or consumer, sees the published language through its translation, as the
@@ -890,7 +890,7 @@ product differently does not merge (`no_merge`); the checks run in the kernel.
 `Examples/Sigma.lean` has the adjunction with keys along OrdersPL → Payments.
 
 The editor follows the format of the revision after step 14 (csd-editor 4b87d3f,
-on its branch `claude/format-2`, not yet on `main` nor on the A52): it writes
+on `main` since 2026-11-16, not yet on the A52): it writes
 `csd-ddd/2` and reads `csd-ddd/1`, marks an arrow as a published language from
 its menu, completes the image of an attribute with the conversions out of its
 value type, and lists the problems of the map with the context map. The import
@@ -905,7 +905,8 @@ checker are deployed together.
 Next step 16, event types, is complete, with no `sorry`.
 `EventType.lean`: an event type has a name, references and attributes; over a
 published language `P` its schema `ev.over P` is `P` with the entity type of the
-event, a value object and an aggregate of its own, and `EventType.check` decides
+event, an aggregate of its own and a value object when the event type has a field,
+and `EventType.check` decides
 that the name is new, the references go to entity types of `P`, the schema is well
 formed, so that the references reach roots, and `P` is included in it. An
 occurrence gives an entity for each reference and a value for each attribute;
@@ -930,8 +931,30 @@ invoice; an occurrence that names a second order is refused, and so is the
 occurrence in Payments before the invoice; an endpoint of OrdersPL emits it, and
 Payments receives it along the arrow and issues its invoice. The Julia side claims
 the event type and the occurrence in Orders and in Payments; its certificate of
-85 claims holds. csd-editor keeps the event types of a document and does not
-show them.
+85 claims holds.
+
+Next step 17, the full version of the Context Mapper import, is complete.
+`cml_import.py` in csd-editor (67d3924, on its branch `claude/import-full`, not
+yet on `main` nor on the A52) makes value objects without references record types
+of the list of value types: those that are not roots, not abstract and in no
+hierarchy, whose fields are single attributes of types that are not records. A
+field of that type is an attribute, and a collection of it an intermediate entity
+type with the key `{owner, value}`; a value object of the same name with other
+fields in another context stays a value object. Domain events become event types
+of each published language that publishes the root of their aggregate, and
+otherwise of their context, with the fields of the domain events they extend;
+references to anything but a root, nullable references and collections are
+reported and left out, and abstract domain events are not event types. The editor
+lists the event types of a context, edits their names, references and attributes
+in place, and shows the problems of `csd-check` at their rows. An event type
+without fields is now checked: its entity type is not a value object
+(`EventType.over`, `Examples/Events.lean`: `ordersClosed_check`,
+`closed_orders`), and the report gives a target that is not an entity type once.
+The 55 example models of Context Mapper, imported again, have 37 record types and
+41 event types, 7 of them published (30 of the 45 domain events have no field);
+they hold 213 of their 218 results, as before, and the 5 that fail are the
+aggregate-boundary problems of two models. The `csd-check` on the A52 is still
+the one of step 13.
 
 ## Next steps
 
@@ -1970,9 +1993,12 @@ Next step 16:
 - A consumer accepts an occurrence when its references resolve in its own view. A
   consumer that does not hold the order yet refuses an occurrence about it: the
   published state reaches a consumer by `Σ` or by agreement, not by events.
-- The entity type of an event is a value object and an aggregate of its own, so
-  the checks of schemas apply: an event type without a field, with a field named
-  twice, or with a reference to a member of an aggregate is not well formed.
+- The entity type of an event is an aggregate of its own, and a value object when
+  the event type has a field, so the checks of schemas apply: an event type with
+  a field named twice, or with a reference to a member of an aggregate, is not
+  well formed. An event type without fields was refused until item 17
+  (2026-11-17): a value object needs a field, and 30 of the 45 domain events of
+  the Context Mapper examples have none.
 - Occurrences are emitted by the services of `Events.lean`, as events of the
   context of the published language, which has routes to the owner and to each
   consumer. The machines of `Production` do not emit them.
@@ -1980,3 +2006,24 @@ Next step 16:
   `csd-ddd/2`: no document of version 2 was deployed before. An event type is
   checked over its context, published language or not.
 - `keyNotKept` stays a failure on every arrow (2026-11-16).
+
+Next step 17:
+
+- A value object becomes a record type only when it has no reference, is not a
+  root, is in no hierarchy, and its fields are single attributes of types that
+  are not records: fields of records are flat. Every other value object stays an
+  entity type, as in item 12.
+- Records are shared by the model through the list of value types. The first
+  value object of a name that qualifies gives the record; one of the same name
+  and fields in another context is the same record, and one with other fields
+  stays a value object of its context.
+- A domain event goes where its aggregate is published: to each published
+  language that publishes the root of its aggregate, otherwise to its context.
+  Its references are kept when they go to a root of its context, or to an entity
+  type of the published language; any other reference, a nullable reference and
+  a collection are reported and left out, since the fields of an event type are
+  single and its references are required.
+- The fields of a domain event include those of the domain events it extends; an
+  abstract domain event is not an event type. Commands stay entity types.
+- An event type without fields is checked, with an entity type that is not a
+  value object, rather than given an invented field by the import.
