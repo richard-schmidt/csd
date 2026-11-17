@@ -934,8 +934,8 @@ the event type and the occurrence in Orders and in Payments; its certificate of
 85 claims holds.
 
 Next step 17, the full version of the Context Mapper import, is complete.
-`cml_import.py` in csd-editor (67d3924, on its branch `claude/import-full`, not
-yet on `main` nor on the A52) makes value objects without references record types
+`cml_import.py` in csd-editor (67d3924, on `main` since 2026-11-17, not yet on
+the A52) makes value objects without references record types
 of the list of value types: those that are not roots, not abstract and in no
 hierarchy, whose fields are single attributes of types that are not records. A
 field of that type is an attribute, and a collection of it an intermediate entity
