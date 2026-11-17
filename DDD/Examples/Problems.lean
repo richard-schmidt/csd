@@ -15,8 +15,8 @@ import DDD.Examples.Integration
   broken context, a context with undeclared value types, a failing arrow, an
   arrow that does not keep a key, an arrow to a missing context, an arrow out of
   a kernel that renames, a published language that reaches a member of an
-  aggregate, two contexts on a cycle, and two declared route equations that do
-  not hold (`brokenMap`). `cli/CsdExport.lean` writes it to
+  aggregate, two contexts on a cycle, two declared route equations that do
+  not hold, and two event types that are none (`brokenMap`). `cli/CsdExport.lean` writes it to
   `cli/test/broken-map.json`, which CI checks with `csd-check --json`.
 - Documents with a published language that merges entity types (`mergedMap`) and
   with names declared twice (`twiceMap`).
@@ -140,7 +140,9 @@ not keep a key, one to a context the document does not have, one out of the
 kernel that renames customers to payers, one marked as publishing that sends its
 entity type to a member of the invoice aggregate, and two that form a cycle. Two
 route equations are declared: one between two routes with different translations,
-one whose right side names no arrow. -/
+one whose right side names no arrow. Two event types: one named after an entity
+type of its context, and one that refers to a refund, a member of the payment
+aggregate. -/
 def brokenMap : MapDoc where
   valueTypes := { decls := [("PaymentMethod", .enum ["card", "invoice", "transfer"]),
     ("Size", .enum []), ("string", .over .string)] }
@@ -156,6 +158,8 @@ def brokenMap : MapDoc where
     ("publishLines", "Lines", "Payments", {}),
     ("ping", "Ping", "Pong", {}), ("pong", "Pong", "Ping", {})]
   published := ["publishLines"]
+  events := [("OrdersPL", { name := "Order", refs := [("order", "Order")] }),
+    ("Payments", { name := "Refunded", refs := [("refund", "Refund")] })]
   routeEqns := [(["billing"], ["streetToCity"]), (["billing"], ["nowhere"])]
 
 /-- The kinds of the problems of the entries of a report, with their names and
@@ -171,7 +175,7 @@ def summary (entries : Json) : List (String × Bool × List String) :=
   | .error _ => []
 
 #guard summary (brokenMap.report.getObjValD "contexts") ==
-  [("OrdersPL", true, []), ("Payments", true, []),
+  [("OrdersPL", false, ["eventName"]), ("Payments", false, ["aggregateBoundary"]),
    ("Broken", false, ["duplicateEntity", "duplicateGenerator", "referenceTarget",
      "referenceSource", "attributeSource", "equationNotParallel", "equationSource",
      "aggregateEntity", "aggregateOverlap", "missingOwner", "ownerCycle", "aggregateBoundary",
@@ -193,7 +197,7 @@ def summary (entries : Json) : List (String × Bool × List String) :=
 #guard summary (Json.arr #[(brokenMap.report.getObjValD "map").setObjVal! "name" ""]) ==
   [("", false, ["cycle", "routeEquation", "routeEquation"])]
 
-#guard brokenMap.report.getObjValD "failed" == (9 : Nat)
+#guard brokenMap.report.getObjValD "failed" == (11 : Nat)
 
 -- The conditions on the map: the names are distinct, and the other four fail.
 #guard brokenMap.conditions.map (·.2.1) == [true, false, false, false, false]
@@ -208,6 +212,16 @@ def mergedMap : MapDoc where
 
 #guard summary (mergedMap.report.getObjValD "arrows") ==
   [("catalogPL_orders", false, ["entitiesMerged", "entitiesMerged"])]
+
+/-- An event type of a context the document does not have: a problem of the map. -/
+def lostMap : MapDoc where
+  contexts := [("Ping", thing, false)]
+  arrows := []
+  events := [("Nowhere", { name := "Lost" })]
+
+#guard summary (Json.arr #[(lostMap.report.getObjValD "map").setObjVal! "name" ""]) ==
+  [("", false, ["unknownSchema"])]
+#guard !lostMap.check
 
 /-- A context and an arrow declared twice. -/
 def twiceMap : MapDoc where

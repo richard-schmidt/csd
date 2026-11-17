@@ -299,6 +299,22 @@ function application. The alternative, states over a fixed object built from
 `K`, gets colimits from Mathlib's `Over`, but a state then carries value slots
 that may repeat a value.
 
+### Event types
+
+An event type is structure (`EventType.lean`): a name, references to entity types
+of a published language, and attributes. Over the published language `P` it is the
+event schema, `P` with one more entity type, a value object and an aggregate of its
+own, so that an occurrence is identified by all its fields and its references go
+to roots. An occurrence is dynamics: an entity for each reference and a value for
+each attribute. Over a state of `P` it is that state with one entity of the event
+type, a state of the event schema; states do not store occurrences. A context,
+owner or consumer, sees the published language through its translation, as the
+restriction of its state, and an occurrence is checked against that view: its
+references then name entities of the context. An occurrence with a dangling
+reference is refused. Services emit occurrences as events of the context of the
+published language, which reach its owner and its consumers along the routes of
+`J` (`Events.lean`).
+
 ### Open systems
 
 Structured cospans `I ⟶ S ⟵ O` of schemas, whose interfaces are included by
@@ -402,7 +418,10 @@ DDD/
   NormalForm.lean    the normal form of a translation: an inclusion into a
                      definitional extension of its target
   OpenMachine.lean   machines on open schemas, serial wiring
-  Events.lean        services and events along the routes of J
+  EventType.lean     event types over a published language, occurrences, their
+                     check against the view of a context
+  Events.lean        services and events along the routes of J, the emission of
+                     occurrences
   Aggregates.lean    aggregate schemas, the rules across aggregates,
                      consistency as gluing
   AggregateMachine.lean
@@ -438,7 +457,8 @@ DDD/
                      of a document that passes, its report
   Examples/          Values, Literals, Catalog, Orders, Payments, Shipping,
                      Integration, Gluing, Routes, Structure, Conversions,
-                     Exchange, Merge, Sigma, Closure, Open, NormalForm, Problems
+                     Exchange, Merge, Sigma, Closure, Open, Events, NormalForm,
+                     Problems
   docs/              approach.md, its figures, and figures.py, which draws them
 cli/                 csd-check, a native executable (lake exe csd-check), and
                      csd-export, run with lake env lean --run;
@@ -881,6 +901,37 @@ published keys: without them the arrow into the downstream context failed
 The 55 example models hold 213 of their 218 results as before. The `csd-check`
 on the A52 is the one of step 13, which refuses `csd-ddd/2`; the editor and the
 checker are deployed together.
+
+Next step 16, event types, is complete, with no `sorry`.
+`EventType.lean`: an event type has a name, references and attributes; over a
+published language `P` its schema `ev.over P` is `P` with the entity type of the
+event, a value object and an aggregate of its own, and `EventType.check` decides
+that the name is new, the references go to entity types of `P`, the schema is well
+formed, so that the references reach roots, and `P` is included in it. An
+occurrence gives an entity for each reference and a value for each attribute;
+`occ.state ev X` is the state `X` of `P` with one entity of the event type, and
+`Occurrence.check` that it is a state of the event schema. A checked occurrence
+names entities of `X` (`resolves`); one with a dangling reference or without a
+field is refused (`check_eq_false_of_dangling`, `check_eq_false_of_missing`).
+`Occurrence.checkAt` checks an occurrence in a context, against the view of its
+state along its translation, which may convert; the references then name entities
+of the context, of the images of their targets (`resolvesAt`), and two contexts
+whose states agree on the published language accept the same occurrences
+(`checkAt_of_agree`). `CSvc.emitOccurrence` (`Events.lean`) emits a checked
+occurrence as an event of its context and nothing otherwise.
+The format has event types on the contexts of a map document, and the claims
+`eventType` and `occurrence`; a report names a dangling reference
+(`danglingReference`), a field without a value (`occurrenceField`), and the
+problems of an event type (`eventName`, `eventTarget`, and those of its schema).
+In the example map, OrdersPL publishes `OrderPlaced` (the order, its customer, the
+instant). `Examples/Events.lean`: an occurrence passes in Orders and, since the
+states agree on the published language, in Payments, where its order is an
+invoice; an occurrence that names a second order is refused, and so is the
+occurrence in Payments before the invoice; an endpoint of OrdersPL emits it, and
+Payments receives it along the arrow and issues its invoice. The Julia side claims
+the event type and the occurrence in Orders and in Payments; its certificate of
+85 claims holds. csd-editor keeps the event types of a document and does not
+show them.
 
 ## Next steps
 
@@ -1903,3 +1954,29 @@ Next step 15:
   it also adds. Such an entity type stands for the published one, so it is
   identified the same way; with `keyNotKept` a failure on every arrow, an import
   without the keys does not pass.
+
+Next step 16:
+
+- An event type is declared over a published language and its schema is the
+  published language with one more entity type, not a schema of its own with the
+  roots as identities, as the aggregate schemas are. The published language is
+  then included in the event schema by an inclusion that keeps names, and an
+  occurrence over a state is one more entity in that state.
+- "Translated with the published language" is through views: a context sees the
+  published language as the restriction of its state along its translation, and
+  an occurrence is checked against that view. No translation of event schemas is
+  defined; that a translation of the published language extends to the event
+  schemas of its source and its target is not stated.
+- A consumer accepts an occurrence when its references resolve in its own view. A
+  consumer that does not hold the order yet refuses an occurrence about it: the
+  published state reaches a consumer by `Σ` or by agreement, not by events.
+- The entity type of an event is a value object and an aggregate of its own, so
+  the checks of schemas apply: an event type without a field, with a field named
+  twice, or with a reference to a member of an aggregate is not well formed.
+- Occurrences are emitted by the services of `Events.lean`, as events of the
+  context of the published language, which has routes to the owner and to each
+  consumer. The machines of `Production` do not emit them.
+- The format carries event types on the contexts of a map document, within
+  `csd-ddd/2`: no document of version 2 was deployed before. An event type is
+  checked over its context, published language or not.
+- `keyNotKept` stays a failure on every arrow (2026-11-16).

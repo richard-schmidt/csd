@@ -22,7 +22,8 @@ SCHEMA_KINDS = ["duplicateEntity", "duplicateGenerator", "referenceTarget", "ref
                 "valueObjectFields", "valueObjectEntity", "keyEntity", "keyEmpty", "keyField",
                 "subtypeEntity", "subtypeReference"]
 
-EXPECTED_CONTEXTS = [("OrdersPL", True, []), ("Payments", True, []), ("Broken", False, SCHEMA_KINDS),
+EXPECTED_CONTEXTS = [("OrdersPL", False, ["eventName"]), ("Payments", False, ["aggregateBoundary"]),
+                     ("Broken", False, SCHEMA_KINDS),
                      ("Untyped", False, ["undeclaredValueType", "nestedOptional"]),
                      ("Customers", True, []), ("Lines", True, []), ("Ping", True, []),
                      ("Pong", True, [])]
@@ -51,8 +52,8 @@ def main(argv):
     report = json.loads(r.stdout)
     if report.get("kind") != "mapReport":
         errors.append(f"broken map: kind {report.get('kind')}, expected mapReport")
-    if report.get("failed") != 9:
-        errors.append(f"broken map: {report.get('failed')} failed, expected 9")
+    if report.get("failed") != 11:
+        errors.append(f"broken map: {report.get('failed')} failed, expected 11")
     whole = report.get("map", {})
     if (whole.get("ok"), [p["kind"] for p in whole.get("problems", [])]) != EXPECTED_MAP:
         errors.append(f"broken map: map {whole}")

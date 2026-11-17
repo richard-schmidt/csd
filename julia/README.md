@@ -25,7 +25,8 @@ its published language through `placedAt.date`, the claim that the translation o
 the published language into Payments has a normal form, the agreement of Orders
 and a state of Payments that invoices both orders on the published language, the
 conformance of the state of Payments that invoices one, by a homomorphism Catlab
-finds, and a homomorphism of Shipping states. `csd-check` (`cli/CsdCheck.lean`)
+finds, the event type `OrderPlaced` of the published language and an occurrence
+of it in Orders and in Payments, and a homomorphism of Shipping states. `csd-check` (`cli/CsdCheck.lean`)
 checks it. `out/certificate.json` is committed, and CI fails when the run writes
 another.
 

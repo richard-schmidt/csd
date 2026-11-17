@@ -799,7 +799,7 @@ def aggregates():
 # 17. Modules --------------------------------------------------------------------
 
 def modules():
-    f = Fig("modules", 1180, 660,
+    f = Fig("modules", 1180, 676,
             "Imports between the modules of the DDD library: a chain from value types to "
             "certificates and reports, context maps, states and open systems beside it, and the "
             "examples on top.")
@@ -865,6 +865,7 @@ def modules():
     f.arrow("Keys", "Closure", "", "acl")
     f.node("ClosureData", 426, 308, "ClosureData", w=96, h=30)
     f.arrow("Closure", "ClosureData", "", "acl")
+    f.node("EventType", 636, 308, "EventType", w=84, h=30)
     f.node("MapCheck", 1108, 192, "MapCheck", w=92, h=30)
     f.poly([(1170, 192), (1156, 192)], "muted")
     dy = 100
@@ -893,6 +894,7 @@ def modules():
     f.node("xSigma", 978, 288 + dy, "Sigma", "pl", w=80, h=30)
     f.node("xNormalForm", 874, 288 + dy, "NormalForm", w=104, h=30)
     f.node("xClosure", 1105, 415 + dy, "Closure", w=84, h=30)
+    f.node("xEvents", 1005, 415 + dy, "Events", w=80, h=30)
     f.poly([(978, 141), (978, 271 + dy)], "muted")
     f.poly([(600, 304 + dy), (600, 320 + dy), (978, 320 + dy), (978, 307 + dy)], "muted")
     f.poly([(470, 304 + dy), (470, 320 + dy), (600, 320 + dy), (600, 398 + dy)], "muted")
@@ -923,6 +925,8 @@ def modules():
     f.text(1160, 648, "MapCheck imports Report and ContextMap, the examples Exchange, "
            "Routes and Problems import MapCheck, the example Closure imports ClosureData and "
            "Json, the example Sigma imports Closure", "note", "end")
+    f.text(1160, 664, "EventType imports LitData, Events and Certificate import EventType, "
+           "the example Events imports Events and Exchange", "note", "end")
     return f
 
 

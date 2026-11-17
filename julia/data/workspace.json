@@ -420,7 +420,8 @@
      "aggregates":
      [{"root": "Product", "members": []}, {"root": "Variant", "members": []}]},
     "name": "CatalogPL",
-    "kernel": false},
+    "kernel": false,
+    "events": []},
    {"schema":
     {"valueObjects": ["Address"],
      "subtypes": [],
@@ -444,7 +445,13 @@
       {"root": "Address", "members": []},
       {"root": "Order", "members": []}]},
     "name": "OrdersPL",
-    "kernel": false},
+    "kernel": false,
+    "events":
+    [{"references":
+      [{"target": "Order", "name": "order"},
+       {"target": "Customer", "name": "customer"}],
+      "name": "OrderPlaced",
+      "attributes": [{"type": "timestamp", "name": "at"}]}]},
    {"schema":
     {"valueObjects": ["Address"],
      "subtypes": [],
@@ -459,7 +466,8 @@
      "aggregates":
      [{"root": "Customer", "members": []}, {"root": "Address", "members": []}]},
     "name": "Customers",
-    "kernel": true},
+    "kernel": true,
+    "events": []},
    {"schema":
     {"valueObjects": [],
      "subtypes": [],
@@ -483,7 +491,8 @@
       {"root": "Product", "members": [{"owner": "product", "entity": "Image"}]},
       {"root": "Variant", "members": []}]},
     "name": "Catalog",
-    "kernel": false},
+    "kernel": false,
+    "events": []},
    {"schema":
     {"valueObjects": ["Address"],
      "subtypes": [],
@@ -520,7 +529,8 @@
       {"root": "Order", "members": [{"owner": "order", "entity": "OrderLine"}]},
       {"root": "Product", "members": []}]},
     "name": "Orders",
-    "kernel": false},
+    "kernel": false,
+    "events": []},
    {"schema":
     {"valueObjects": ["Address"],
      "subtypes": [],
@@ -559,7 +569,8 @@
       {"root": "Payment",
        "members": [{"owner": "payment", "entity": "Refund"}]}]},
     "name": "Payments",
-    "kernel": false},
+    "kernel": false,
+    "events": []},
    {"schema":
     {"valueObjects": ["Address"],
      "subtypes": [],
@@ -592,7 +603,8 @@
        "members": [{"owner": "shipment", "entity": "Item"}]},
       {"root": "Carrier", "members": []}]},
     "name": "Shipping",
-    "kernel": false}],
+    "kernel": false,
+    "events": []}],
   "arrows":
   [{"translation": {"generators": [], "entities": []},
     "target": "Catalog",

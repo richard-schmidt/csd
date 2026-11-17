@@ -9,9 +9,9 @@ JSON for the deep data, shared with the Julia side. Every document carries a
 format identifier: `formatVersion`, `csd-ddd/2`, is written, and the readers also
 accept `csd-ddd/1` (`readableFormats`), of which it is an extension. Version 2
 adds translations that send an attribute to a path ending in conversions, arrows
-marked as publishing, and the claims `keysKept`, `agreement` and `normalForm`; a
-reader of version 1 refuses a document of version 2 instead of reporting its
-arrows as invalid.
+marked as publishing, event types, and the claims `keysKept`, `agreement`,
+`conformance`, `normalForm`, `eventType` and `occurrence`; a reader of version 1
+refuses a document of version 2 instead of reporting its arrows as invalid.
 
 - Value types: `"int"`, `"decimal"`, `"string"`, `"date"`, `"uuid"`, `"bool"`,
   `"datetime"`, `"timestamp"`, `"time"`, `"duration"`, `{"named": n}` and
@@ -28,10 +28,13 @@ arrows as invalid.
   names of generators out of the entity type) and `subtypes` (`entity`,
   `reference`, the name of the is-a reference). Lists keep their order.
 - A translation: `entities` (`source`, `target`) and `generators` (`name`, `path`).
+- An event type (`EventType`): `name`, `references` (`name`, `target`) and
+  `attributes` (`name`, `type`).
 - A context map (`MapDoc`): `valueTypes`, `contexts` (`name`, `schema`,
-  `kernel`), `arrows` (`name`, `source`, `target`, `translation`, and
-  `publishes`, true when the source is a published language of the target), and
-  `routeEquations` (`lhs`, `rhs`, lists of arrow names).
+  `kernel`, and `events`, the event types the context publishes), `arrows`
+  (`name`, `source`, `target`, `translation`, and `publishes`, true when the
+  source is a published language of the target), and `routeEquations` (`lhs`,
+  `rhs`, lists of arrow names).
 - A finite state, relative to its schema: `entities` (`type`, `count`),
   `references` and `attributes` (`name`, `column`). Entities are numbered from 0.
   Attribute values are literals (`Lit`): JSON integers, strings, booleans and
@@ -243,6 +246,31 @@ def Translation.fromJson (j : Json) : Except String Translation := do
 instance : ToJson Translation := ⟨Translation.toJson⟩
 instance : FromJson Translation := ⟨Translation.fromJson⟩
 
+/-! ## Event types -/
+
+/-- An event type: its name, its references, each with a name and a target entity
+type of the published language, and its attributes (`EventType.lean`). -/
+structure EventType where
+  name : String
+  refs : List (String × String) := []
+  attrs : List (String × ValueType) := []
+deriving DecidableEq, Repr
+
+def EventType.toJson (ev : EventType) : Json := Json.mkObj [
+  ("name", .str ev.name),
+  ("references", Json.arr (ev.refs.map fun r =>
+    Json.mkObj [("name", .str r.1), ("target", .str r.2)]).toArray),
+  ("attributes", Json.arr (ev.attrs.map fun a =>
+    Json.mkObj [("name", .str a.1), ("type", Lean.toJson a.2)]).toArray)]
+
+def EventType.fromJson (j : Json) : Except String EventType := do
+  let name ← j.getObjValAs? String "name"
+  let refs ← (← getList j "references").mapM fun r => do
+    pure (← r.getObjValAs? String "name", ← r.getObjValAs? String "target")
+  let attrs ← (← getList j "attributes").mapM fun a => do
+    pure (← a.getObjValAs? String "name", ← ValueType.fromJson (← a.getObjVal? "type"))
+  pure { name, refs, attrs }
+
 /-! ## Context maps -/
 
 /-- A context map as data: the list of value types, contexts with their schemas
@@ -254,6 +282,8 @@ structure MapDoc where
   contexts : List (String × Schema × Bool)
   arrows : List (String × String × String × Translation)
   published : List String := []
+  /-- The event types the contexts publish, each with the name of its context. -/
+  events : List (String × EventType) := []
   routeEqns : List (List String × List String) := []
 deriving DecidableEq
 
@@ -261,7 +291,9 @@ def MapDoc.toJson (M : MapDoc) : Json := Json.mkObj [
   ("format", .str formatVersion), ("kind", .str "map"),
   ("valueTypes", M.valueTypes.toJson),
   ("contexts", Json.arr (M.contexts.map fun c =>
-    Json.mkObj [("name", .str c.1), ("schema", c.2.1.toJson), ("kernel", .bool c.2.2)]).toArray),
+    Json.mkObj [("name", .str c.1), ("schema", c.2.1.toJson), ("kernel", .bool c.2.2),
+      ("events", Json.arr ((M.events.filter fun e => e.1 == c.1).map
+        (·.2.toJson)).toArray)]).toArray),
   ("arrows", Json.arr (M.arrows.map fun a =>
     Json.mkObj [("name", .str a.1), ("source", .str a.2.1), ("target", .str a.2.2.1),
       ("translation", a.2.2.2.toJson), ("publishes", .bool (M.published.contains a.1))]).toArray),
@@ -283,9 +315,12 @@ def MapDoc.fromJson (j : Json) : Except String MapDoc := do
       (x.getObjValAs? String "name").toOption == some a.1 &&
         (x.getObjValAs? Bool "publishes").toOption.getD false
     then some a.1 else none
+  let events ← (← getList j "contexts").mapM fun c => do
+    let n ← c.getObjValAs? String "name"
+    (← getList c "events").mapM fun e => do pure (n, ← EventType.fromJson e)
   let routeEqns ← (← getList j "routeEquations").mapM fun e => do
     pure (← e.getObjValAs? (List String) "lhs", ← e.getObjValAs? (List String) "rhs")
-  pure { valueTypes, contexts, arrows, published, routeEqns }
+  pure { valueTypes, contexts, arrows, published, events := events.flatten, routeEqns }
 
 /-! ## Finite states and homomorphisms -/
 

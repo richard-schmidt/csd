@@ -37,6 +37,9 @@ published language: with an invoice for the order the two agree (claim
 `agreement`), before the invoice Payments conforms to Orders without agreeing
 (claim `conformance`), and an invoice dated in another time zone does neither.
 
+The map publishes the event type `OrderPlaced` with the published language of
+Orders (`orderPlaced`); `Examples/Events.lean` has its occurrences.
+
 `map` passes its claims and the conditions on the map (`map_check`, in the
 kernel), so it is a context map on its contexts (`documentMap`), and each context
 embeds into its lax integration (`document_nonInterference`).
@@ -83,13 +86,22 @@ def arrows : List (String × String × String × Translation) :=
 /-- The value types of the example map and of the samples. -/
 def valueTypes : TypeList := Conversions.types
 
+/-- The event type of a placed order, over the published language of Orders: the
+order, its customer, and the instant. -/
+def orderPlaced : EventType where
+  name := "OrderPlaced"
+  refs := [("order", "Order"), ("customer", "Customer")]
+  attrs := [("at", .timestamp)]
+
 /-- The context map as data. The arrows from the two published languages into
-their owners are marked as publishing. -/
+their owners are marked as publishing, and the published language of Orders
+publishes the event type `OrderPlaced`. -/
 def map : MapDoc where
   valueTypes := valueTypes
   contexts := contexts.map fun c => (contextName c, schema c, kernel c)
   arrows := arrows
   published := ["catalogPL_catalog", "ordersPL_orders"]
+  events := [("OrdersPL", orderPlaced)]
 
 /-- Orders, with the date each customer was created. -/
 def ordersCreated : Schema :=
@@ -171,6 +183,7 @@ def roundTrip {α : Type} [DecidableEq α] (enc : α → Json) (dec : Json → E
 #guard contexts.all fun c => roundTrip Schema.toJson Schema.fromJson (schema c)
 #guard arrows.all fun a => roundTrip Translation.toJson Translation.fromJson a.2.2.2
 #guard roundTrip MapDoc.toJson MapDoc.fromJson map
+#guard roundTrip EventType.toJson EventType.fromJson orderPlaced
 #guard roundTrip Schema.toJson Schema.fromJson Gluing.shipping₂
 
 /-- A finite state of the Customers kernel: two customers at one address. -/

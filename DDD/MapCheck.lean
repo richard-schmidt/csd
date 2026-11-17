@@ -35,9 +35,11 @@ The conditions, each a check on the document:
   published language of its target.
 
 `MapDoc.report` is the report of a document for `csd-check --json`: the list of
-value types, each context, each arrow with the problems of its claims and of its
-kernel and publishing conditions, and the map with the problems of its names,
-cycles and route equations.
+value types, each context with the problems of its schema and of the event types
+it publishes, each arrow with the problems of its claims and of its kernel and
+publishing conditions, and the map with the problems of its names, cycles and route
+equations. An event type whose context the document does not have is a problem of
+the map.
 -/
 
 namespace DDD
@@ -169,13 +171,14 @@ theorem check_certificate (h : M.check = true) : M.certificate.check = true := b
 
 theorem sound (h : M.check = true) : M.valueTypes.Sound :=
   M.certificate.check_sound (check_certificate h) .valueTypes
-    (List.mem_append_left _ (List.mem_append_left _ (List.mem_singleton_self _)))
+    (List.mem_append_left _ (List.mem_append_left _ (List.mem_append_left _
+      (List.mem_singleton_self _))))
 
 theorem wellFormedOf (h : M.check = true) (c : M.Ctx) : (M.schemaOf c).WellFormed := by
   obtain ⟨ctx, hctx, hn⟩ := List.mem_map.mp c.2
   obtain ⟨S, hS, hw⟩ := M.certificate.check_sound (check_certificate h) (.wellFormed ctx.1)
-    (List.mem_append_left _ (List.mem_append_right _
-      (List.mem_flatMap.mpr ⟨ctx, hctx, List.mem_cons_self⟩)))
+    (List.mem_append_left _ (List.mem_append_left _ (List.mem_append_right _
+      (List.mem_flatMap.mpr ⟨ctx, hctx, List.mem_cons_self⟩))))
   rw [hn] at hS
   simp only [schemaOf, hS, Option.getD_some]
   exact hw
@@ -185,7 +188,8 @@ theorem validOf (h : M.check = true) {u d : M.Ctx} (f : u ⟶ d) :
   obtain ⟨a, ha, hu, hd⟩ := f
   obtain ⟨S, S', hS, hS', hv⟩ := M.certificate.check_sound (check_certificate h)
     (.translation a.2.1 a.2.2.1 a.2.2.2)
-    (List.mem_append_right _ (List.mem_flatMap.mpr ⟨a, ha, List.mem_cons_self⟩))
+    (List.mem_append_left _ (List.mem_append_right _
+      (List.mem_flatMap.mpr ⟨a, ha, List.mem_cons_self⟩)))
   simp only [schemaOf, translationOf, ← hu, ← hd, hS, hS', Option.getD_some]
   exact hv
 
@@ -307,6 +311,12 @@ def cycleProblems : List Json :=
   | as => [problemJson "cycle" [("arrows", Lean.toJson as)]
     s!"the map has a cycle: the arrows {", ".intercalate as} lie on one or lead out of one"]
 
+/-- The event types whose context the document does not have. -/
+def eventProblems : List Json :=
+  (M.events.filter fun e => !M.names.contains e.1).map fun e =>
+    problemJson "unknownSchema" [("schema", .str e.1), ("event", .str e.2.name)]
+      s!"the event type {e.2.name} is published by {e.1}, which is not a context"
+
 /-- The declared route equations that do not hold. -/
 def routeProblems : List Json :=
   (M.routeEqns.filter fun e => !M.routeOk e).map fun e =>
@@ -326,7 +336,8 @@ def conditions : List (String × Bool × List Json) :=
    ("the declared route equations hold", M.checkRoutes, M.routeProblems)]
 
 /-- The conditions on the map as a whole hold. -/
-def mapOk : Bool := M.checkNames && M.checkAcyclic && M.checkRoutes
+def mapOk : Bool :=
+  M.checkNames && M.checkAcyclic && M.checkRoutes && M.eventProblems.isEmpty
 
 /-- The report of a context map document: the list of value types, each context
 with the problems of its well-formedness and of its value types, each arrow with
@@ -340,8 +351,10 @@ def report : Json :=
   let contexts := M.contexts.map fun ctx =>
     let (ok₁, ps₁) := c.result (.wellFormed ctx.1)
     let (ok₂, ps₂) := c.result (.declared ctx.1)
-    Json.mkObj [("name", .str ctx.1), ("ok", .bool (ok₁ && ok₂)),
-      ("problems", Json.arr (ps₁ ++ ps₂).toArray)]
+    let evs := (M.events.filter fun e => e.1 == ctx.1).map fun e => c.result (.eventType e.1 e.2)
+    Json.mkObj [("name", .str ctx.1), ("ok", .bool (ok₁ && ok₂ && evs.all (·.1))),
+      ("problems", Json.arr (ps₁ ++ ps₂ ++
+        (evs.flatMap (·.2)).filter fun p => !ps₁.contains p).toArray)]
   let arrows := M.arrows.map fun a =>
     let (ok₁, ps₁) := c.result (.translation a.2.1 a.2.2.1 a.2.2.2)
     let (ok₂, ps₂) := c.result (.keysKept a.2.1 a.2.2.1 a.2.2.2)
@@ -350,7 +363,8 @@ def report : Json :=
       ("problems", Json.arr (ps₁ ++ (ps₂.filter fun p => !ps₁.contains p) ++
         M.kernelProblems a ++ M.publishProblems a).toArray)]
   let map := Json.mkObj [("ok", .bool M.mapOk),
-    ("problems", Json.arr (M.nameProblems ++ M.cycleProblems ++ M.routeProblems).toArray)]
+    ("problems", Json.arr (M.nameProblems ++ M.cycleProblems ++ M.routeProblems ++
+      M.eventProblems).toArray)]
   let failed := (valueTypes :: map :: contexts ++ arrows).filter fun j =>
     j.getObjValD "ok" != .bool true
   Json.mkObj [("format", .str formatVersion), ("kind", .str "mapReport"),

@@ -2,6 +2,7 @@ import DDD.Compose
 import DDD.LitData
 import DDD.Keys
 import DDD.NormalForm
+import DDD.EventType
 
 /-!
 # Certificates
@@ -53,6 +54,15 @@ claim that passes its check holds (`Certificate.checkClaim_sound`).
 - `normalForm`: a valid translation factors as an inclusion into a definitional
   extension of its target, which presents a category isomorphic to that of the
   target (`Translation.NormalForm`), checked by `Translation.checkNormalForm`.
+- `eventType`: an event type over a schema, a published language: its name is new,
+  its references go to entity types of the schema, its value types are admitted,
+  and the event schema is well formed and includes the schema
+  (`EventType.check`).
+- `occurrence`: an occurrence of an event type over a published language, in a
+  context: over the view of a state of the context, its restriction along a
+  translation that may convert, it is a one-entity state of the event schema whose
+  references name entities of the view (`Occurrence.IsOccurrence`). An occurrence
+  with a dangling reference fails.
 - `homomorphism`: a homomorphism of finite states that is a morphism of their
   states.
 - `pathEquality`: two paths out of an object of a schema present the same
@@ -158,6 +168,9 @@ inductive Claim where
   | conformance (shared left right : String) (T₁ T₂ : Translation)
       (leftState rightState : String) (h : FinHom)
   | normalForm (source target : String) (T : Translation)
+  | eventType (schema : String) (ev : EventType)
+  | occurrence (shared context : String) (T : Translation) (ev : EventType) (state : String)
+      (occ : Occurrence LitK)
   | homomorphism (source target : String) (h : FinHom)
   | pathEquality (schema : String) (src : Ob) (lhs rhs : List String)
   | conversion (type : ValueType) (path : List String) (value result : Lit)
@@ -247,6 +260,16 @@ def checkClaim : Claim → Bool
     | some S, some S' => S.checkWellFormed && S'.checkWellFormed &&
         T.checkValid S S' S'.pathEq && T.checkNormalForm S S'
     | _, _ => false
+  | .eventType s ev => match c.schema? s with
+    | some P => ev.check P && ev.attrs.all fun a => c.valueTypes.admits a.2
+    | none => false
+  | .occurrence p s T ev x occ => match c.schema? p, c.schema? s, c.state? x with
+    | some P, some S, some (sx, X) =>
+      sx == s && c.valueTypes.checkSound && P.checkWellFormed && S.checkWellFormed &&
+        X.check S && T.checkVValid c.valueTypes P S (S.pathEqV c.valueTypes) &&
+        X.litsFit c.valueTypes && ev.check P && occ.litsFit c.valueTypes &&
+        occ.checkAt c.valueTypes T P S ev X
+    | _, _, _ => false
   | .homomorphism x y h => match c.state? x, c.state? y with
     | some (sx, X), some (sy, Y) => sx == sy && match c.schema? sx with
       | some S => S.checkWellFormed && X.check S && Y.check S && h.check S X Y
@@ -296,6 +319,12 @@ def Holds : Claim → Prop
       FinState.ConformsTo c.valueTypes T₁ T₂ P S₁ S₂ X Y
   | .normalForm s t T => ∃ (S S' : Schema) (hS' : S'.WellFormed) (hT : T.Valid S S'),
       c.schema? s = some S ∧ c.schema? t = some S' ∧ Nonempty (T.NormalForm hS' hT)
+  | .eventType s ev => ∃ P : Schema, c.schema? s = some P ∧ (ev.over P).WellFormed ∧
+      ev.name ∉ P.entities ∧ ({} : Translation).Valid P (ev.over P)
+  | .occurrence p s T ev x occ => ∃ (P S : Schema) (X : FinState LitK),
+      c.schema? p = some P ∧ c.schema? s = some S ∧ c.state? x = some (s, X) ∧
+      FinState.IsVRestriction c.valueTypes T P S X (X.vrestrictLit c.valueTypes T P S) ∧
+      Occurrence.IsOccurrence ev P (X.vrestrictLit c.valueTypes T P S) occ
   | .homomorphism x y _ => ∃ (s : String) (S : Schema) (X Y : FinState LitK)
       (hX : X.check S = true) (hY : Y.check S = true),
       c.state? x = some (s, X) ∧ c.state? y = some (s, Y) ∧ c.schema? s = some S ∧
@@ -515,6 +544,33 @@ theorem checkClaim_sound (cl : Claim) (h : c.checkClaim cl = true) : c.Holds cl 
       have wS'₁ := (Schema.checkWellFormed_iff S').mp wS'
       have hT' := Translation.checkValid_sound (fun a _ _ hp => Schema.pathEq_sound wS'₁ a hp) hT
       exact ⟨S, S', wS'₁, hT', hs, ht, ⟨Translation.normalForm wS₁ wS'₁ hT' hn⟩⟩
+  | eventType s ev =>
+    simp only [checkClaim] at h
+    cases hs : c.schema? s with
+    | none => simp [hs] at h
+    | some P =>
+      simp only [hs, Bool.and_eq_true] at h
+      exact ⟨P, hs, EventType.wellFormed h.1, EventType.name_notMem h.1, EventType.inclusion h.1⟩
+  | occurrence p s T ev x occ =>
+    simp only [checkClaim] at h
+    cases hp : c.schema? p with
+    | none => simp [hp] at h
+    | some P =>
+    cases hs : c.schema? s with
+    | none => simp [hp, hs] at h
+    | some S =>
+    cases hx : c.state? x with
+    | none => simp [hp, hs, hx] at h
+    | some u =>
+    obtain ⟨sx, X⟩ := u
+    simp only [hp, hs, hx, Bool.and_eq_true, beq_iff_eq] at h
+    obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨rfl, hL⟩, wP⟩, wS⟩, hX⟩, hT⟩, hfit⟩, hev⟩, -⟩, hocc⟩ := h
+    have wP' := (Schema.checkWellFormed_iff P).mp wP
+    have wS' := (Schema.checkWellFormed_iff S).mp wS
+    have hL' := (TypeList.checkSound_iff _).mp hL
+    exact ⟨P, S, X, hp, hs, hx, FinState.isVRestriction_vrestrictLit hL' wP' wS'
+      (Translation.checkVValid_sound (fun a _ _ hq => Schema.pathEqV_sound wS' a hq) hT)
+      (FinState.litsFit_of_check hL' hfit) hX, Occurrence.isOccurrence hev hocc⟩
   | homomorphism x y hh =>
     simp only [checkClaim] at h
     cases hx : c.state? x with
@@ -585,6 +641,9 @@ def Claim.describe : Claim → String
   | .agreement p l r _ _ x y => s!"{x} of {l} and {y} of {r} agree on {p}"
   | .conformance p l r _ _ x y _ => s!"{y} of {r} conforms to {x} of {l} on {p}"
   | .normalForm s t _ => s!"the translation {s} → {t} has a normal form"
+  | .eventType s ev => s!"{ev.name} is an event type over {s}"
+  | .occurrence p s _ ev x _ =>
+    s!"an occurrence of {ev.name} over {p} resolves in the state {x} of {s}"
   | .homomorphism x y _ => s!"a homomorphism {x} → {y}"
   | .pathEquality s o l r =>
     s!"in {s}, the paths {String.intercalate "." l} and {String.intercalate "." r} out of \
@@ -648,6 +707,18 @@ def Claim.fromJson (j : Json) : Except String Claim := do
     let y ← j.getObjValAs? String "rightState"
     let h ← FinHom.fromJson (← j.getObjVal? "homomorphism")
     pure (.conformance p l r T₁ T₂ x y h)
+  | "eventType" => do
+    let s ← j.getObjValAs? String "schema"
+    let ev ← EventType.fromJson (← j.getObjVal? "event")
+    pure (.eventType s ev)
+  | "occurrence" => do
+    let p ← j.getObjValAs? String "shared"
+    let s ← j.getObjValAs? String "context"
+    let T ← Translation.fromJson (← j.getObjVal? "translation")
+    let ev ← EventType.fromJson (← j.getObjVal? "event")
+    let x ← j.getObjValAs? String "state"
+    let occ ← Occurrence.fromJson ev (← j.getObjVal? "occurrence")
+    pure (.occurrence p s T ev x occ)
   | "normalForm" => do
     let s ← j.getObjValAs? String "source"
     let t ← j.getObjValAs? String "target"
@@ -692,7 +763,10 @@ def Certificate.fromJson (j : Json) : Except String Certificate := do
     let sname ← x.getObjValAs? String "schema"
     let some S := schemas.lookup sname | throw s!"state {name}: unknown schema {sname}"
     pure (name, sname, (← FinState.fromJson S (← x.getObjVal? "state")).normalize valueTypes)
-  let claims ← (← getList j "claims").mapM Claim.fromJson
+  let claims ← (← getList j "claims").mapM fun cl => do
+    match ← Claim.fromJson cl with
+    | .occurrence p s T ev x occ => pure (.occurrence p s T ev x (occ.normalize valueTypes))
+    | other => pure other
   pure { producer, valueTypes, schemas, states, claims }
 
 end DDD

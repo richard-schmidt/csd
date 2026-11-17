@@ -33,6 +33,12 @@ for c in map["contexts"]
   add_claim!(cert, "wellFormed"; schema=String(c["name"]))
   add_claim!(cert, "declared"; schema=String(c["name"]))
 end
+# The event types the contexts publish, passed on as they are.
+events = Dict{String,Any}()
+for c in map["contexts"], ev in get(c, "events", [])
+  events[String(ev["name"])] = ev
+  add_claim!(cert, "eventType"; schema=String(c["name"]), event=ev)
+end
 translations = Dict{String,Translation}()
 for a in map["arrows"]
   T = read_translation(a["translation"])
@@ -250,6 +256,19 @@ hpl = homomorphism_search(schemas["OrdersPL"], XPL, XOPL)
 hpl === nothing && error("XP does not conform to XO on the published language")
 add_claim!(cert, "conformance"; on_published(leftState="XO", rightState="XP",
   homomorphism=Dict("components" => [Dict("type" => e, "column" => c .- 1) for (e, c) in hpl]))...)
+
+# An occurrence of the event type OrderPlaced: the first order, its customer and its
+# instant. Its references name entities of the published state, so it resolves in
+# Orders, and in the state of Payments that agrees with Orders.
+placed = Dict(
+  "references" => [Dict("name" => "order", "entity" => 0),
+    Dict("name" => "customer", "entity" => CsdDDD.lookup(XOPL.refs, ("Order", "customer"))[1] - 1)],
+  "attributes" => [Dict("name" => "at", "value" => CsdDDD.lookup(XO.attrs, ("Order", "placedAt"))[1])])
+for (ctx, arrow, x) in (("Orders", "ordersPL_orders", "XO"), ("Payments", "ordersPL_payments", "XPA"))
+  add_claim!(cert, "occurrence"; shared="OrdersPL", context=ctx,
+    translation=write_translation(translations[arrow]), event=events["OrderPlaced"], state=x,
+    occurrence=placed)
+end
 
 # Samples: a schema and a state read from the workspace and passed on, with
 # their literals as written.

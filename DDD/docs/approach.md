@@ -977,11 +977,11 @@ keeps keys, the restriction of a state that passes the key check passes it
 `DDD/Json.lean` writes the deep data as JSON with the format identifier
 `csd-ddd/2` and reads `csd-ddd/1` as well, which it extends: schemas, with
 generators named `Entity.name`; translations; context maps (`MapDoc`), with
-contexts, named arrows, kernel flags, the arrows marked as publishing and route
-equations; finite states, with literal values (`Lit`: integers, text and
+contexts with the event types they publish, named arrows, kernel flags, the arrows
+marked as publishing and route equations; finite states, with literal values (`Lit`: integers, text and
 booleans); and homomorphisms. Version 2 adds translations that convert, the
-publishing mark and the claims `keysKept`, `agreement`, `conformance` and
-`normalForm`. Reading back what was written gives the same data
+publishing mark, event types, and the claims `keysKept`, `agreement`,
+`conformance`, `normalForm`, `eventType` and `occurrence`. Reading back what was written gives the same data
 for every schema whose entity type names contain no dot, and likewise for the
 other kinds. `Examples/Exchange.lean` tests the round trips through JSON text on
 the examples, and `julia/test` tests them on the Julia side.
@@ -1013,6 +1013,9 @@ passes its check holds (`checkClaim_sound`):
   the restrictions (`FinState.ConformsTo`);
 - a valid translation has a normal form (`Translation.NormalForm`), checked by
   `checkNormalForm`;
+- an event type over a schema (`EventType.check`), and an occurrence of it in a
+  context: over the view of a named state along a translation, it is a one-entity
+  state of the event schema whose references resolve (`Occurrence.IsOccurrence`);
 - a homomorphism of finite states that is a morphism of their states;
 - two paths out of an object of a schema present the same morphism of the
   category with conversions, checked by `pathEqV`;
@@ -1062,6 +1065,7 @@ together with the conditions on the map (`DDD/MapCheck.lean`):
 - every arrow out of a context marked as a kernel is the empty translation;
 - every arrow marked as publishing keeps the entity types of its source apart
   and sends them to roots (`Publishes`);
+- each event type is one over its context (the claim `eventType`);
 - the map has no cycle: ranks computed for the contexts increase along every
   arrow;
 - each declared route equation names two routes between the same contexts whose
@@ -1126,11 +1130,12 @@ whose date of each order is the date of its instant, and of the anti-corruption
 layer from OrdersPL into Payments; that this layer has a normal form; that a state
 of Payments with an invoice for each order agrees with the state of Orders on the
 published language, and that the state with one invoice conforms to it, by a
-homomorphism Catlab finds; and a homomorphism between two Shipping states. The
+homomorphism Catlab finds; the event type `OrderPlaced` and an occurrence of it in
+Orders and in Payments; and a homomorphism between two Shipping states. The
 workspace also carries three samples, each a schema and a state passed through
 (Deliveries, Sales and Billing, the last with a record value), the conversions
 of `Examples/Conversions.lean`, whose results `apply_lit` computes as
-`TypeList.applyLit` does, and its path equalities, passed on as claims. All 82
+`TypeList.applyLit` does, and its path equalities, passed on as claims. All 85
 claims pass `csd-check`.
 
 CI checks that the exported workspace and broken map equal the committed
@@ -1285,6 +1290,44 @@ arrows between domains, and projects to `Svc`, which it leaves unchanged.
   and Customers lie in one domain, and no route of `J` leads from OrdersPL to
   Customers (`no_route_ordersPL_customers`).
 
+### Event types and occurrences
+
+An event type (`DDD/EventType.lean`) has a name, references to entity types of a
+published language `P`, and attributes. Its schema `ev.over P` is `P` with one more
+entity type, named after the event type, which is a value object and an aggregate
+of its own: an occurrence is identified by all its fields, and well-formedness
+makes its references go to roots. `EventType.check` decides that the name is new,
+that the references go to entity types of `P`, that the event schema is well
+formed and that `P` is included in it (`EventType.inclusion`).
+
+An occurrence (`Occurrence`) gives an entity number for each reference and a value
+for each attribute. Over a finite state `X` of `P`, `occ.state ev X` is `X` with
+one entity of the event type, and `Occurrence.check` asks that it be a state of the
+event schema. States do not store occurrences: the state of the context is `X`.
+
+- A checked occurrence names entities of `X` (`resolves`); one with a dangling
+  reference, or without a field, is refused (`check_eq_false_of_dangling`,
+  `check_eq_false_of_missing`).
+- A context sees `P` as the restriction of its state along its translation.
+  `Occurrence.checkAt` checks an occurrence against that view, for the owner and
+  for a consumer alike, along a translation that may convert; the references then
+  name entities of the context, of the images of their targets (`resolvesAt`).
+- Two contexts whose states agree on `P` accept the same occurrences
+  (`checkAt_of_agree`). A consumer that does not hold an entity yet refuses an
+  occurrence about it.
+- `CSvc.emitOccurrence` (`DDD/Events.lean`) emits a checked occurrence as an event
+  of its context, named after the event type, and nothing when the check fails.
+  An event of the context of a published language reaches the owner and the
+  consumers along the arrows out of it.
+
+In `Examples/Events.lean`, OrdersPL publishes `OrderPlaced`, with the order, its
+customer and the instant. An occurrence passes in Orders, over the view whose date
+is the date of the instant, and in Payments, whose state agrees with Orders on the
+published language and where the order is an invoice. An occurrence that names a
+second order is refused; so is the occurrence in Payments before the invoice. An
+endpoint of OrdersPL emits the occurrence, and Payments receives the event along
+the arrow and issues its invoice.
+
 ![Open schemas compose by gluing along the shared interface; machines on them compose by serial wiring; events follow the routes of the category of contexts.](figures/open.svg)
 
 *Figure 15. Top: Orders and Shipping as open schemas along Customers, and their
@@ -1413,7 +1456,7 @@ are outside the library.*
 | `OpenMachine.lean` | `CheckedState`, `OpenMachine`, `OpenMachine.comp`, `split_agree`, `comp_view_split`, `conformist`, `serialAssoc` |
 | `Rename.lean` | `Schema.qualify`, `Translation.catIso`, `OpenSchema.Iso`, `checkQualify`, `qualifyIso` |
 | `NormalForm.lean` | `Translation.ext`, `toTarget`, `fromTarget`, `checkNormalForm`, `NormalForm`, `normalForm` |
-| `Events.lean` | `CSvc`, `emit`, `callAlong`, `Projection`, `toSvc` |
+| `Events.lean` | `CSvc`, `emit`, `callAlong`, `Projection`, `toSvc`, `emitOccurrence` |
 | `Aggregates.lean` | `allAggregates`, `aggregateSchema`, `crossAggregateEqns`, `internalSchema`, `aggregateCover`, `Compatible`, `familyEquiv`, `crossEquiv`, `contextEquiv` |
 | `AggregateMachine.lean` | `Violation`, `FinState.violations`, `glueFamily`, `violations_glue`, `glue_parts`, `aggregateMachine`, `dispatch`, `contextMachine` |
 | `ContextMap.lean` | `ContextMap`, `J`, `diagram` to the categories with conversions, `coherent_of_check`, `Lax`, `nonInterference`, `Publishes`, `valid_empty`, `kernelGluing`, `isPushout_kernel` |
@@ -1423,6 +1466,7 @@ are outside the library.*
 | `StateLimits.lean` | profiles, the terminal and initial states, `limitCone`, `colimitCocone`, connected limits and colimits pointwise, colimits pointwise at entity types |
 | `StateSigma.lean` | `AttrBijective`, `sigmaState`, `sigmaStateAdjunction`, `isRightAdjoint_restrictStateFunctor_iff`, `not_attrBijective` |
 | `Data.lean` | `FinState`, `check`, `toState`, keys (`checkKeys`, `State.Keys`, `toState_keys`), `FinHom`, `restrict`, `restrictIso` |
+| `EventType.lean` | `EventType.over`, `check`, `inclusion`, `Occurrence.state`, `check`, `resolves`, `check_eq_false_of_dangling`, `checkAt`, `resolvesAt`, `checkAt_of_agree`, `IsOccurrence` |
 | `Closure.lean` | `State.KeyRel`, `Consistent`, `closure`, `closureHomEquiv`, `closureAdjunction`, `isPushout_closure`, `keyedSigmaAdjunction`, `keys_of_isLimit`, `isColimitOfEntities`, `VState.closure` |
 | `ClosureData.lean` | `FinState.reps`, `inv_reps`, `closure`, `closure_closed`, `closure_inconsistent`, `sum`, `sumIsColimit`, `merge_closed`, `merge_inconsistent` |
 | `Keys.lean` | `restrictState_keys`, `restrict_checkKeys`, `vrestrict_checkKeys`, `State.KeysOf`, `keys_restrict_empty_iff`, `Gluing.keysOf_iff`, `keys_of_keysOf`, `keyedStateEquiv`, `keyedFamilyEquiv`, `VState.Keys`, `vrestrictState_keys`, `vrestrictLit_checkKeys`, `Agree.keys`, `keyedVStateEquiv` |
@@ -1445,6 +1489,7 @@ are outside the library.*
 | `Examples/Integration.lean` | the seven-context map with a published field that converts, kept keys, its projection onto the Showcase map, non-interference, references |
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, keyed data gluing, the failing kernel |
 | `Examples/NormalForm.lean` | the normal form of OrdersPL → Payments, its isomorphism and factorization, roots only, an open schema through it; none for CatalogPL → Orders; Catalog and a storefront composed along CatalogPL; keys kept through a renamed field and through the empty path |
+| `Examples/Events.lean` | the event type `OrderPlaced` of OrdersPL, an occurrence in Orders and in Payments, occurrences refused, its emission and reception, the claims in a certificate |
 | `Examples/Closure.lean` | two lists of products and variants merged by their keys, a merge that fails on two names, a list with a product twice, the terminal state |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one; the same as documents |
 | `Examples/Structure.lean` | a value object with references, a nested aggregate, intermediate entity types with the keys `{owner}` and `{owner, item}`, a subtype, states that keep and break each key, and a broken variant |
@@ -1615,7 +1660,11 @@ The correspondence leaves out part of each side:
   states, related to the states of the glued schema through `split`, up to
   isomorphism; no machine has the glued schema as its state.
 - Events are typed at the level of contexts in Lean only; `Svc` of the Showcase
-  map is unchanged, and the Julia side has no events.
+  map is unchanged. The Julia side passes event types and an occurrence on as
+  claims and emits nothing. An occurrence is checked against a view; no
+  translation of event schemas is defined, and a consumer that does not hold an
+  entity refuses an occurrence about it. The machines of `Production` do not emit
+  occurrences, and csd-editor does not show event types.
 - `csd-check` trusts the Lean compiler and runtime. It links every module it
   imports, Mathlib's category theory among them, because the checkers share
   modules with their soundness proofs; the stripped executable is 172 MB.

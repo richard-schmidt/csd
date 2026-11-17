@@ -4500,6 +4500,29 @@
             "schema": "Shipping"
         },
         {
+            "event": {
+                "references": [
+                    {
+                        "target": "Order",
+                        "name": "order"
+                    },
+                    {
+                        "target": "Customer",
+                        "name": "customer"
+                    }
+                ],
+                "name": "OrderPlaced",
+                "attributes": [
+                    {
+                        "type": "timestamp",
+                        "name": "at"
+                    }
+                ]
+            },
+            "claim": "eventType",
+            "schema": "OrdersPL"
+        },
+        {
             "translation": {
                 "generators": [
                 ],
@@ -5146,6 +5169,144 @@
                     }
                 ],
                 "entities": [
+                ]
+            }
+        },
+        {
+            "state": "XO",
+            "translation": {
+                "generators": [
+                    {
+                        "name": "Order.placedOn",
+                        "path": [
+                            "placedAt",
+                            "date"
+                        ]
+                    }
+                ],
+                "entities": [
+                ]
+            },
+            "event": {
+                "references": [
+                    {
+                        "target": "Order",
+                        "name": "order"
+                    },
+                    {
+                        "target": "Customer",
+                        "name": "customer"
+                    }
+                ],
+                "name": "OrderPlaced",
+                "attributes": [
+                    {
+                        "type": "timestamp",
+                        "name": "at"
+                    }
+                ]
+            },
+            "shared": "OrdersPL",
+            "claim": "occurrence",
+            "context": "Orders",
+            "occurrence": {
+                "references": [
+                    {
+                        "name": "order",
+                        "entity": 0
+                    },
+                    {
+                        "name": "customer",
+                        "entity": 0
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "at",
+                        "value": "2026-10-01T09:30:00Z"
+                    }
+                ]
+            }
+        },
+        {
+            "state": "XPA",
+            "translation": {
+                "generators": [
+                    {
+                        "name": "Order.customer",
+                        "path": [
+                            "payer"
+                        ]
+                    },
+                    {
+                        "name": "Order.billTo",
+                        "path": [
+                            "payer",
+                            "address"
+                        ]
+                    },
+                    {
+                        "name": "Order.id",
+                        "path": [
+                            "orderId"
+                        ]
+                    },
+                    {
+                        "name": "Order.placedOn",
+                        "path": [
+                            "orderedOn"
+                        ]
+                    }
+                ],
+                "entities": [
+                    {
+                        "source": "Customer",
+                        "target": "Payer"
+                    },
+                    {
+                        "source": "Order",
+                        "target": "Invoice"
+                    }
+                ]
+            },
+            "event": {
+                "references": [
+                    {
+                        "target": "Order",
+                        "name": "order"
+                    },
+                    {
+                        "target": "Customer",
+                        "name": "customer"
+                    }
+                ],
+                "name": "OrderPlaced",
+                "attributes": [
+                    {
+                        "type": "timestamp",
+                        "name": "at"
+                    }
+                ]
+            },
+            "shared": "OrdersPL",
+            "claim": "occurrence",
+            "context": "Payments",
+            "occurrence": {
+                "references": [
+                    {
+                        "name": "order",
+                        "entity": 0
+                    },
+                    {
+                        "name": "customer",
+                        "entity": 0
+                    }
+                ],
+                "attributes": [
+                    {
+                        "name": "at",
+                        "value": "2026-10-01T09:30:00Z"
+                    }
                 ]
             }
         },

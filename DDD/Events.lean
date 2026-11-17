@@ -1,4 +1,5 @@
 import DDD.ContextMap
+import DDD.EventType
 import Showcase.ContextMapNotifications
 
 /-!
@@ -22,6 +23,11 @@ with the routes of `J` in place of the arrows between domains.
   domain; it commutes with `pure`, `bind` and `emit`. When the projection gives
   no arrival from the domain of `u` to that of `d`, there is no route from `u`
   to `d` (`Projection.isEmpty_hom`).
+- `CSvc.emitOccurrence` emits an occurrence of an event type (`EventType.lean`) in
+  a context, over the current state of its schema: an event named after the event
+  type, with the occurrence as its payload, when the occurrence passes its check,
+  and no event when it does not. Like every event of the context, it reaches the
+  contexts downstream along the routes of `J`.
 -/
 
 namespace DDD
@@ -92,6 +98,28 @@ def emit (label : String) (level : Level) (payload : String) : CSvc M c Unit :=
     simp only [List.mem_singleton] at he
     subst he
     exact ⟨𝟙 _⟩⟩
+
+/-- Emit an occurrence of the event type `ev` in the context `c`, over the state `X`
+of the schema of `c`. When the occurrence passes its check, the event is named
+after the event type and carries the occurrence; when a reference dangles or a
+field is missing, nothing is emitted. The result says which. -/
+def emitOccurrence (ev : EventType) (X : FinState LitK) (occ : Occurrence LitK)
+    (level : Level := .low) : CSvc M c Bool :=
+  if occ.check ev X (M.schema c) then
+    CSvc.bind (emit ev.name level occ.text) fun _ => CSvc.pure true
+  else CSvc.pure false
+
+theorem emitOccurrence_run_of_check {ev : EventType} {X : FinState LitK}
+    {occ : Occurrence LitK} {level : Level} (h : occ.check ev X (M.schema c) = true) :
+    (emitOccurrence (M := M) (c := c) ev X occ level).run =
+      (true, [⟨c, ev.name, level, occ.text⟩]) := by
+  simp [emitOccurrence, h, CSvc.bind, CSvc.pure, emit, run]
+
+/-- An occurrence that fails its check is not emitted. -/
+theorem emitOccurrence_run_of_not_check {ev : EventType} {X : FinState LitK}
+    {occ : Occurrence LitK} {level : Level} (h : occ.check ev X (M.schema c) = false) :
+    (emitOccurrence (M := M) (c := c) ev X occ level).run = (false, []) := by
+  simp [emitOccurrence, h, CSvc.pure, run]
 
 end CSvc
 

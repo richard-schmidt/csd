@@ -31,7 +31,11 @@
      {"root": "Address", "members": []},
      {"root": "Order", "members": []}]},
    "name": "OrdersPL",
-   "kernel": false},
+   "kernel": false,
+   "events":
+   [{"references": [{"target": "Order", "name": "order"}],
+     "name": "Order",
+     "attributes": []}]},
   {"schema":
    {"valueObjects": ["Address"],
     "subtypes": [],
@@ -70,7 +74,11 @@
      {"root": "Payment",
       "members": [{"owner": "payment", "entity": "Refund"}]}]},
    "name": "Payments",
-   "kernel": false},
+   "kernel": false,
+   "events":
+   [{"references": [{"target": "Refund", "name": "refund"}],
+     "name": "Refunded",
+     "attributes": []}]},
   {"schema":
    {"valueObjects": ["E", "V"],
     "subtypes":
@@ -96,7 +104,8 @@
      {"root": "W", "members": []},
      {"root": "E", "members": [{"owner": "f", "entity": "G"}]}]},
    "name": "Broken",
-   "kernel": false},
+   "kernel": false,
+   "events": []},
   {"schema":
    {"valueObjects": [],
     "subtypes": [],
@@ -109,7 +118,8 @@
      {"type": {"optional": {"optional": "int"}}, "name": "Tag.weight"}],
     "aggregates": []},
    "name": "Untyped",
-   "kernel": false},
+   "kernel": false,
+   "events": []},
   {"schema":
    {"valueObjects": ["Address"],
     "subtypes": [],
@@ -124,7 +134,8 @@
     "aggregates":
     [{"root": "Customer", "members": []}, {"root": "Address", "members": []}]},
    "name": "Customers",
-   "kernel": true},
+   "kernel": true,
+   "events": []},
   {"schema":
    {"valueObjects": [],
     "subtypes": [],
@@ -135,7 +146,8 @@
     "attributes": [{"type": "int", "name": "InvoiceLine.quantity"}],
     "aggregates": []},
    "name": "Lines",
-   "kernel": false},
+   "kernel": false,
+   "events": []},
   {"schema":
    {"valueObjects": [],
     "subtypes": [],
@@ -146,7 +158,8 @@
     "attributes": [],
     "aggregates": []},
    "name": "Ping",
-   "kernel": false},
+   "kernel": false,
+   "events": []},
   {"schema":
    {"valueObjects": [],
     "subtypes": [],
@@ -157,7 +170,8 @@
     "attributes": [],
     "aggregates": []},
    "name": "Pong",
-   "kernel": false}],
+   "kernel": false,
+   "events": []}],
  "arrows":
  [{"translation":
    {"generators":

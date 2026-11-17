@@ -33,6 +33,12 @@ decided by `Certificate.checkClaim` alone, which is sound
 - normal form: the problems of the schemas and of the translation, the entity
   types the translation does not keep apart (`entitiesMerged`), and the problems
   of the definitional extension;
+- event type: a name that is an entity type (`eventName`), a reference to an
+  entity type the schema does not have (`eventTarget`), a value type that is not
+  admitted, and the problems of the event schema;
+- occurrence: those, the parts of the check that fail, a field without a value or
+  with a value of another type (`occurrenceField`), and a reference to an entity
+  that the view does not have (`danglingReference`);
 - path equality: the problems of the schema, a path that does not exist, two
   paths that do not end at the same object, and normal forms that differ;
 - conversion: a path of conversions that does not exist, a literal that is not
@@ -188,6 +194,9 @@ def Claim.refFields : Claim → List (String × Json)
   | .conformance p l r _ _ x y _ => [("claim", .str "conformance"), ("shared", .str p),
       ("left", .str l), ("right", .str r), ("leftState", .str x), ("rightState", .str y)]
   | .normalForm s t _ => [("claim", .str "normalForm"), ("source", .str s), ("target", .str t)]
+  | .eventType s ev => [("claim", .str "eventType"), ("schema", .str s), ("event", .str ev.name)]
+  | .occurrence p s _ ev x _ => [("claim", .str "occurrence"), ("shared", .str p),
+      ("context", .str s), ("event", .str ev.name), ("state", .str x)]
   | .homomorphism x y _ => [("claim", .str "homomorphism"), ("from", .str x), ("to", .str y)]
   | .pathEquality s o l r => [("claim", .str "pathEquality"), ("schema", .str s),
       ("from", o.toJson), ("lhs", Lean.toJson l), ("rhs", Lean.toJson r)]
@@ -214,6 +223,58 @@ def failing (parts : List (Bool × String × String)) : List Json :=
 /-- The problems of the inclusion of `n` into `m` by the empty translation. -/
 def inclusionProblems (n m : String) (S S' : Schema) : List Json :=
   ((({} : Translation).problems S S' S'.pathEq).map (Translation.Problem.toJson n m))
+
+/-- The problems of an event type over the schema named `s`: a name that is an entity
+type of the schema, references to entity types the schema does not have, value
+types the list does not admit, and the problems of the event schema, among them a
+reference to a member of an aggregate and an event type without fields. -/
+def eventProblems (s : String) (P : Schema) (ev : EventType) : List Json :=
+  (if P.entities.contains ev.name then
+    [problemJson "eventName" [("schema", .str s), ("event", .str ev.name)]
+      s!"{ev.name} is an entity type of {s}, so it cannot name an event type over it"]
+  else []) ++
+  (ev.refs.filter fun r => !P.entities.contains r.2).map (fun r =>
+    problemJson "eventTarget" [("schema", .str s), ("event", .str ev.name),
+      ("field", .str r.1), ("target", .str r.2)]
+      s!"the reference {r.1} of the event type {ev.name} goes to {r.2}, which is not an entity \
+        type of {s}") ++
+  (ev.attrs.filter fun a => !c.valueTypes.admits a.2).map (fun a =>
+    problemJson "undeclaredValueType" [("schema", .str s), ("event", .str ev.name),
+      ("field", .str a.1), ("type", Lean.toJson a.2)]
+      s!"the list of value types does not admit {a.2.text}, the type of {a.1} of the event type \
+        {ev.name}") ++
+  (if P.entities.contains ev.name then [] else
+    (ev.over P).problems.map (Schema.Problem.toJson s!"{ev.name} over {s}"))
+
+/-- The fields of an occurrence that keep it from being one over the state `V` of
+the published language: a reference or an attribute without a value, a reference to
+an entity that `V` does not have, a value of another type, and a name that is no
+field of the event type. -/
+def occurrenceProblems (ev : EventType) (V : FinState LitK) (occ : Occurrence LitK) : List Json :=
+  ev.refs.filterMap (fun r => match occ.refs.lookup r.1 with
+    | none => some (problemJson "occurrenceField" [("event", .str ev.name), ("field", .str r.1)]
+        s!"the occurrence of {ev.name} has no entity for {r.1}")
+    | some i => if i < V.size r.2 then none else
+        some (problemJson "danglingReference" [("event", .str ev.name), ("field", .str r.1),
+          ("entity", (i : Nat)), ("target", .str r.2), ("count", (V.size r.2 : Nat))]
+          s!"{r.1} of the occurrence of {ev.name} names the entity {i} of {r.2}, and there are \
+            {V.size r.2}")) ++
+  ev.attrs.filterMap (fun a => match occ.attrs.lookup a.1 with
+    | none => some (problemJson "occurrenceField" [("event", .str ev.name), ("field", .str a.1)]
+        s!"the occurrence of {ev.name} has no value for {a.1}")
+    | some x => if x.1 == a.2 then none else
+        some (problemJson "occurrenceField" [("event", .str ev.name), ("field", .str a.1)]
+          s!"the value of {a.1} of the occurrence of {ev.name} is not of type {a.2.text}")) ++
+  ((occ.refs.map (·.1) ++ occ.attrs.map (·.1)).filter fun f =>
+    !(ev.refs.map (·.1) ++ ev.attrs.map (·.1)).contains f).map (fun f =>
+      problemJson "occurrenceField" [("event", .str ev.name), ("field", .str f)]
+        s!"{f} is not a field of the event type {ev.name}") ++
+  (occ.attrs.filterMap fun a => match c.valueTypes.normalize a.2.1 a.2.2 with
+    | .ok l => if l == a.2.2 then none else
+        some (problemJson "literal" [("event", .str ev.name), ("field", .str a.1)]
+          s!"{Lit.render a.2.2} is not in normal form; it is written {l.render}")
+    | .error e => some (problemJson "literal" [("event", .str ev.name), ("field", .str a.1)]
+        s!"{a.1}: {e}"))
 
 /-- The problems that explain a failing claim. -/
 def explain : Claim → List Json
@@ -363,6 +424,24 @@ def explain : Claim → List Json
       (T.ext S S').problems.map (Schema.Problem.toJson s!"the extension of {t} along {s} → {t}")
     | _, _ => (if (c.schema? s).isNone then [unknown "schema" s] else []) ++
       (if (c.schema? t).isNone then [unknown "schema" t] else [])
+  | .eventType s ev => match c.schema? s with
+    | some P => c.schemaProblems s ++ c.eventProblems s P ev
+    | none => [unknown "schema" s]
+  | .occurrence p s T ev x occ => match c.schema? p, c.schema? s, c.state? x with
+    | some P, some S, some (sx, X) =>
+      failing [(sx == s, "stateSchema", s!"{x} is a state of {sx}, not of {s}")] ++
+      c.schemaProblems p ++ c.schemaProblems s ++
+      (T.vproblems c.valueTypes P S (S.pathEqV c.valueTypes)).map
+        (Translation.Problem.toJson p s) ++
+      failing [(X.check S, "stateCheck", s!"{x} does not pass the check of {s}"),
+        (c.valueTypes.checkSound, "valueTypesUnsound", "the list of value types is not sound"),
+        (X.litsFit c.valueTypes, "literals",
+          s!"the literals of {x} are not values of their types in normal form")] ++
+      c.eventProblems p P ev ++
+      c.occurrenceProblems ev (X.vrestrictLit c.valueTypes T P S) occ
+    | _, _, _ => ([p, s].filterMap fun n =>
+        if (c.schema? n).isNone then some (unknown "schema" n) else none) ++
+      (if (c.state? x).isNone then [unknown "state" x] else [])
   | .homomorphism x y h => match c.state? x, c.state? y with
     | some (sx, X), some (sy, Y) =>
       failing [(sx == sy, "stateSchema", s!"{x} is a state of {sx} and {y} a state of {sy}")] ++
@@ -427,17 +506,18 @@ def schema? (n : String) : Option Schema := (M.contexts.lookup n).map (·.1)
 
 /-- The certificate of a context map document: its list of value types, its
 contexts as schemas, and the claims that the list is sound, that each context is
-well formed and declares its value types, and that each arrow is a valid
-translation and keeps keys: the list first, then the contexts, then the arrows, in
-their order. -/
+well formed and declares its value types, that each arrow is a valid translation
+and keeps keys, and that each event type is one over its context: the list first,
+then the contexts, the arrows and the event types, in their order. -/
 def certificate : Certificate where
   producer := "map"
   valueTypes := M.valueTypes
   schemas := M.contexts.map fun ctx => (ctx.1, ctx.2.1)
   states := []
   claims := [.valueTypes] ++ M.contexts.flatMap (fun ctx => [.wellFormed ctx.1, .declared ctx.1]) ++
-    M.arrows.flatMap fun a =>
-      [.translation a.2.1 a.2.2.1 a.2.2.2, .keysKept a.2.1 a.2.2.1 a.2.2.2]
+    M.arrows.flatMap (fun a =>
+      [.translation a.2.1 a.2.2.1 a.2.2.2, .keysKept a.2.1 a.2.2.1 a.2.2.2]) ++
+    M.events.map fun e => .eventType e.1 e.2
 
 /-- A context map document, read from JSON with its format and kind checked. -/
 def ofJson (j : Json) : Except String MapDoc := do
