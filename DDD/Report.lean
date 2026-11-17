@@ -226,8 +226,9 @@ def inclusionProblems (n m : String) (S S' : Schema) : List Json :=
 
 /-- The problems of an event type over the schema named `s`: a name that is an entity
 type of the schema, references to entity types the schema does not have, value
-types the list does not admit, and the problems of the event schema, among them a
-reference to a member of an aggregate and an event type without fields. -/
+types the list does not admit, and the problems of the event schema that are not
+problems of the schema, among them a reference to a member of an aggregate. A target
+that is not an entity type is reported once, as `eventTarget`. -/
 def eventProblems (s : String) (P : Schema) (ev : EventType) : List Json :=
   (if P.entities.contains ev.name then
     [problemJson "eventName" [("schema", .str s), ("event", .str ev.name)]
@@ -244,7 +245,8 @@ def eventProblems (s : String) (P : Schema) (ev : EventType) : List Json :=
       s!"the list of value types does not admit {a.2.text}, the type of {a.1} of the event type \
         {ev.name}") ++
   (if P.entities.contains ev.name then [] else
-    (ev.over P).problems.map (Schema.Problem.toJson s!"{ev.name} over {s}"))
+    ((ev.over P).problems.filter fun p => !P.problems.contains p && !p matches .refTarget _).map
+      (Schema.Problem.toJson s!"{ev.name} over {s}"))
 
 /-- The fields of an occurrence that keep it from being one over the state `V` of
 the published language: a reference or an attribute without a value, a reference to

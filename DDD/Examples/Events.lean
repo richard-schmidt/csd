@@ -9,7 +9,9 @@ The published language of Orders publishes the event type `OrderPlaced`
 schema is the published language with the entity type `OrderPlaced`, a value
 object with two references and an attribute (`orderPlaced_check`,
 `orderPlaced_entities`). An event type over Orders that refers to a line of an
-order, a member of the order aggregate, fails the check (`lineAdded_check`).
+order, a member of the order aggregate, fails the check (`lineAdded_check`). An
+event type without fields is not a value object, which needs a field; its one
+occurrence says that it happened (`ordersClosed_check`, `closed_orders`).
 
 An occurrence names the order and the customer by their numbers in the published
 state (`placed`).
@@ -66,6 +68,16 @@ def lineAdded : EventType where
 /-- A line is a member of the order aggregate, and a reference from outside an
 aggregate goes to its root: the event type fails its check. -/
 theorem lineAdded_check : lineAdded.check Orders.schema = false := by decide
+
+/-- An event type without fields over the published language. -/
+def ordersClosed : EventType where
+  name := "OrdersClosed"
+
+theorem ordersClosed_check : ordersClosed.check Orders.published = true := by decide
+
+theorem ordersClosed_notValueObject :
+    "OrdersClosed" ∉ (ordersClosed.over Orders.published).valueObjects := by
+  decide
 
 /-! ## Occurrences -/
 
@@ -133,6 +145,11 @@ theorem missing_refused : ({ placed with refs := [("order", 0)] } : Occurrence L
 occurrence does not resolve there. -/
 theorem placed_not_yet_payments : placed.checkAt valueTypes ordersPayments Orders.published
     Payments.schema orderPlaced paymentsX₀ = false := by
+  decide +kernel
+
+/-- The occurrence of the event type without fields passes its check in Orders. -/
+theorem closed_orders : ({} : Occurrence LitK).checkAt valueTypes ordersPublish
+    Orders.published Orders.schema ordersClosed ordersX = true := by
   decide +kernel
 
 /-- The published state with the occurrence, as a state of the event schema. -/

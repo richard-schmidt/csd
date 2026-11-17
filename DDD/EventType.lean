@@ -6,8 +6,9 @@ import DDD.LitData
 An event type is structure: a name, references to entity types of a published
 language, and attributes (`EventType`). Over a published language `P` it is the
 schema `ev.over P`: `P` with one more entity type, named after the event type, its
-references into `P` and its attributes. The entity type is a value object, so an
-occurrence is identified by all its fields, and an aggregate of its own.
+references into `P` and its attributes. The entity type is an aggregate of its own
+and, when the event type has a field, a value object, so an occurrence is identified
+by all its fields; all occurrences of an event type without fields are alike.
 `EventType.check` decides that the name is new, that the references go to entity
 types of `P`, that the schema is well formed, which makes the references reach
 roots only, and that `P` is included in it.
@@ -39,15 +40,16 @@ namespace EventType
 variable (ev : EventType) (P : Schema)
 
 /-- The event schema over the published language `P`: `P` with the entity type of
-the event, its references and attributes. The entity type is a value object and an
-aggregate of its own. -/
+the event, its references and attributes. The entity type is an aggregate of its
+own, and a value object when the event type has a field: a value object needs one. -/
 def over : Schema :=
   { P with
     entities := P.entities ++ [ev.name]
     refs := P.refs ++ ev.refs.map fun r => ⟨r.1, ev.name, r.2⟩
     attrs := P.attrs ++ ev.attrs.map fun a => ⟨a.1, ev.name, a.2⟩
     aggregates := P.aggregates ++ [⟨ev.name, []⟩]
-    valueObjects := P.valueObjects ++ [ev.name] }
+    valueObjects :=
+      P.valueObjects ++ if ev.refs.isEmpty && ev.attrs.isEmpty then [] else [ev.name] }
 
 /-- The check of an event type over `P`: its name is not an entity type of `P`, its
 references go to entity types of `P`, the event schema is well formed, and `P` is

@@ -1294,9 +1294,11 @@ arrows between domains, and projects to `Svc`, which it leaves unchanged.
 
 An event type (`DDD/EventType.lean`) has a name, references to entity types of a
 published language `P`, and attributes. Its schema `ev.over P` is `P` with one more
-entity type, named after the event type, which is a value object and an aggregate
-of its own: an occurrence is identified by all its fields, and well-formedness
-makes its references go to roots. `EventType.check` decides that the name is new,
+entity type, named after the event type, which is an aggregate of its own and,
+when the event type has a field, a value object: an occurrence is identified by
+all its fields, and well-formedness makes its references go to roots. All
+occurrences of an event type without fields are alike; a value object needs a
+field, so such an entity type is not one. `EventType.check` decides that the name is new,
 that the references go to entity types of `P`, that the event schema is well
 formed and that `P` is included in it (`EventType.inclusion`).
 
@@ -1326,7 +1328,16 @@ is the date of the instant, and in Payments, whose state agrees with Orders on t
 published language and where the order is an invoice. An occurrence that names a
 second order is refused; so is the occurrence in Payments before the invoice. An
 endpoint of OrdersPL emits the occurrence, and Payments receives the event along
-the arrow and issues its invoice.
+the arrow and issues its invoice. The event type `OrdersClosed` has no field, and
+its one occurrence passes in Orders.
+
+The import of Context Mapper models in csd-editor makes the domain events of a
+model event types: of each published language that publishes the root of their
+aggregate, and otherwise of their context. References to anything but a root,
+nullable references and collections are reported and left out; value objects
+without references become record types of the list of value types. Of the 55
+example models of Context Mapper, the import gives 41 event types, 7 of them
+published, and 37 record types.
 
 ![Open schemas compose by gluing along the shared interface; machines on them compose by serial wiring; events follow the routes of the category of contexts.](figures/open.svg)
 
@@ -1489,7 +1500,7 @@ are outside the library.*
 | `Examples/Integration.lean` | the seven-context map with a published field that converts, kept keys, its projection onto the Showcase map, non-interference, references |
 | `Examples/Gluing.lean` | the gluing of Orders and Shipping, strict non-interference, data gluing, keyed data gluing, the failing kernel |
 | `Examples/NormalForm.lean` | the normal form of OrdersPL → Payments, its isomorphism and factorization, roots only, an open schema through it; none for CatalogPL → Orders; Catalog and a storefront composed along CatalogPL; keys kept through a renamed field and through the empty path |
-| `Examples/Events.lean` | the event type `OrderPlaced` of OrdersPL, an occurrence in Orders and in Payments, occurrences refused, its emission and reception, the claims in a certificate |
+| `Examples/Events.lean` | the event type `OrderPlaced` of OrdersPL, an occurrence in Orders and in Payments, occurrences refused, its emission and reception, an event type without fields, the claims in a certificate |
 | `Examples/Closure.lean` | two lists of products and variants merged by their keys, a merge that fails on two names, a list with a product twice, the terminal state |
 | `Examples/Routes.lean` | a declared diamond accepted by the check, and a refuted one; the same as documents |
 | `Examples/Structure.lean` | a value object with references, a nested aggregate, intermediate entity types with the keys `{owner}` and `{owner, item}`, a subtype, states that keep and break each key, and a broken variant |
@@ -1664,7 +1675,7 @@ The correspondence leaves out part of each side:
   claims and emits nothing. An occurrence is checked against a view; no
   translation of event schemas is defined, and a consumer that does not hold an
   entity refuses an occurrence about it. The machines of `Production` do not emit
-  occurrences, and csd-editor does not show event types.
+  occurrences, and csd-editor edits event types but not occurrences.
 - `csd-check` trusts the Lean compiler and runtime. It links every module it
   imports, Mathlib's category theory among them, because the checkers share
   modules with their soundness proofs; the stripped executable is 172 MB.
@@ -1674,9 +1685,8 @@ The correspondence leaves out part of each side:
   violation by violation, since `FinState.violations` lives with the aggregate
   machines.
 - A context map document marks a published language on its arrow into the owner;
-  unmarked arrows are not checked for it, and csd-editor and its import of
-  Context Mapper models do not write the mark. That a map without cycles passes
-  the rank check is not proved.
+  unmarked arrows are not checked for it. That a map without cycles passes the
+  rank check is not proved.
 - The checks compare names as strings in the kernel. The strict
   non-interference checks of the example take 14 to 22 seconds of kernel time
   each, which bounds the size of schemas checked with `decide`.
